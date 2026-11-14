@@ -1,0 +1,54 @@
+schema: 1
+story: "1.3"
+story_title: "Voix de lecture : tête, bornes et interpolation"
+pr: 60
+issue: 21
+reviewed_sha: "bd80b62"
+gate: PASS
+status_reason: >-
+  Les 12 critères d'acceptation sont implémentés et testés par des mesures de signal.
+  scripts/linux-test.sh passe (158/158) ; AddressSanitizer relancé par la QA sur les tests de bornes
+  (0 erreur) ; CI Linux et macOS verte ; fusion sans conflit. D-13 tenu (repli ≤ −40 dB, niveau total
+  ≤ −46 dBFS) ; aucun clic aux inversions ni aux bornes ; fondu de 5 ms sur saut ; render sans
+  allocation. Les trois écarts du dev sont acceptables.
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues: []
+deviations:
+  - id: "DEV-1"
+    description: "Fondus de bord en fonction de la position (0,5 ms après 0 s, 2 ms avant la fin) plutôt que déclenchés par l'arrivée en butée."
+    verdict: PASS
+    rationale: "La discontinuité de fin arrive au franchissement de la fin : un fondu déclenché par l'arrivée viendrait trop tard. L'attaque ne perd que 0,5 ms (≤ 1 ms, piège de la story)."
+  - id: "DEV-2"
+    description: "Disque immobile : gain lié à l'enveloppe de |vitesse| plutôt qu'un passe-haut."
+    verdict: PASS
+    rationale: "Un passe-haut casserait le CA3 (phase) ; l'attaque du release est intacte (remontée ≤ 1 ms) ; inversions non touchées ; silence en 150 à 200 ms."
+  - id: "DEV-3"
+    description: "Saut pendant un fondu : le fondu repart de la nouvelle origine. Chargement sans fondu."
+    verdict: PASS
+    rationale: "Les sauts sont testés. Le chargement est hors du CA10 ; la coupure au remplacement d'une platine active est à vérifier en 1.5 (note sur #23)."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Aucune lecture hors du clip (AddressSanitizer relancé par la QA) ; vitesses non finies ramenées à 0."
+  performance:
+    status: PASS
+    notes: "Coût borné (≈ 180 coefficients à 16×) ; 5,2 % d'un tampon de 256 trames pour deux voix à 16× (Linux, release) ; mesure Mac en 1.5."
+  reliability:
+    status: PASS
+    notes: "Silence virtuel aux bornes, fondus sans clic, sortie indépendante du découpage en blocs."
+  maintainability:
+    status: PASS
+    notes: "Interpolation, filtre et rendu séparés ; choix documentés ; outils SignalAnalysis et VoiceHarness partagés."
+evidence:
+  linux_tests: "scripts/linux-test.sh sur bd80b62 : 158/158"
+  asan: "swift test --sanitize=address --filter 'DeckRendererBoundaryTests|HermiteInterpolatorTests' (ASAN_OPTIONS=detect_leaks=0) : 9 tests, 0 rapport AddressSanitizer"
+  ci: "Rapport CI fe2dd85 (fusion dans a10e683) : Linux ✅, macOS ✅ ; aucun changement de ScratchCore sur main depuis"
+  merge_check: "git merge-tree avec origin/main : sans conflit"
+recommendations:
+  immediate: []
+  future:
+    - action: "1.5 : vérifier la coupure au remplacement d'un son sur une platine active ; fondu de sortie si le clic est audible (note sur #23)."
+    - action: "1.5 : test d'allocations global (10 000 rendus) et charge NFR3 sur Mac pour deux voix à 16×."
+    - action: "Recette : fin d'un son en pleine amplitude atteinte à vitesse élevée (fondu de 2 ms de son, environ 6 échantillons à 16×)."
+    - action: "scripts/linux-test.sh : transmettre ASAN_OPTIONS au conteneur."
