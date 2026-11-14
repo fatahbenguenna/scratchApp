@@ -42,6 +42,14 @@ enum DeckFormatting {
         return (tenths < 0 ? "moins " : "") + parts.joined(separator: " ")
     }
 
+    /// Pitch signé au dixième de pour cent : « +5,3 % », « −2,0 % » (U+2212), « 0,0 % » (UX §8.1).
+    static func pitchText(_ pitch: Double) -> String {
+        let tenths = Int((pitch * 1000).rounded())
+        let magnitude = abs(tenths)
+        let sign = tenths > 0 ? "+" : (tenths < 0 ? minusSign : "")
+        return "\(sign)\(magnitude / 10),\(magnitude % 10)\u{00A0}%"
+    }
+
     /// Texte entre guillemets français avec espaces insécables (UX §8.1).
     static func quoted(_ text: String) -> String { "«\(nbsp)\(text)\(nbsp)»" }
 

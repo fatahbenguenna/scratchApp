@@ -14,7 +14,7 @@ struct DeckBandView: View {
             if model.deck == .b { panel }
             HStack(spacing: metrics.platterSpacing) {
                 TurntableView(model: model, intents: intents, platter: metrics.platter)
-                reserved(height: metrics.platter).frame(width: metrics.pitchWidth)   // pitch (4.5)
+                PitchFader(model: model, height: metrics.platter)
             }
             if model.deck == .a { panel }
         }
@@ -30,7 +30,7 @@ struct DeckBandView: View {
             reserved(height: 56)                                                    // waveform (4.6)
             reserved(height: 32)                                                    // overview (4.6)
             TransportControls(model: model, metrics: metrics, grid: true)
-            reserved(height: metrics.resistanceHeight)                              // resistance (4.5)
+            ResistanceSlider(model: model)
         }
         .frame(width: LayoutMetrics.bandPanelWidth)
     }
