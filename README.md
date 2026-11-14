@@ -11,8 +11,9 @@ du vinyle et crossfader de scratch.
 
 | Document | Rôle |
 |---|---|
-| [Spécifications v2.0](docs/specs/scratchapp_specifications_v2_0.md) | Référence fonctionnelle (SF, RM, Gherkin) |
+| [Spécifications v2.1](docs/specs/scratchapp_specifications_v2_1.md) | Référence fonctionnelle (SF, RM, Gherkin) ; la v2.0 est archivée dans `docs/specs/archive/` |
 | [Revue v1.9 → v2.0](docs/specs/REVUE_v1.9_vers_v2.0.md) | Incohérences corrigées, scénarios ajoutés, évolutions |
+| [Validation PO](docs/bmad/po-validation.md) | Checklist PO, registre des décisions D-01 à D-47, verdict |
 | [Équipe BMAD](docs/bmad/TEAM.md) | Rôles des 10 agents et processus de développement |
 | `docs/bmad/` | Brief, PRD, spec UX, architecture, validation PO |
 | `docs/stories/` | Stories de développement (une par issue GitHub) |

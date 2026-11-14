@@ -1,11 +1,11 @@
 # ScratchApp — Spécifications fonctionnelles et scénarios Gherkin
 
-- **Version :** 2.0 — refonte explicite de la v1.9 (« Platine Scratch 33 »)
+- **Version :** 2.1 — intégration des décisions de la validation PO (D-01 à D-47) dans la v2.0, refonte explicite de la v1.9 (« Platine Scratch 33 »)
 - **Date :** 14 novembre 2026
 - **Nom de l'application :** ScratchApp
 - **Plateformes cibles :** iPhone (iOS 17+), iPad (iPadOS 17+), Mac (macOS 14 Sonoma+)
 - **Objectif :** reproduire une **double platine vinyle 33⅓ tours avec table de mixage** pour scratcher des fichiers audio personnels, au doigt (iPhone, iPad) ou à la souris, au trackpad et au clavier (Mac).
-- **Statut :** base de référence pour le développement V1. Les décisions prises à la revue sont signalées **[Décision v2.0]**. La revue complète (incohérences, scénarios ajoutés, évolutions) est dans [`REVUE_v1.9_vers_v2.0.md`](REVUE_v1.9_vers_v2.0.md).
+- **Statut :** base de référence pour le développement V1 (fait foi). Les décisions prises à la revue v1.9 → v2.0 sont signalées **[Décision v2.0]** ; la revue complète (incohérences, scénarios ajoutés, évolutions) est dans [`REVUE_v1.9_vers_v2.0.md`](REVUE_v1.9_vers_v2.0.md). Les décisions de la validation PO sont signalées **[Décision v2.1, D-nn]** ; le registre complet (source, décision, impact) est dans [`po-validation.md`](../bmad/po-validation.md). La v2.0 est archivée : [`archive/scratchapp_specifications_v2_0.md`](archive/scratchapp_specifications_v2_0.md).
 
 ## 0. Conventions
 
@@ -14,6 +14,7 @@
 - Les identifiants SF, RM et PO de la v1.9 sont conservés.
 - **Seule exception :** les trois règles de copie locale ajoutées en v1.8 portaient les numéros RM-43 à RM-45, déjà attribués en v1.9 aux règles de nommage (section 10.5). Elles deviennent **RM-47, RM-48 et RM-49**.
 - Nouveaux identifiants v2.0 : **SF-64 à SF-83**, **RM-50 à RM-61**, **PO-12 à PO-16**, **E-01 à E-12** (évolutions).
+- **v2.1 :** aucun nouvel identifiant SF, RM, PO ou E, aucune renumérotation. Les décisions intégrées sont référencées **D-01 à D-47** (registre de la validation PO).
 
 ### 0.2 Vocabulaire
 
@@ -41,7 +42,7 @@
 | Doigt posé sur le disque | Clic maintenu (bouton principal) sur le disque |
 | Rotation au doigt | Clic-glisser circulaire, ou défilement à deux doigts sur le trackpad |
 | Multitouch (disque + crossfader) | Souris ou trackpad pour le disque, **clavier** pour le crossfader et les coupures |
-| Interruption de session audio (appel, Siri, alarme) | Changement de configuration audio, mise en veille, périphérique retiré |
+| Interruption de session audio (appel, Siri, alarme) | Mise en veille, disparition du périphérique de sortie utilisé (RM-56). Un changement de sortie par défaut alors que l'ancienne sortie reste connectée n'est pas une interruption (SF-16). **[Décision v2.1, D-04]** |
 | Passage en arrière-plan | Fenêtre inactive : la lecture continue (comportement Mac standard) |
 | Fichiers › Sur mon iPhone/iPad › ScratchApp | Conteneur de l'app, ouvert par le menu « Afficher la bibliothèque dans le Finder » |
 | Route audio iOS (AVAudioSession) | Périphérique de sortie par défaut du système (Réglages Système › Son) |
@@ -58,7 +59,7 @@ Le scratch n'est **pas** un effet préenregistré : il est calculé à partir du
 - Une sortie audio stéréo.
 - Import local, iCloud Drive ou disque Mac via le sélecteur de documents du système, et par glisser-déposer (iPad, Mac). Chaque import est copié dans le stockage de l'app.
 - **Bibliothèque locale minimale** : liste des sons copiés, chargement sur A ou B, suppression. [E-07]
-- **Son de démonstration** intégré, libre de droits. [E-08]
+- **Son de démonstration** généré par l'application, libre de droits par construction. [E-08]
 - Formats WAV, AIFF, MP3, M4A (AAC/ALAC) non protégés, sous réserve du décodage système. Mono, stéréo ou multicanal (réduit en stéréo).
 - Lecture 33⅓ RPM par défaut, option 45 RPM, par platine.
 - Commandes START/STOP, PITCH (−8 % à +8 %), SET CUE/CUE, par platine.
@@ -66,7 +67,7 @@ Le scratch n'est **pas** un effet préenregistré : il est calculé à partir du
 - Résistance du vinyle réglable, par platine.
 - **Repère visuel** sur le disque, **forme d'onde** défilante et positionnement direct dans le son (needle drop). [E-04]
 - **Amorce silencieuse** avant le son et **sillon fermé** en fin de son. [E-05]
-- Manipulation multitouch sur iPhone/iPad : deux disques et le crossfader en même temps.
+- Manipulation multitouch sur iPhone/iPad : deux disques et le crossfader en même temps (iPad, iPhone en paysage) ; le disque affiché, le crossfader et le fader de voie (iPhone en portrait) (SF-19).
 - **Commandes Mac** : souris, trackpad, clavier (coupures, crossfader, transport), menus et raccourcis. [E-09]
 - Lecture avant et arrière, à vitesse et hauteur variables, avec une interpolation de qualité. [E-06]
 - Affichage du titre, de la durée, de la position et de la sortie audio.
@@ -112,11 +113,11 @@ Synchronisation BPM, stems en temps réel, effets complexes, export et partage a
 - Bouton **Importer** (et zone de dépôt de fichier).
 - Bouton **START / STOP**.
 - Sélecteur **33⅓ / 45 RPM**, réglé sur 33⅓ au premier lancement.
-- Curseur **PITCH** de −8 % à +8 % par pas de 0,1 %, valeur initiale 0 %, avec affichage numérique et remise à zéro (double-toucher ou bouton « 0 »).
+- Curseur **PITCH** de −8 % à +8 % par pas de 0,1 %, valeur initiale 0 %, avec affichage numérique et remise à zéro (double-toucher ou bouton « 0 »). Le « + » est en haut du curseur. **[Décision v2.1, D-31]**
 - Curseur **RÉSISTANCE DU VINYLE** (léger ↔ lourd), réglable pendant le scratch, 50 % par défaut.
 - Boutons **SET CUE** (mémoriser) et **CUE** (rappeler). **[Décision v2.0]** Les deux boutons sont distincts ; cela clôt l'« interaction équivalente à préciser » de la v1.9.
-- **Forme d'onde** : bande zoomée qui défile sous la tête de lecture, et aperçu complet du son. Toucher l'aperçu positionne la tête (needle drop).
-- Titre, durée, position de lecture (mm:ss.d).
+- **Forme d'onde** : bande zoomée qui défile sous la tête de lecture, et aperçu complet du son. Toucher puis relâcher l'aperçu positionne la tête (needle drop, SF-71).
+- Titre (nom de la copie locale du son, SF-02), durée et position de lecture au format `mm:ss,d`, avec la virgule décimale (« 00:12,3 » ; « −00:01,2 » dans l'amorce). **[Décision v2.1, D-12, D-28]**
 
 ### 3.2 Table de mixage
 
@@ -124,22 +125,25 @@ Synchronisation BPM, stems en temps réel, effets complexes, export et partage a
 - **Crossfader** horizontal : A à gauche, B à droite, position initiale au centre.
 - Réglage de **courbe** du crossfader (douce ↔ coupure franche), « coupure franche » par défaut.
 - Interrupteur **Hamster** (inversion du crossfader), désactivé par défaut.
-- **VU-mètre** par voie et indicateur de saturation de la sortie.
+- **VU-mètre** par voie (niveau après le fader de voie, avant le crossfader) et indicateur de saturation de la sortie (« limiteur actif » ou « écrêtage », SF-65). **[Décision v2.1, D-26, D-13]**
 - Indication de la sortie audio active (ex. « Haut-parleur », « Casque », « MPC Sample (USB) »).
+- Sur iPhone, la courbe et le hamster sont réunis dans un panneau « Table » ouvert depuis la table de mixage, faute de place à l'écran. **[Décision v2.1, D-30]**
 
 ### 3.3 Accès secondaires
 
 - **Bibliothèque** : liste des sons copiés et du son de démonstration. Actions : charger sur A, charger sur B, supprimer.
-- **Réglages** : durées de démarrage et de freinage, temps de rattrapage de la feutrine, aide sur les raccourcis clavier (Mac).
+- **Réglages** : durées de démarrage et de freinage, temps de rattrapage de la feutrine (communs aux deux platines, SF-68), aide sur les raccourcis clavier (Mac). L'écran Réglages est livré en P1 ; les réglages eux-mêmes sont pris en charge par le moteur dès le P0. **[Décision v2.1, D-18]**
 
 ### 3.4 Disposition par appareil
 
 | Appareil | Disposition |
 |---|---|
-| iPhone portrait | Une platine plein écran (sélecteur A/B) + crossfader et fader de voie en bas, accessibles au pouce. |
-| iPhone paysage | Deux platines réduites à gauche et à droite, table de mixage au centre. |
-| iPad portrait | Deux platines empilées ou côte à côte selon la largeur, table de mixage entre les deux. |
-| iPad paysage et Mac | Platine A à gauche, table de mixage au centre, platine B à droite. Le Mac accepte toute taille de fenêtre au-delà d'un minimum de 960 × 600 points. |
+| iPhone portrait | Une platine plein écran (sélecteur A/B) + crossfader et fader de voie en bas, accessibles au pouce ; courbe et hamster dans le panneau « Table ». |
+| iPhone paysage | Deux platines réduites à gauche et à droite, table de mixage au centre ; courbe et hamster dans le panneau « Table ». |
+| iPad portrait | Deux platines empilées quand la fenêtre est plus haute que large, côte à côte sinon ; table de mixage entre les deux. **[D-29]** |
+| iPad paysage et Mac | Platine A à gauche, table de mixage au centre, platine B à droite. Le Mac a une seule fenêtre principale, redimensionnable, dont la zone de contenu fait au moins 960 × 600 points. **[D-38]** |
+
+**[Décision v2.1, D-29, D-39]** En multitâche sur iPad (Split View, Slide Over, Stage Manager), une fenêtre de moins de 600 points de large affiche une seule platine, comme l'iPhone en portrait (recette « devrait », non bloquante). Le thème sombre est imposé en V1, sans thème clair.
 
 Le design graphique détaillé est défini dans la spécification UX (`docs/bmad/front-end-spec.md`).
 
@@ -151,12 +155,22 @@ Le design graphique détaillé est défini dans la spécification UX (`docs/bmad
 | SET CUE / CUE | `A` / `S` | `L` / `K` | — |
 | Coupure momentanée (maintenir = ouvrir la voie) | `F` | `J` | — |
 | Pitch −/+ 0,1 % | `Z` / `X` | `,` / `.` | — |
-| Crossfader : déplacer par pas de 5 % | — | — | `←` / `→` |
-| Crossfader : butée A / centre / butée B | — | — | `⇧←` / `⇧↓` / `⇧→` |
+| Crossfader : déplacer de 5 % vers la gauche / la droite | — | — | `←` / `→` |
+| Crossfader : butée gauche / centre / butée droite | — | — | `⇧←` / `⇧↓` / `⇧→` |
 | Importer sur A / sur B | — | — | `⌘O` / `⇧⌘O` |
 | Bibliothèque | — | — | `⌘L` |
 
 Une **coupure momentanée** (« transformer ») ouvre la voie tant que la touche est maintenue et la ferme au relâchement. C'est le moyen de rythmer un scratch à la souris : le pointeur tient le disque, la main gauche coupe le son au clavier.
+
+Règles du clavier **[Décision v2.1]** :
+
+- **Position physique (D-08).** Les raccourcis sont lus par position physique de touche (code de touche) ; le tableau nomme les touches d'un clavier QWERTY. Sur un clavier AZERTY, les mêmes emplacements servent : START / STOP de la platine A est la touche marquée « A », SET CUE la touche « Q », pitch −/+ de la platine A les touches « W » et « X », pitch −/+ de la platine B les touches « ; » et « : ». L'aide des raccourcis et les menus affichent le caractère réel du clavier courant.
+- **Butées (D-09).** `⇧←` et `⇧→` placent le crossfader en butée **gauche** et **droite** physiques ; `←` et `→` le déplacent dans leur sens, que le hamster soit actif ou non.
+- **Flèches et focus (D-07).** Quand l'accès clavier complet donne le focus à une commande réglable (pitch, résistance, fader de voie, courbe, crossfader, aperçu), les flèches agissent sur elle ; sinon, sur le crossfader. Échap retire le focus.
+- **Répétition (D-25).** La répétition automatique des touches est acceptée pour le pitch et pour `←` / `→` ; elle est ignorée pour START / STOP, SET CUE, CUE, les coupures momentanées et les butées.
+- **Coupures momentanées.** `F` et `J` peuvent être maintenues ensemble. Si la fenêtre perd le focus ou qu'une fenêtre de dialogue s'ouvre pendant le maintien, la voie se referme comme au relâchement.
+- **Inactivité et menus (D-34).** Les raccourcis à touche simple sont inactifs quand un champ de texte a le focus ou qu'une fenêtre de dialogue est ouverte. Les menus portent les raccourcis à touche simple ; `F` et `J`, qui se maintiennent, figurent seulement dans l'aide des raccourcis.
+- **iPad (D-32).** Pas de raccourcis clavier sur iPad en V1, même avec un clavier physique.
 
 ### 3.6 Interfaces futures (P2 uniquement)
 
@@ -164,12 +178,12 @@ Interrupteur REVERSE, module Crépitement vinyle ON/OFF avec niveau 0–100 %, b
 
 ## 4. Exigences fonctionnelles V1
 
-Sauf mention contraire, les exigences SF-03 à SF-24 s'appliquent **à chaque platine** (A et B) de façon indépendante (voir SF-64).
+Sauf mention contraire, les exigences SF-03 à SF-24 s'appliquent **à chaque platine** (A et B) de façon indépendante (voir SF-64). **[Décision v2.1, D-17]** Sont globales : SF-12 (crossfader), SF-16 (sortie), SF-18 (interruptions, qui arrêtent les deux moteurs), SF-19 (multitouch) et SF-20 (hors ligne). SF-17 conserve des réglages par platine et des réglages globaux. Les durées de démarrage et de freinage et le temps de rattrapage (SF-68) sont communs aux deux platines.
 
 | ID | Exigence | Résultat attendu |
 |---|---|---|
 | SF-01 | Ouverture | Afficher les platines et la table de mixage sans lecture automatique. Sur une platine vide, proposer l'import et le son de démonstration. |
-| SF-02 | Import audio et copie | Ouvrir le sélecteur du système (Fichiers ou Finder) et accepter les fichiers WAV, AIFF, MP3 et M4A décodables et non protégés. Copier le fichier dans le dossier local de l'application, sans modifier la source. Le chargement ultérieur repose sur cette copie, jamais sur un signet ou un chemin externe. En cas d'échec de copie ou d'espace insuffisant, signaler l'erreur et ne pas ajouter de fichier incomplet. Le fichier est chargé sur la platine depuis laquelle l'import a été lancé. |
+| SF-02 | Import audio et copie | Ouvrir le sélecteur du système (Fichiers ou Finder) et accepter les fichiers WAV, AIFF, MP3 et M4A décodables et non protégés. Copier le fichier dans le dossier local de l'application, sans modifier la source. Le chargement ultérieur repose sur cette copie, jamais sur un signet ou un chemin externe. En cas d'échec de copie ou d'espace insuffisant, signaler l'erreur et ne pas ajouter de fichier incomplet. Le fichier est chargé sur la platine depuis laquelle l'import a été lancé. **[Décision v2.1, D-12]** La copie garde le nom du fichier d'origine ; en cas de collision dans le dossier de l'application, un suffixe `_2`, `_3`… est ajouté avant l'extension (`voix_funk_2.wav`), sans jamais écraser une copie existante (règle de SF-60 et RM-43 appliquée dès la V1). Le titre affiché du son est le nom de sa copie. |
 | SF-03 | Initialisation | Après chargement : titre et durée affichés, tête au début du son (0 s), repère aligné, moteur arrêté. |
 | SF-04 | START | Accélérer progressivement jusqu'à la vitesse cible pendant la durée de démarrage (0,7 s par défaut). L'audio suit la vitesse réelle. |
 | SF-05 | STOP | Décélérer jusqu'à zéro pendant la durée de freinage (1,0 s par défaut) et conserver la position audio. Le scratch manuel reste disponible moteur arrêté. |
@@ -177,41 +191,41 @@ Sauf mention contraire, les exigences SF-03 à SF-24 s'appliquent **à chaque pl
 | SF-07 | Scratch avant | Une rotation manuelle vers l'avant avance dans l'audio. |
 | SF-08 | Scratch arrière | Une rotation manuelle inverse lit l'audio à l'envers. |
 | SF-09 | Vitesse du geste | La vitesse et la hauteur de lecture suivent le mouvement du disque, avec une interpolation audio adaptée (SF-77). |
-| SF-10 | Relâchement | Moteur actif : le disque rattrape la vitesse du plateau en un temps de rattrapage court (60 ms par défaut) depuis la position atteinte. Moteur arrêté : le disque ralentit naturellement jusqu'à l'arrêt en 150 ms au plus, et aucune lecture motorisée ne démarre. |
+| SF-10 | Relâchement | Moteur actif : le disque rattrape la vitesse du plateau en un temps de rattrapage court (60 ms par défaut, défini en SF-68) depuis la position atteinte. Moteur arrêté : la vitesse du disque décroît linéairement jusqu'à 0, l'arrêt survenant 150 ms au plus après le relâchement, et aucune lecture motorisée ne démarre. **[Décision v2.1, D-03]** |
 | SF-11 | Pitch | Modifier la vitesse nominale de −8 % à +8 % par pas de 0,1 %, en modifiant aussi la hauteur. Remise à 0 % en un geste. |
 | SF-12 | Crossfader | Le crossfader modifie uniquement le gain de sortie de chaque voie, sans altérer la position de lecture (voir SF-65 à SF-67). |
 | SF-13 | CUE | **SET CUE** mémorise la position de la tête. **CUE** y ramène la tête sans changer l'état du moteur. Sans CUE défini, CUE ramène au début du son (0 s). Le CUE est propre à chaque platine et réinitialisé au chargement d'un autre son. |
 | SF-14 | Limites du fichier | La tête reste dans l'intervalle [−2 s ; durée]. Elle se bloque à la borne de l'amorce en reculant, et à la fin du son en avançant (sillon fermé, RM-55). Aucune lecture hors limites ni clic anormal. |
-| SF-15 | Remplacement | Si la platine cible est **active** (moteur en marche, disque en mouvement ou tenu), demander confirmation avant de remplacer son son. Si elle est à l'arrêt, remplacer directement. Après remplacement, la platine revient à l'état initial (SF-03). Le son précédent reste disponible dans la bibliothèque. L'autre platine n'est jamais affectée. |
-| SF-16 | Sortie audio | Utiliser la route audio active du système : route iOS/iPadOS, ou périphérique de sortie par défaut sur macOS, y compris une interface USB compatible. Suivre les changements de route sans plantage. |
-| SF-17 | Préférences | Conserver, par platine, la vitesse (RPM), le pitch et la résistance. Conserver aussi la position du crossfader, sa courbe, le hamster, les faders de voie et les durées moteur. Ne jamais relancer automatiquement l'audio. Les sons chargés ne sont pas rechargés automatiquement en V1 (voir PO-12). |
+| SF-15 | Remplacement | Si la platine cible est **active** (moteur en marche, disque en mouvement ou tenu), demander confirmation avant de remplacer son son. Si elle est à l'arrêt, remplacer directement. Après remplacement, la platine revient à l'état initial (SF-03). Le son précédent reste disponible dans la bibliothèque. L'autre platine n'est jamais affectée. **[Décision v2.1, D-40]** Le disque est « en mouvement » quand sa vitesse de lecture dépasse, en valeur absolue, 0,001 fois la vitesse de gravure. Une platine **vide** ne demande jamais de confirmation, même plateau en rotation ; le chargement arrête alors son moteur (SF-03). |
+| SF-16 | Sortie audio | Utiliser la route audio active du système : route iOS/iPadOS, ou périphérique de sortie par défaut sur macOS, y compris une interface USB compatible. Suivre les changements de route sans plantage. **[Décision v2.1, D-04]** Sur Mac, si la sortie par défaut change alors que le périphérique utilisé est toujours connecté, le son passe sur la nouvelle sortie et l'état des moteurs ne change pas ; si le périphérique utilisé disparaît, chaque moteur passe à STOP (RM-56). Sur iPhone/iPad, si l'ancienne route n'est plus disponible (casque débranché, interface retirée), chaque moteur passe à STOP avant tout son sur le haut-parleur (RM-56) ; un autre changement de route (nouveau périphérique branché) ne change pas l'état des moteurs. |
+| SF-17 | Préférences | Conserver, par platine, la vitesse (RPM), le pitch et la résistance. Conserver aussi la position du crossfader, sa courbe, le hamster, les faders de voie, les durées moteur et le temps de rattrapage. Ne jamais relancer automatiquement l'audio. Les sons chargés ne sont pas rechargés automatiquement en V1 (voir PO-12). |
 | SF-18 | Interruptions | Lors d'une interruption système, passer chaque moteur à l'état STOP, conserver les positions et exiger une reprise manuelle (RM-56). |
-| SF-19 | Multitouch | Sur iPhone/iPad, permettre au moins trois contacts simultanés et indépendants : disque A, disque B et crossfader (ou un fader de voie), sans perte de contrôle. |
+| SF-19 | Multitouch | Sur iPhone/iPad, permettre au moins trois contacts simultanés et indépendants, sans perte de contrôle. **[Décision v2.1, D-05]** Sur iPad et sur iPhone en paysage : disque A, disque B et crossfader (ou un fader de voie). Sur iPhone en portrait, où une seule platine est visible : disque affiché, crossfader et fader de voie. Dans toutes les dispositions, un disque tenu n'empêche pas d'utiliser START/STOP, SET CUE, CUE, le pitch ou la résistance d'un autre doigt. |
 | SF-20 | Absence de réseau | Fonctionner entièrement hors ligne. La bibliothèque est locale et l'app n'exige aucune connexion. |
 | SF-21 | Résistance réglable | Proposer sur chaque platine un curseur « Résistance du vinyle » de 0 à 100 %, de léger à lourd, ajustable en temps réel. |
 | SF-22 | Effet de la résistance | À geste identique, une résistance élevée atténue les accélérations et variations de vitesse excessives ; une résistance faible donne une réponse plus directe. Le moteur sonore suit le mouvement simulé du disque, pas directement celui du doigt. |
 | SF-23 | Continuité du réglage | Modifier la résistance ne fait pas sauter la position de lecture et ne provoque ni clic audio ni inversion inattendue. Le contrôle du disque reste prioritaire sur le moteur. |
 | SF-24 | Préférence de résistance | Mémoriser la dernière valeur de résistance de chaque platine pour les lancements suivants, sans lecture automatique. |
-| SF-64 | Deux platines | Fournir deux platines A et B identiques et indépendantes : son, moteur, RPM, pitch, CUE, résistance et repère propres à chacune. Toutes les exigences SF-03 à SF-24 s'appliquent à chaque platine. |
-| SF-65 | Table de mixage | Fournir un fader de voie par platine (0–100 %, 100 % par défaut), un crossfader A↔B et un VU-mètre par voie. Le gain d'une voie est le produit de son fader de voie et du gain que lui donne le crossfader. La somme des voies ne doit pas produire d'écrêtage numérique : une marge et un limiteur doux sont appliqués en sortie. |
+| SF-64 | Deux platines | Fournir deux platines A et B identiques et indépendantes : son, moteur, RPM, pitch, CUE, résistance et repère propres à chacune. Les exigences par platine de SF-03 à SF-24 s'appliquent à chaque platine (exigences globales : introduction de la section 4). |
+| SF-65 | Table de mixage | Fournir un fader de voie par platine (0–100 %, 100 % par défaut), un crossfader A↔B et un VU-mètre par voie (niveau après le fader de voie, avant le crossfader). Le gain d'une voie est défini par RM-52. La somme des voies ne doit pas produire d'écrêtage numérique : une marge et un limiteur doux sont appliqués en sortie, dont la crête reste à −0,1 dBFS au plus. **[Décision v2.1, D-13, D-26]** L'indicateur de saturation signale « limiteur actif » dès que le limiteur réduit le gain d'au moins 1 dB, et « écrêtage » si la crête de sortie atteint 0 dBFS (cas qui ne doit pas se produire). |
 | SF-66 | Courbe du crossfader | Proposer un réglage continu, de « douce » (puissance constante, −3 dB au centre) à « coupure franche ». En coupure franche, une voie passe du silence au plein niveau sur 3 % au plus de la course, depuis la butée opposée (« cut-in »). Valeur par défaut : coupure franche. |
 | SF-67 | Hamster | Un interrupteur inverse le sens du crossfader. La bascule est sans clic : transition de gain lissée sur 5 ms au plus. |
-| SF-68 | Feutrine et couple moteur | Moteur actif, retenir le disque n'arrête pas le plateau. Au relâchement, le disque rejoint la vitesse du plateau en un temps de rattrapage réglable de 0 à 300 ms (60 ms par défaut), sans discontinuité audible. Les durées de démarrage (0,7 s) et de freinage (1,0 s) sont réglables de 0,1 à 5 s. |
-| SF-69 | Repère visuel | Afficher sur l'étiquette du disque un repère (autocollant) dont l'angle correspond à la position du CUE (ou à 0 s sans CUE). Le repère tourne avec le disque. |
-| SF-70 | Forme d'onde | Afficher pour chaque platine une forme d'onde zoomée centrée sur la tête de lecture (environ ±1,8 s, soit un tour de disque de chaque côté) et un aperçu complet du son, avec la position de la tête et du CUE. L'affichage suit le scratch sans retard visible (rafraîchissement ≥ 60 i/s). |
-| SF-71 | Needle drop | Toucher l'aperçu complet place la tête à la position correspondante, sans changer l'état du moteur. Ce geste est ignoré tant que le disque de cette platine est tenu. Le repositionnement est lissé (≤ 5 ms) pour éviter un clic. |
+| SF-68 | Feutrine et couple moteur | Moteur actif, retenir le disque n'arrête pas le plateau. Au relâchement, le disque rejoint la vitesse du plateau en un temps de rattrapage réglable de 0 à 300 ms (60 ms par défaut), sans discontinuité audible. **[Décision v2.1, D-03]** Le temps de rattrapage T est la durée au bout de laquelle l'écart entre la vitesse du disque et celle du plateau est réduit à 5 % de sa valeur au relâchement : un disque relâché immobile atteint 95 % de la vitesse du plateau en T. À T = 0, le disque prend immédiatement la vitesse du plateau, sans saut de position. Les durées de démarrage (0,7 s) et de freinage (1,0 s) sont réglables de 0,1 à 5 s. Ces trois réglages sont communs aux deux platines (D-17). |
+| SF-69 | Repère visuel | Afficher sur l'étiquette du disque un repère (autocollant) dont l'angle correspond à la position du CUE (ou à 0 s sans CUE). Le repère tourne avec le disque et passe sous la position de lecture chaque fois que la tête est au CUE, y compris après un saut de position (CUE, needle drop, chargement, sortie du sillon fermé ou de l'amorce) : l'angle du disque est alors recalé (5.4). **[Décision v2.1, D-10]** |
+| SF-70 | Forme d'onde | Afficher pour chaque platine une forme d'onde zoomée centrée sur la tête de lecture (environ ±1,8 s, soit un tour de disque de chaque côté) et un aperçu complet du son, avec la position de la tête et du CUE. L'affichage suit le scratch sans retard visible : **[Décision v2.1, D-13]** disque, repère et formes d'onde sont redessinés à chaque image de l'écran (60 i/s au moins, 120 i/s sur un écran à 120 Hz) à partir du dernier état publié par le moteur audio, sans image perdue pendant un scratch sur les appareils de référence (SF-78). |
+| SF-71 | Needle drop | Toucher l'aperçu complet place la tête à la position correspondante, sans changer l'état du moteur. **[Décision v2.1, D-33]** Le placement a lieu au relâchement du doigt ou du clic : pendant l'appui, une tête fantôme et le temps visé suivent le doigt ; sortir de l'aperçu avant de relâcher annule le geste. Ce geste est ignoré tant que le disque de cette platine est tenu. Le repositionnement est lissé (≤ 5 ms) pour éviter un clic. |
 | SF-72 | Amorce silencieuse | Chaque son est précédé d'une amorce silencieuse de 2 s (positions −2 s à 0). On peut ainsi reculer avant l'attaque du son et l'attaquer en poussant le disque. La position initiale après chargement reste 0 s. |
-| SF-73 | Glisser-déposer | Déposer un fichier audio sur une platine (depuis Fichiers sur iPad, depuis le Finder sur Mac) l'importe comme SF-02, puis le charge sur cette platine selon SF-15. Un fichier non compatible est refusé avec un message. |
-| SF-74 | Bibliothèque minimale | Afficher la liste des sons copiés (nom, durée, date d'import, origine), les charger sur A ou sur B, et les supprimer après confirmation. Le son de démonstration apparaît en tête et ne peut pas être supprimé. La bibliothèque persiste entre les lancements. Le renommage et les prises micro sont en P2 (10.5). |
+| SF-73 | Glisser-déposer | Déposer un fichier audio sur une platine (depuis Fichiers sur iPad, depuis le Finder sur Mac) l'importe comme SF-02, puis le charge sur cette platine selon SF-15. Un fichier non compatible est refusé avec un message. **[Décision v2.1, D-27]** Un dépôt de plusieurs fichiers est refusé dès le survol (« Un seul fichier à la fois ») ; la platine n'est pas modifiée. |
+| SF-74 | Bibliothèque minimale | Afficher la liste des sons copiés (nom, durée, date d'import, origine : « Import », ou « Intégré » pour le son de démonstration), les charger sur A ou sur B, et les supprimer après confirmation. Le son de démonstration apparaît en tête et ne peut pas être supprimé. La bibliothèque persiste entre les lancements et se réconcilie avec les copies présentes (RM-48). Le renommage et les prises micro sont en P2 (10.5). **[Décision v2.1, D-11, D-36]** |
 | SF-75 | Dédoublonnage | Importer un contenu identique (même empreinte SHA-256) à une entrée existante n'ajoute pas de seconde copie : l'entrée existante est réutilisée et chargée. |
-| SF-76 | Son de démonstration | Fournir un son de démonstration libre de droits, embarqué ou généré par l'app, pour essayer le scratch sans import. Il ne se charge jamais automatiquement (RM-01). |
-| SF-77 | Qualité audio du scratch | Interpolation au moins cubique. Pas de discontinuité aux inversions de sens. Repliement atténué aux vitesses élevées (au-delà de 2×). Vitesse de lecture bornée à ±16× la vitesse nominale. Pas de souffle ni de grésillement « en escalier » dû à une mise à jour trop lente de la vitesse (paramètres lissés à la fréquence audio). |
-| SF-78 | Latence | Objectifs : tampon audio de 256 trames à 48 kHz (≈5,3 ms) au plus lorsque le matériel le permet ; latence geste→son de 20 ms au plus sur iPhone/iPad récents et Mac. Le suivi tactile exploite tous les événements disponibles (touches regroupées et prédites). La latence mesurée est consignée dans la recette. |
-| SF-79 | Commandes Mac | Clic-glisser sur le disque = doigt posé. Défilement à deux doigts sur le trackpad au-dessus du disque = rotation du disque, relâchée 80 ms après le dernier événement. Clavier selon 3.5. Menus Fichier, Platine et Table avec leurs raccourcis. Le scratch à la souris et le crossfader au clavier fonctionnent simultanément. |
-| SF-80 | Formats, canaux, fréquences | Le mono est dupliqué sur les deux canaux, la stéréo conservée, le multicanal réduit en stéréo. Toute fréquence d'échantillonnage est convertie vers celle de la sortie sans changer la hauteur nominale. Durée maximale acceptée : 10 minutes par son en V1 ; au-delà, l'import est refusé avec un message explicite. Durée minimale : 50 ms. |
-| SF-81 | Cycle de vie | iPhone/iPad : en arrière-plan, chaque moteur passe à STOP, la sortie est coupée et les positions sont conservées. L'audio en arrière-plan n'est pas pris en charge en V1. Mac : la lecture continue quand la fenêtre est inactive ; fermer la dernière fenêtre quitte l'application. |
-| SF-82 | Sortie indisponible | Si aucune sortie audio n'est disponible ou si le moteur audio ne peut démarrer, afficher un état « Sortie audio indisponible ». L'interface reste utilisable et l'app réessaie automatiquement dès qu'une sortie apparaît. Jamais de plantage. |
-| SF-83 | Accessibilité | Chaque commande porte un libellé VoiceOver. Pitch, résistance, faders et crossfader sont ajustables par les actions d'accessibilité et, sur Mac, au clavier. Contraste conforme WCAG AA pour les libellés. |
+| SF-76 | Son de démonstration | Fournir un son de démonstration libre de droits pour essayer le scratch sans import. Il ne se charge jamais automatiquement (RM-01). **[Décision v2.1, D-20]** Le son est généré par l'application, de façon déterministe : une attaque franche (« stab ») à 0 s suivie d'une voix synthétique « ahh », 8 s, stéréo, 48 kHz, crête ≤ −1 dBFS. Il n'a aucune licence tierce et sert aussi au self-test de la CI. Titre affiché : « Son de démonstration ». |
+| SF-77 | Qualité audio du scratch | Interpolation au moins cubique. Pas de discontinuité aux inversions de sens. Repliement atténué aux vitesses élevées (au-delà de 2×) : **[Décision v2.1, D-13]** une sinusoïde de 12 kHz lue à 3× (sortie à 48 kHz) ne produit que des composantes repliées inférieures d'au moins 40 dB au niveau de la sinusoïde. Vitesse de lecture bornée à ±16× la vitesse nominale. Pas de souffle ni de grésillement « en escalier » dû à une mise à jour trop lente de la vitesse (paramètres lissés à la fréquence audio). |
+| SF-78 | Latence | Objectifs : tampon audio de 256 trames à 48 kHz (≈5,3 ms) au plus lorsque le matériel le permet ; **[Décision v2.1, D-14, D-15, D-16]** latence geste→son de 20 ms au plus sur un écran à 120 Hz et de 30 ms au plus sur un écran à 60 Hz, sur les appareils de référence : iPhone 13 ou plus récent, iPad avec puce M1 ou plus récente, Mac Apple Silicon. La latence est mesurée de l'horodatage système de l'événement (toucher, clic, défilement) à la sortie du son correspondant, latence de sortie annoncée par le système incluse. Les sorties Bluetooth et AirPlay, dont la latence propre dépasse ces objectifs, en sont exclues. Le suivi tactile exploite toutes les touches regroupées ; les touches prédites ne servent qu'à combler l'attente entre deux livraisons de touches, sans jamais provoquer de dépassement dans le mauvais sens aux inversions (SF-77). La latence mesurée est consignée dans la recette (P1). |
+| SF-79 | Commandes Mac | Clic-glisser sur le disque = doigt posé. Défilement à deux doigts sur le trackpad au-dessus du disque = rotation du disque, relâchée 80 ms après le dernier événement ; **[Décision v2.1, D-24, D-34]** la surface du disque sous le pointeur suit le mouvement des doigts, l'inertie du défilement est ignorée et un cran de molette classique tourne le disque de 15°. Clavier selon 3.5. Menus Fichier, Platine, Table et Aide, avec leurs raccourcis à touche simple (3.5). Le scratch à la souris et le crossfader au clavier fonctionnent simultanément. |
+| SF-80 | Formats, canaux, fréquences | Le mono est dupliqué sur les deux canaux, la stéréo conservée, le multicanal réduit en stéréo. Toute fréquence d'échantillonnage est convertie vers celle de la sortie sans changer la hauteur nominale ; un changement de sortie ne demande aucun nouveau décodage du son (D-22). Durée maximale acceptée : 10 minutes par son en V1 ; au-delà, l'import est refusé avec un message explicite. Durée minimale : 50 ms. |
+| SF-81 | Cycle de vie | iPhone/iPad : en arrière-plan, chaque moteur passe à STOP, la sortie est coupée et les positions sont conservées. L'audio en arrière-plan n'est pas pris en charge en V1. L'écran ne se verrouille pas automatiquement tant qu'un moteur tourne ou qu'un disque est tenu (D-37). Mac : la lecture continue quand la fenêtre est inactive ; fermer la fenêtre principale, unique, quitte l'application (D-38). |
+| SF-82 | Sortie indisponible | Si aucune sortie audio n'est disponible ou si le moteur audio ne peut démarrer, afficher un état « Sortie audio indisponible ». L'interface reste utilisable et l'app réessaie automatiquement dès qu'une sortie apparaît. **[Décision v2.1, D-35]** En attendant, une horloge de secours fait vivre les platines en silence : disques, plateaux et commandes répondent comme d'habitude, sans son. Au retour d'une sortie, aucun moteur ne démarre de lui-même. Jamais de plantage. |
+| SF-83 | Accessibilité | Chaque commande porte un libellé VoiceOver. Pitch, résistance, faders et crossfader sont ajustables par les actions d'accessibilité et, sur Mac, au clavier (flèches et focus : 3.5, D-07). Contraste conforme WCAG AA pour les libellés (rapport de 4,5:1 au moins). |
 
 ## 5. Règles métier V1
 
@@ -227,17 +241,17 @@ Sauf mention contraire, les exigences SF-03 à SF-24 s'appliquent **à chaque pl
 - **RM-10 :** aucune interruption système ne provoque une reprise sonore automatique.
 - **RM-11 :** la résistance change la réponse dynamique du disque au geste. Elle ne change ni la hauteur ni la vitesse nominale du moteur en l'absence de manipulation.
 - **RM-12 :** une résistance élevée ne doit pas rendre le scratch impossible : l'utilisateur doit toujours pouvoir déplacer le disque dans les deux sens et l'immobiliser en gardant son doigt fixe.
-- **RM-13 :** les variations de résistance ne désynchronisent jamais la position visuelle du disque, la position audio et le geste (hors sillon fermé, RM-55).
+- **RM-13 :** les variations de résistance ne désynchronisent jamais la position visuelle du disque, la position audio et le geste (hors sillon fermé, RM-55). Après un saut de position (CUE, needle drop, chargement, sortie de butée), l'angle du disque est recalé sur la position (5.4) ; un disque tenu reste sous le doigt. **[Décision v2.1, D-10]**
 - **RM-47 (ex-RM-43 v1.8) :** tout fichier sélectionné dans le sélecteur du système ou déposé sur une platine est copié dans le stockage propre à l'application. Sa source reste inchangée et n'est pas nécessaire aux rechargements suivants.
-- **RM-48 (ex-RM-44 v1.8) :** aucune entrée de bibliothèque ne peut référencer une copie locale incomplète ou absente. Une erreur de stockage est signalée sans altérer le son en cours.
+- **RM-48 (ex-RM-44 v1.8) :** aucune entrée de bibliothèque ne peut référencer une copie locale incomplète ou absente. Une erreur de stockage est signalée sans altérer le son en cours. **[Décision v2.1, D-11]** Au lancement et avant chaque chargement d'un son, la bibliothèque se réconcilie avec ses copies : une entrée dont la copie a disparu ou dont la taille a changé (copie supprimée ou modifiée depuis Fichiers ou le Finder) est retirée de la bibliothèque et l'utilisateur en est informé. Un son déjà chargé sur une platine continue d'être joué depuis la mémoire. Les fichiers du dossier absents de l'index sont ignorés en V1.
 - **RM-49 (ex-RM-45 v1.8) :** supprimer une entrée de la bibliothèque supprime sa copie dans l'application, jamais le fichier original (Drive, Fichiers, Finder).
 - **RM-50 :** le son est considéré comme **gravé à 33⅓ tours** : un tour complet du disque correspond à 1,8 s de son. La vitesse de lecture vaut `ω / (2π × 33⅓ / 60)`, où ω est la vitesse angulaire du disque en rad/s. À 45 RPM, le son est donc lu 1,35× plus vite et plus aigu, comme un vrai 33 tours joué en 45. **[Décision v2.0]**
 - **RM-51 :** les deux platines sont indépendantes. Aucune commande d'une platine ne modifie l'état de l'autre ; seule la table de mixage combine leurs sorties.
-- **RM-52 :** gain de sortie d'une voie = fader de voie × gain du crossfader pour cette voie. Les deux facteurs sont lissés à la fréquence audio (≤ 5 ms) ; le crossfader en coupure franche garde un temps de montée de 1 ms au plus pour rester percutant.
+- **RM-52 :** gain de sortie d'une voie = fader de voie × (coupure momentanée de la voie ouverte ? 1 : gain du crossfader pour cette voie). **[Décision v2.1, D-06]** La coupure momentanée (3.5) ne remplace que le gain du crossfader : un fader de voie à 0 garde la voie silencieuse, et une voie dont le gain de crossfader vaut déjà 1 n'est pas modifiée. Les facteurs sont lissés à la fréquence audio (≤ 5 ms) ; le crossfader en coupure franche et la coupure momentanée gardent un temps de montée de 1 ms au plus pour rester percutants.
 - **RM-53 :** feutrine : moteur actif, le plateau tourne toujours à la vitesse moteur, que le disque soit tenu ou non. Un toucher n'arrête jamais le moteur et ne change pas son état START/STOP.
 - **RM-54 :** la résistance n'agit que sur la réponse au geste. Elle ne modifie ni les durées de démarrage et de freinage ni le temps de rattrapage au relâchement.
 - **RM-55 :** sillon fermé : en fin de son, la tête reste sur la fin (silence) tant que le disque avance ; le disque et le repère continuent de tourner. Un mouvement arrière fait immédiatement revenir dans le son, sans « dérouler » les tours accumulés. La borne de l'amorce (−2 s) se comporte de la même façon en sens inverse.
-- **RM-56 :** interruption système ou passage en arrière-plan (iPhone/iPad) : chaque moteur passe immédiatement à l'état STOP, sans rampe puisque la sortie est coupée. L'état arrêté est affiché et les positions sont conservées.
+- **RM-56 :** interruption système ou passage en arrière-plan (iPhone/iPad), disparition du périphérique de sortie utilisé (casque débranché, interface USB retirée) ou mise en veille du Mac : chaque moteur passe immédiatement à l'état STOP, sans rampe. L'état arrêté est affiché, les positions sont conservées et la reprise demande START. Un changement de sortie par défaut sur Mac, l'ancien périphérique restant connecté, n'est pas concerné (SF-16). **[Décision v2.1, D-04]**
 - **RM-57 :** une platine ne porte qu'un son à la fois. Charger un son sur une platine ne modifie jamais l'autre. Le même son peut être chargé sur les deux platines en même temps.
 - **RM-58 :** chaque entrée de bibliothèque possède un identifiant interne stable (UUID) et une empreinte de contenu (SHA-256). L'identifiant ne change jamais, même après un renommage (P2). L'empreinte sert au dédoublonnage (SF-75) et à l'association des pointeurs (P2, 10.4). Cela concilie SF-43 et SF-63.
 - **RM-59 :** sur Mac, un clic maintenu équivaut à un doigt posé. La souris n'offrant qu'un pointeur, la simultanéité passe par le clavier : coupures momentanées et crossfader (3.5).
@@ -251,7 +265,7 @@ Le réglage de résistance porte sur **la sensation de lourdeur du disque**, pas
 Modèle de référence, à calibrer sur appareil :
 
 1. **Plateau** : vitesse angulaire `ωp` qui tend vers la cible `ωt = 2π × RPM/60 × (1 + pitch)` quand le moteur est actif, vers 0 sinon. La pente vaut `ωt / durée de démarrage` à l'accélération et `ωt / durée de freinage` à la décélération.
-2. **Disque libre** (non tenu) : couplé au plateau par la feutrine. Sa vitesse `ωd` rejoint `ωp` avec une constante de temps égale au temps de rattrapage (60 ms par défaut). Moteur arrêté, un disque lancé ralentit par friction jusqu'à 0 en 150 ms au plus.
+2. **Disque libre** (non tenu) : couplé au plateau par la feutrine. **[Décision v2.1, D-03]** Sa vitesse `ωd` rejoint `ωp` par une réponse du premier ordre de constante de temps τ = T / 3, où T est le temps de rattrapage (SF-68, 60 ms par défaut) : l'écart initial est réduit à 5 % en T (e⁻³ ≈ 0,05). T = 0 aligne immédiatement `ωd` sur `ωp`. Moteur arrêté, un disque lancé ralentit par friction constante : `ωd` décroît linéairement jusqu'à 0, l'arrêt survenant 150 ms au plus après le relâchement.
 3. **Disque tenu** : l'angle du disque `θd` suit l'angle du doigt `θf` à travers un filtre du second ordre à amortissement critique. Sa constante de temps varie de 2 ms (résistance 0 %) à 35 ms (résistance 100 %). Un doigt fixe entraîne la convergence de `θd` vers `θf` et une vitesse nulle (RM-12).
 4. **Tête de lecture** : `p += ωd / (2π) × 1,8 s × dt`, bornée à [−2 s ; durée] (RM-55), avec `dt` la période d'échantillonnage. L'intégration se fait **à la fréquence audio**, dans le fil de rendu. Les positions du doigt (60 à 120 Hz) sont interpolées pour éviter les marches de vitesse.
 5. **Géométrie du geste** : angle du doigt mesuré par `atan2` autour du centre du disque, avec dépliement des tours (pas de saut à ±π) et zone morte centrale (RM-61). Le gain de déplacement tactile reste 1:1 en V1 (un tour de doigt = un tour de disque).
@@ -265,17 +279,29 @@ Soit `x ∈ [0 ; 1]` la position du crossfader (0 = butée A, 1 = butée B ; inv
 - Douce (`c = 0`) : `gA = cos(x·π/2)`, `gB = sin(x·π/2)` (puissance constante).
 - Coupure franche (`c = 1`) : `gB = min(1, x / w)` et `gA = min(1, (1 − x) / w)`, avec une largeur de cut-in `w = 0,03`.
 - Valeurs intermédiaires : `w = lerp(1, 0,03, c)` et une interpolation de forme entre les deux familles, de sorte que `c` varie de façon monotone et perceptible.
+- Hamster (SF-67) : `x` est remplacé par `1 − x`. Les butées « gauche » et « droite » (clavier, VoiceOver) désignent toujours la position physique du curseur. **[Décision v2.1, D-09]**
+- Coupure momentanée : tant qu'elle est ouverte, le gain du crossfader de la voie est remplacé par 1 (RM-52). **[Décision v2.1, D-06]**
 
 ### 5.3 Précision de conception — Stockage
 
 | Contenu | Emplacement (dans le bac à sable de l'app) |
 |---|---|
-| Copies des sons importés | `Documents/Banque de sons/` (visible dans Fichiers sur iPhone/iPad ; menu « Afficher dans le Finder » sur Mac) |
-| Index de bibliothèque (UUID, empreinte, nom, durée, dates, origine) | `Application Support/ScratchApp/library.json` (écriture atomique) |
+| Copies des sons importés | `Documents/Banque de sons/` (visible dans Fichiers sur iPhone/iPad ; menu « Afficher dans le Finder » sur Mac) ; nom d'origine, suffixe `_2`, `_3`… en cas de collision (SF-02) |
+| Index de bibliothèque (UUID, empreinte, nom et taille de la copie, titre, durée, date d'import, origine ; **[Décision v2.1, D-41]**) | `Application Support/ScratchApp/library.json` (écriture atomique) |
 | Préférences | `UserDefaults` |
 | Enregistrements du mix (P2) | `Documents/Enregistrements/` |
 
-Une copie est écrite d'abord dans un fichier temporaire, vérifiée (décodable, taille), puis déplacée atomiquement à sa place finale. L'index n'est mis à jour qu'ensuite (RM-48).
+Une copie est écrite d'abord dans un fichier temporaire, vérifiée (décodable, taille), puis déplacée atomiquement à sa place finale. L'index n'est mis à jour qu'ensuite (RM-48). Il est réconcilié avec les copies au lancement et avant chaque chargement (RM-48, D-11).
+
+### 5.4 Précision de conception — Repère et angle du disque **[Décision v2.1, D-10]**
+
+Le moteur publie l'angle du plateau, l'angle du disque (étiquette) et l'angle du repère, dans le repère de l'écran (0 = midi, sens horaire positif) :
+
+- **Angle du disque** `discAngle` : hors butée, `discAngle ≡ 2π × position / 1,8 s (mod 2π)`. Après chaque saut de position (CUE, needle drop, chargement) et à la sortie d'une butée (amorce, sillon fermé), le moteur recale cette relation par la plus petite correction (au plus ±π). En butée, le disque continue de tourner (RM-55). Disque tenu, le recalage ne déplace pas le disque sous le doigt et ne produit aucun saut de son.
+- **Angle du repère** `stickerAngle = discAngle − 2π × cue / 1,8 s`, avec `cue = 0` sans CUE. Il est calculé, jamais cumulé : solidaire de l'étiquette, il vaut 0 (midi, sous la position de lecture) quand la tête est sur le CUE.
+- Au recalage, l'étiquette et le repère sautent ensemble d'un angle.
+
+La forme `stickerAngle = discAngle − 2π × (position − cue) / 1,8 s`, envisagée avant la validation, est écartée : elle immobiliserait le repère en lecture normale, les deux termes avançant ensemble.
 
 ## 6. Scénarios Gherkin — classés par priorité
 
@@ -286,6 +312,8 @@ Une copie est écrite d'abord dans un fichier temporaire, vérifiée (décodable
 **P2 — Option future :** fonctionnalités exclues de la recette V1, spécifiées en fin de document.
 
 > Convention : lorsqu'un scénario ne nomme pas la platine, il s'applique à la platine A et doit être vrai à l'identique pour la platine B.
+>
+> **[Décision v2.1, D-01]** Dans une feature [P0], un scénario marqué du tag `@P1` vérifie une exigence P1 : il est recetté avec le P1. Les autres scénarios d'une feature ont sa priorité.
 
 ### 6.1 [P0] Lancement et import
 
@@ -338,6 +366,7 @@ Feature: Lancement et importation d'un fichier audio
     Then une copie est créée dans le conteneur de l'application
     And le fichier est chargé sur la platine A
 
+  @P1
   Scenario: Recharger un son déjà importé sans accéder à Drive
     Given un fichier audio a été importé et copié dans le dossier de l'application
     And sa source d'origine est devenue inaccessible
@@ -391,6 +420,7 @@ Feature: Lancement et importation d'un fichier audio
     Then un message indique que la durée maximale est de 10 minutes
     And aucune copie n'est conservée
 
+  @P1
   Scenario: Importer un contenu déjà présent dans la bibliothèque
     Given "boucle.wav" a déjà été importé
     When j'importe un fichier "copie de boucle.wav" au contenu identique
@@ -469,6 +499,7 @@ Feature: Contrôle du moteur de la platine
     Then le disque réaccélère depuis sa vitesse courante jusqu'à la vitesse cible
     And aucun saut de position ni clic ne se produit
 
+  @P1
   Scenario: Régler les durées de démarrage et de freinage
     Given la durée de freinage est réglée à 3 secondes dans les réglages
     When j'appuie sur "STOP" alors que le moteur tourne
@@ -542,7 +573,7 @@ Feature: Manipulation tactile du vinyle
     Scenario: Relâcher le disque moteur actif
       Given je maintiens le disque immobile
       When je retire mon doigt
-      Then le disque rattrape la vitesse du plateau en 60 ms environ
+      Then le disque atteint 95 % de la vitesse du plateau en 60 ms environ
       And la lecture reprend depuis la position actuelle
       And la vitesse rejoint 33⅓ RPM
       And aucune discontinuité audible ne se produit
@@ -720,6 +751,13 @@ Feature: Cycle de vie et sortie audio
     When je donne le focus à une autre application
     Then la lecture continue
 
+  Scenario: Mettre le Mac en veille
+    Given le moteur de la platine A tourne sur Mac
+    When le Mac se met en veille puis se réveille
+    Then le moteur de la platine A est à l'état STOP
+    And la position de lecture est conservée
+    And aucun son ne reprend automatiquement
+
   Scenario: Brancher une interface audio USB
     Given une interface audio USB compatible est connectée
     And elle est sélectionnée comme sortie par le système
@@ -748,14 +786,17 @@ Feature: Cycle de vie et sortie audio
     Then le son est envoyé à la nouvelle interface
     And la hauteur et la vitesse nominale sont inchangées
     And la position de lecture est conservée
+    And l'état des moteurs est inchangé
 
   Scenario: Aucune sortie audio disponible
     Given aucun périphérique de sortie n'est disponible
     When je lance l'application
     Then l'état « Sortie audio indisponible » est affiché
     And l'interface reste utilisable
+    And les disques peuvent être tenus et tournés, sans son
     When un périphérique de sortie devient disponible
     Then l'application l'utilise sans redémarrage
+    And aucun moteur ne démarre de lui-même
 
   Scenario: Restaurer les préférences
     Given j'ai sélectionné 45 RPM sur la platine A
@@ -952,6 +993,11 @@ Feature: Deux platines indépendantes
     When je tiens le disque A, je tiens le disque B et je déplace le crossfader
     Then les trois commandes répondent simultanément
 
+  Scenario: Trois contacts simultanés sur iPhone en portrait
+    Given l'iPhone est en portrait et la platine A est affichée
+    When je tiens le disque A, je déplace le crossfader et je règle le fader de voie A
+    Then les trois commandes répondent simultanément
+
   Scenario: Passer d'une platine à l'autre sur iPhone en portrait
     Given l'iPhone est en portrait et la platine A est affichée
     And le moteur de la platine A tourne
@@ -993,7 +1039,8 @@ Feature: Feutrine et couple moteur
   Scenario: Rattrapage plus lent
     Given le temps de rattrapage est réglé à 300 ms
     When je relâche le disque retenu
-    Then le son monte progressivement en vitesse pendant environ 300 ms
+    Then le son monte progressivement en vitesse
+    And il atteint 95 % de la vitesse du plateau en 300 ms environ
 
   Scenario: Démarrage court
     Given la durée de démarrage est réglée à 0,1 seconde
@@ -1036,6 +1083,16 @@ Feature: Réglage de la courbe du crossfader et inversion hamster
     Then la butée gauche correspond désormais à la voie B
     And la bascule ne produit pas de clic
 
+  Scenario: Butées au clavier avec le hamster (Mac)
+    Given l'application est ouverte sur Mac
+    And le hamster est activé
+    When j'appuie sur "⇧←"
+    Then le crossfader est en butée gauche
+    And seule la voie B est audible
+    When j'appuie sur "⇧→"
+    Then le crossfader est en butée droite
+    And seule la voie A est audible
+
   Scenario: Conserver les réglages de crossfader
     Given j'ai activé le hamster et réglé la courbe sur "douce"
     When je relance l'application
@@ -1067,8 +1124,9 @@ Feature: Repérage visuel du son
   Scenario: Positionner la tête sur l'aperçu (needle drop)
     Given le moteur tourne
     And je ne touche pas le disque
-    When je touche l'aperçu complet aux trois quarts de sa largeur
-    Then la tête se place aux trois quarts du son
+    And le son dure 2 minutes
+    When je touche l'aperçu complet à l'emplacement de la 30e seconde puis relâche
+    Then la tête se place à 30 secondes
     And la lecture continue depuis cette position sans clic
     And l'état du moteur est conservé
 
@@ -1076,6 +1134,19 @@ Feature: Repérage visuel du son
     Given je retiens le disque
     When je touche l'aperçu complet
     Then la position de la tête n'est pas modifiée
+
+  Scenario: Annuler un needle drop
+    Given le moteur tourne
+    When je touche l'aperçu complet puis fais glisser le doigt hors de l'aperçu avant de relâcher
+    Then la position de la tête n'est pas modifiée
+
+  Scenario: Le repère reste aligné après un saut de position
+    Given un point CUE est défini à 4 secondes
+    And le moteur tourne
+    When je place la tête à 30 secondes par needle drop
+    And j'appuie sur "CUE"
+    Then la tête est à 4 secondes
+    And le repère est sous la position de lecture
 ```
 
 ### 6.12 [P1] Bornes, amorce et sillon fermé
@@ -1136,7 +1207,8 @@ Feature: Bibliothèque locale minimale
     Given j'ai importé trois sons
     When j'ouvre la bibliothèque
     Then le son de démonstration apparaît en tête
-    And les trois sons apparaissent avec leur nom, leur durée et leur date d'import
+    And les trois sons apparaissent avec leur nom, leur durée, leur date d'import et l'origine « Import »
+    And l'origine du son de démonstration est « Intégré »
 
   Scenario: Charger un son de la bibliothèque sur la platine B
     Given la bibliothèque contient "voix_funk.wav"
@@ -1178,6 +1250,33 @@ Feature: Bibliothèque locale minimale
     When je fais glisser un fichier PDF sur une platine
     Then le dépôt est refusé
     And la platine n'est pas modifiée
+
+  Scenario: Déposer plusieurs fichiers à la fois
+    Given l'application est ouverte sur iPad ou sur Mac
+    When je fais glisser deux fichiers WAV valides sur la platine A
+    Then le dépôt est refusé dès le survol avec le message « Un seul fichier à la fois »
+    And la platine A n'est pas modifiée
+
+  Scenario: Importer deux fichiers portant le même nom
+    Given "voix_funk.wav" est dans la bibliothèque
+    When j'importe un autre fichier nommé "voix_funk.wav", au contenu différent
+    Then sa copie locale est nommée "voix_funk_2.wav"
+    And la copie "voix_funk.wav" n'est pas écrasée
+    And les deux sons apparaissent dans la bibliothèque sous le nom de leur copie
+
+  Scenario: Copie supprimée en dehors de l'application
+    Given "boucle.wav" est dans la bibliothèque
+    And sa copie a été supprimée depuis Fichiers ou le Finder
+    When je relance l'application
+    Then "boucle.wav" n'est plus dans la bibliothèque
+    And un message m'indique que ce son a été retiré
+
+  Scenario: Charger un son dont la copie a disparu
+    Given "boucle.wav" est dans la bibliothèque
+    And sa copie a été supprimée depuis le Finder pendant que l'application est ouverte
+    When je choisis "Charger sur A" pour ce son
+    Then un message indique que le son est introuvable et qu'il a été retiré de la bibliothèque
+    And la platine A n'est pas modifiée
 ```
 
 ### 6.14 [P0] Commandes Mac
@@ -1224,15 +1323,22 @@ Feature: Scratcher sur Mac avec souris, trackpad et clavier
 
   Scenario: Déplacer le crossfader au clavier
     Given le crossfader est au centre
+    And le hamster est désactivé
     When j'appuie sur "⇧←"
-    Then le crossfader est en butée A
+    Then le crossfader est en butée gauche, côté voie A
     When j'appuie trois fois sur "→"
-    Then le crossfader est à 15 % de la course vers B
+    Then le crossfader est à 15 % de la course depuis la butée gauche
 
   Scenario: Raccourcis inactifs pendant la saisie de texte
     Given un champ de texte a le focus
     When je tape "q"
     Then le moteur de la platine A n'est pas affecté
+
+  Scenario: Raccourcis sur un clavier AZERTY
+    Given la disposition de clavier active est AZERTY
+    When j'appuie sur la touche marquée « A », à l'emplacement du Q d'un clavier QWERTY
+    Then le moteur de la platine A passe à STOP
+    And l'aide des raccourcis indique « A » pour START / STOP de la platine A
 
   Scenario: Redimensionner la fenêtre pendant un scratch
     Given je scratche le disque A à la souris
@@ -1291,6 +1397,15 @@ Feature: Accessibilité
     Given l'accès clavier complet est activé sur Mac
     When j'utilise la tabulation
     Then le focus parcourt les commandes dans un ordre logique : platine A, table, platine B
+
+  Scenario: Flèches sur une commande qui a le focus (Mac)
+    Given l'accès clavier complet est activé sur Mac
+    And le fader de voie A a le focus clavier
+    When j'appuie sur "↓"
+    Then le fader de voie A diminue de 5 %
+    And le crossfader ne bouge pas
+    When j'appuie sur Échap puis sur "→"
+    Then le crossfader se déplace de 5 % vers la droite
 ```
 
 ## 7. Critères de recette V1 (P0 puis P1)
@@ -1302,7 +1417,7 @@ Feature: Accessibilité
 - [ ] Démarrer et arrêter chaque moteur à 33⅓ et 45 RPM.
 - [ ] Retenir le disque au toucher (ou au clic) sans saut de lecture, le plateau continuant de tourner (feutrine).
 - [ ] Scratcher dans les deux sens, à différentes vitesses, y compris moteur arrêté.
-- [ ] Relâcher le disque et retrouver la vitesse motorisée en 60 ms environ.
+- [ ] Relâcher le disque et retrouver 95 % de la vitesse motorisée en 60 ms environ (SF-68).
 - [ ] Scratcher et utiliser simultanément le crossfader : au doigt sur iPhone/iPad, souris + clavier sur Mac.
 - [ ] Courbe « coupure franche » : la voie s'ouvre à plein niveau en 3 % de course au plus.
 - [ ] Application fonctionnelle sur macOS : compilation, tests automatisés et lancement vérifiés en CI.
@@ -1313,15 +1428,17 @@ Feature: Accessibilité
 - [ ] Modifier le pitch (pas de 0,1 %, remise à 0) et rappeler un point CUE, y compris disque tenu.
 - [ ] Voir le repère et la forme d'onde suivre le scratch ; positionner la tête par needle drop.
 - [ ] Reculer dans l'amorce et atteindre le sillon fermé sans clic.
-- [ ] Recharger un son depuis la bibliothèque sur A ou B, le supprimer, dédoublonner un import identique.
+- [ ] Recharger un son depuis la bibliothèque sur A ou B, le supprimer, dédoublonner un import identique, nommer sans écrasement deux imports homonymes, retirer une entrée dont la copie a disparu.
 - [ ] Émettre le son sur une sortie audio USB compatible et suivre un changement de périphérique.
 - [ ] Gérer interruptions, arrière-plan, fichiers incorrects ou protégés et déconnexion USB sans plantage.
-- [ ] Latence geste→son mesurée et consignée (objectif ≤ 20 ms) ; tampon ≤ 256 trames à 48 kHz.
+- [ ] Latence geste→son mesurée et consignée sur les appareils de référence (objectifs : ≤ 20 ms sur écran 120 Hz, ≤ 30 ms sur écran 60 Hz, hors Bluetooth et AirPlay, SF-78) ; tampon ≤ 256 trames à 48 kHz.
+
+**[Décision v2.1, D-23, D-15, D-21]** La recette sur macOS est bloquante pour la V1. Les scénarios qui exigent un iPhone ou un iPad physique (trois contacts, latence tactile, interruptions, casque, glisser-déposer depuis Fichiers) sont recettés sur appareil, hors de la CI, qui se limite au simulateur ; tant qu'ils ne le sont pas, la gate de recette est CONCERNS et la réserve est consignée. Un objectif mesuré non atteint (latence, mémoire) donne aussi une gate CONCERNS et une issue de calibrage, pas un refus de la V1. Les scénarios marqués `@P1` (section 6) relèvent de la recette P1.
 - [ ] VoiceOver : toutes les commandes sont étiquetées.
 
 ## 8. Points ouverts
 
-| ID | Sujet | Statut v2.0 |
+| ID | Sujet | Statut v2.1 |
 |---|---|---|
 | PO-01 | Comportement du plateau sans fichier chargé | **Clos :** le plateau peut tourner (START), sans aucun son (RM-01). |
 | PO-02 | Ergonomie du crossfader sur une platine unique | **Clos :** deux platines et crossfader A↔B (SF-64 à SF-67). |
@@ -1329,16 +1446,16 @@ Feature: Accessibilité
 | PO-04 | Inertie au relâchement, geste et angle tactile | **Clos :** feutrine, rattrapage de 60 ms, modèle 5.1, RM-60 et RM-61. Calibrage final sur appareil. |
 | PO-05 | Comportement en fin de sample | **Clos :** sillon fermé (RM-55). Boucle éventuelle en P2. |
 | PO-06 | Ergonomie des points CUE et de leurs raccourcis | **Clos :** boutons SET CUE / CUE, raccourcis Mac (3.5). Pointeurs multiples en P2 (10.4). |
-| PO-07 | Contraintes de latence audio et tactile | **Partiellement clos :** objectifs fixés (SF-78), mesure à faire sur prototype. |
-| PO-08 | Compatibilité USB avec la MPC Sample et enregistrement dans Logic Pro | **Ouvert :** test sur matériel. |
+| PO-07 | Contraintes de latence audio et tactile | **Clos (v2.1, D-15) :** objectifs par cadence d'affichage, appareils de référence et méthode de mesure fixés (SF-78) ; mesure consignée à la recette, calibrage du rejeu du doigt et des touches prédites en story 1.2. |
+| PO-08 | Compatibilité USB avec la MPC Sample et enregistrement dans Logic Pro | **Ouvert, non bloquant (D-44) :** essai à la recette si le matériel est disponible, sinon critère consigné « non testé, matériel indisponible ». La compatibilité USB générique (SF-16) reste exigée. |
 | PO-09 | Arrière-plan et stratégie de session audio | **Clos :** pas d'audio en arrière-plan sur iOS/iPadOS en V1 (SF-81), catégorie de session « lecture » exclusive ; sur Mac, la lecture continue fenêtre inactive. |
 | PO-10 | Design graphique et disposition des commandes | **Délégué** à la spécification UX (`docs/bmad/front-end-spec.md`), dans le cadre de 3.4. |
 | PO-11 [P2] | Calibrage du souffle et des micro-craquements | Ouvert (P2). |
-| PO-12 | Rechargement automatique des sons chargés au relancement | **Ouvert :** non retenu en V1 (SF-17). À trancher pour la V1.1, sans jamais relancer l'audio. |
+| PO-12 | Rechargement automatique des sons chargés au relancement | **Clos (v2.1, D-45) :** non retenu en V1 ; classé parmi les options P2 (10.7, « Rechargement de session »), à replanifier avec elles après la V1, sans jamais relancer l'audio. |
 | PO-13 | Mappage MIDI par défaut (contrôleurs de scratch du marché) | Ouvert (P2, 10.7). |
-| PO-14 | Taille et contenu du son de démonstration | **Ouvert :** son généré par l'app (stab + voix synthétique « ahh ») ou ressource libre de droits embarquée ; licence à documenter. |
-| PO-15 | Calibrage des constantes de résistance (2 à 35 ms) | **Ouvert :** validation sur appareil physique. |
-| PO-16 | Durée maximale par son (10 min) au regard de la mémoire des appareils anciens | **Ouvert :** à réévaluer après mesure de l'empreinte mémoire. |
+| PO-14 | Taille et contenu du son de démonstration | **Clos (v2.1, D-20) :** son généré par l'application (stab + voix synthétique « ahh »), 8 s, stéréo, 48 kHz, déterministe, sans licence tierce (SF-76). |
+| PO-15 | Calibrage des constantes de résistance (2 à 35 ms) | **Ouvert, non bloquant (D-46) :** constantes paramétrables (2 à 35 ms par défaut) ; validation sur appareil physique avec un turntablist, sans changer les exigences. |
+| PO-16 | Durée maximale par son (10 min) au regard de la mémoire des appareils anciens | **Ouvert, non bloquant (D-21) :** limite de 10 min maintenue en V1 ; empreinte mesurée à la recette (deux sons de 10 min, budget ≤ 650 Mo) ; si le budget est dépassé sur un appareil de référence, le PO réduit la limite par un amendement de SF-80. |
 
 ## 9. Journal des modifications
 
@@ -1355,6 +1472,7 @@ Feature: Accessibilité
 | 1.8 | 2026-11-12 | Décision : copie locale systématique des imports, bibliothèque physique unifiée avec les prises micro (interface P2) ; pas de signets ni de liens externes ; Gherkin sur copie, lecture hors ligne, stockage et suppression. |
 | 1.9 | 2026-11-12 | Nommage des prises micro et conservation des noms importés ; menu contextuel de renommage dans la banque (SF-60 à SF-63, RM-43 à RM-46, huit scénarios Gherkin) ; pointeurs préservés par identifiant stable. |
 | 2.0 | 2026-11-14 | Refonte explicite. Application renommée **ScratchApp**. Ajout de macOS (équivalences 0.3, SF-79, 6.14). **Deux platines et table de mixage** en V1 (SF-64 à SF-67). Feutrine et couple moteur (SF-68), repère, forme d'onde et needle drop (SF-69 à SF-71), amorce et sillon fermé (SF-72, RM-55), glisser-déposer, bibliothèque minimale, dédoublonnage et démo (SF-73 à SF-76), qualité audio et latence (SF-77, SF-78), formats, cycle de vie, sortie indisponible et accessibilité (SF-80 à SF-83). Règles RM-50 à RM-61. Renumérotation des règles de copie v1.8 en RM-47 à RM-49 (collision avec RM-43 à RM-46). Background de 6.3 scindé en règles « moteur actif » et « moteur arrêté ». Points ouverts PO-01 à PO-06 et PO-09 clos ; PO-12 à PO-16 ajoutés. Nommage harmonisé des enregistrements de mix (`MIX_…`). Section 10.7 (nouvelles options P2). |
+| 2.1 | 2026-11-14 | Intégration des décisions de la validation PO (registre D-01 à D-47, `docs/bmad/po-validation.md`), sans nouvel identifiant ni renumérotation. Tags `@P1` dans les features [P0] (6.1, 6.2). Temps de rattrapage défini à 95 % et relâchement linéaire moteur arrêté (SF-10, SF-68, 5.1). Règle des changements de sortie (0.3, SF-16, RM-56). Gain avec coupure momentanée (RM-52, 5.2). Trois contacts selon la disposition (SF-19). Clavier Mac : position physique, butées gauche et droite, flèches et focus, répétition, menus (3.5). Repère et recalage de l'angle du disque (SF-69, RM-13, 5.4). Réconciliation de la bibliothèque et nommage des copies dès la V1 (SF-02, RM-48, SF-74, 5.3). Seuils chiffrés : saturation, fluidité, anti-repliement, latence par cadence d'affichage et appareils de référence (SF-65, SF-70, SF-77, SF-78). Son de démonstration généré de 8 s (SF-76). Sortie indisponible avec platines vivantes en silence (SF-82). Propositions UX retenues (3.1 à 3.5, SF-71, SF-73, SF-79, SF-81). Portée globale ou par platine des exigences (section 4). Onze scénarios ajoutés. Règles de recette (section 7). PO-07, PO-12 et PO-14 clos. |
 
 > Les prochains ajouts et corrections devront garder les identifiants SF, RM, PO et E stables, sauf refonte explicite.
 
@@ -1364,7 +1482,7 @@ Feature: Accessibilité
 
 Ces fonctionnalités sont **documentées mais non exigées** pour la première version. Leur développement et leur recette seront planifiés ultérieurement. Les identifiants SF et RM d'origine sont conservés.
 
-> **Note v2.0 :** chaque option P2 s'applique **par platine** (A et B) lorsqu'elle concerne le disque (reverse, pointeurs), et **à la sortie de la table de mixage** lorsqu'elle concerne le mix (crépitement, REC mix). Sur Mac, « Fichiers » se lit « Finder », « iPhone/iPad » se lit « Mac » et « interruption de session audio » se lit « changement de configuration audio » (tableau 0.3).
+> **Note v2.0 :** chaque option P2 s'applique **par platine** (A et B) lorsqu'elle concerne le disque (reverse, pointeurs), et **à la sortie de la table de mixage** lorsqu'elle concerne le mix (crépitement, REC mix). Sur Mac, « Fichiers » se lit « Finder », « iPhone/iPad » se lit « Mac » et « interruption de session audio » se lit « mise en veille ou disparition du périphérique de sortie utilisé » (tableau 0.3, RM-56).
 
 ### 10.1 Reverse motorisé — P2
 
@@ -1846,6 +1964,8 @@ Feature: Gestion automatique des pointeurs de scratch
 **Objectif :** permettre de créer un nouveau sample en enregistrant la voix, un instrument ou un bruit avec le microphone intégré de l’iPhone/iPad/Mac (ou une entrée audio sélectionnée par le système), puis de charger cet enregistrement directement sur la platine virtuelle pour le scratcher. Cette fonction est **distincte** de l’option 10.3 « Enregistrement audio local », qui capture la sortie/mix de la platine.
 
 **Note v2.0 :** la « Banque de sons » P2 **étend la bibliothèque minimale V1** (SF-74) : même stockage, même index, mêmes identifiants (RM-58). Le dédoublonnage par contenu (SF-75) est déjà actif en V1.
+
+**Note v2.1 (D-12) :** la règle de nommage des copies importées (SF-60, RM-43 : nom d'origine, suffixe numérique en cas de collision) s'applique dès la V1, avec le suffixe `_2`, `_3`… (SF-02). Le renommage (SF-62) reste en P2.
 
 **Décision de bibliothèque :** la banque est une bibliothèque physique locale, et non un catalogue de signets ou de chemins distants. Les sons importés depuis Fichiers y sont copiés ; les enregistrements micro y sont créés directement. Les deux catégories apparaissent dans la même bibliothèque. Toute suppression doit être confirmée et ne peut pas effacer le fichier source externe. Les pointeurs sont attachés à un identifiant interne stable de la copie, indépendamment de son nom physique, et restent dans des métadonnées internes distinctes. Un menu contextuel accessible par appui long permet de renommer localement les fichiers importés et les prises micro.
 

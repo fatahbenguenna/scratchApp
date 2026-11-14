@@ -2,7 +2,7 @@
 
 - **Auteur :** 📊 Mary, Analyst BMAD
 - **Date :** 14 novembre 2026
-- **Sources :** `docs/specs/scratchapp_specifications_v2_0.md` (fait foi), `docs/specs/REVUE_v1.9_vers_v2.0.md`
+- **Sources :** spécifications v2.0, analysées ici et désormais archivées ([`archive/scratchapp_specifications_v2_0.md`](../specs/archive/scratchapp_specifications_v2_0.md)), et [`REVUE_v1.9_vers_v2.0.md`](../specs/REVUE_v1.9_vers_v2.0.md). La spec qui fait foi est la [v2.1](../specs/scratchapp_specifications_v2_1.md), qui intègre les décisions du PO.
 - **Artefact compagnon :** [`traceability.md`](traceability.md) : matrice des 72 exigences V1 → épopées → scénarios Gherkin → vérification.
 - **Statut :** à valider par le PM (John) et le PO (Sarah). Aucune exigence nouvelle : les identifiants SF, RM, PO et E renvoient à la spec v2.0.
 - **Renvois :** « §n » et « 6.n » désignent les sections de la spec v2.0 ; I-nn et E-nn, la revue v1.9 → v2.0 ; « section n », ce brief.
@@ -175,6 +175,8 @@ Priorités déduites des features Gherkin et des critères de recette (règle et
 ## 10. Incohérences détectées
 
 La spec v2.0 n'est pas modifiée. Chaque point est soumis au PO ; les pistes ne sont que des propositions.
+
+> **Tranché par le PO** dans [`po-validation.md`](po-validation.md) et intégré à la spec v2.1 : IC-01 → D-01, IC-02 → D-02, IC-03 → D-03, IC-04 → D-04, IC-05 → D-05, IC-06 → D-06, IC-07 → D-07, IC-08 → D-08, IC-09 → D-10, IC-10 → D-11 et D-12, IC-11 → D-13 et D-14, IC-12 → D-17 ; Q-01 → D-14, Q-02 → D-15, Q-03 → registre complet.
 
 | ID | Type | Constat | Conséquence et piste |
 |---|---|---|---|

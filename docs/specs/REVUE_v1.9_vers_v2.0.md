@@ -2,7 +2,7 @@
 
 - **Date :** 14 novembre 2026
 - **Document revu :** [`archive/platine_scratch_specifications_v1_9.md`](archive/platine_scratch_specifications_v1_9.md)
-- **Document produit :** [`scratchapp_specifications_v2_0.md`](scratchapp_specifications_v2_0.md)
+- **Document produit :** [`scratchapp_specifications_v2_0.md`](archive/scratchapp_specifications_v2_0.md), archivé depuis ; la version qui fait foi est la [v2.1](scratchapp_specifications_v2_1.md), qui intègre les décisions de la validation PO ([`po-validation.md`](../bmad/po-validation.md))
 - **But visé :** pouvoir scratcher des pistes **à la façon d'une double platine vinyle 33 tours** (deux platines et une table de mixage), sur iPhone, iPad et Mac.
 
 ## 1. Incohérences corrigées
