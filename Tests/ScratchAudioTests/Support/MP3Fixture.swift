@@ -25,6 +25,60 @@ enum MP3Fixture {
         return url
     }
 
+    // MARK: - MP3 de 10 min (#61)
+
+    /// Répétitions des trames audio : 574 × 40 × 1 152 / 44 100 ≈ 599,8 s, sous la limite de 10 min
+    /// (SF-80) ; 600 répétitions donneraient 627 s.
+    static let tenMinuteRepetitions = 574
+    /// Échantillons par trame MPEG-1 Layer III.
+    static let samplesPerFrame = 1_152
+
+    /// MP3 CBR d'environ 10 min, construit sans encodeur (méthode de la QA, #61) : les trames audio du
+    /// fichier, sans la trame `Info` d'en-tête (qui annoncerait 1 s), répétées `repetitions` fois.
+    static func tenMinutes(repetitions: Int = tenMinuteRepetitions) -> Data {
+        let audio = frames(of: data).filter { !isInfoFrame($0) }
+        var result = Data()
+        result.reserveCapacity(audio.reduce(0) { $0 + $1.count } * repetitions)
+        for _ in 0 ..< repetitions {
+            for frame in audio { result.append(frame) }
+        }
+        return result
+    }
+
+    /// Trames MPEG-1 Layer III de `data`, dans l'ordre ; s'arrête au premier octet qui n'est pas un
+    /// en-tête de trame.
+    static func frames(of data: Data) -> [Data] {
+        let bytes = [UInt8](data)
+        let bitrates = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320] // kbit/s
+        let sampleRates = [44_100, 48_000, 32_000]
+        var frames: [Data] = []
+        var offset = 0
+        while offset + 4 <= bytes.count {
+            // Sync, MPEG-1, Layer III (the CRC bit is ignored).
+            guard bytes[offset] == 0xFF, bytes[offset + 1] & 0xFE == 0xFA else { break }
+            let bitrateIndex = Int(bytes[offset + 2] >> 4)
+            let rateIndex = Int((bytes[offset + 2] >> 2) & 0x3)
+            guard (1 ..< bitrates.count).contains(bitrateIndex), rateIndex < sampleRates.count else { break }
+            let padding = Int((bytes[offset + 2] >> 1) & 0x1)
+            let length = 144 * bitrates[bitrateIndex] * 1_000 / sampleRates[rateIndex] + padding
+            guard offset + length <= bytes.count else { break }
+            frames.append(Data(bytes[offset ..< offset + length]))
+            offset += length
+        }
+        return frames
+    }
+
+    /// Trame `Info` ou `Xing` (en-tête LAME, sans audio) : étiquette après les informations
+    /// annexes, de 17 octets en mono et 32 sinon.
+    static func isInfoFrame(_ frame: Data) -> Bool {
+        let bytes = [UInt8](frame)
+        guard bytes.count > 40 else { return false }
+        let isMono = bytes[3] >> 6 == 0x3
+        let tagOffset = 4 + (isMono ? 17 : 32)
+        let tag = String(decoding: bytes[tagOffset ..< tagOffset + 4], as: UTF8.self)
+        return tag == "Info" || tag == "Xing"
+    }
+
     private static let base64 = """
 //tAwAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAoAAARCgAQEBYWHR0dIyMpKSkvLzU1NTs7QUFBSEhOTk5UVFpaWmBgZmZm
 bGxycnJ5eX9/f4WFi4uLkZGXl5ednaOjo6qqsLCwtra8vLzCwsjIyM7O1dXV29vh4eHn5+3t7fPz+fn5//8AAAAATGF2ZiBsYW1l
