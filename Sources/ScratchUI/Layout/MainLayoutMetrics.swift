@@ -59,4 +59,17 @@ struct MainLayoutMetrics: Equatable {
     var setCueWidth: CGFloat { idiom == .mac ? 80 : 104 }
     var cueWidth: CGFloat { idiom == .mac ? 48 : 70 }
     let transportSpacing: CGFloat = 8
+
+    // MARK: Table de mixage (UX §4.5, §4.6, §5.12)
+
+    /// Hauteur du crossfader : 44 (Mac), 56 (iPad).
+    var crossfaderHeight: CGFloat { idiom == .mac ? 44 : 56 }
+
+    /// Hauteur du contenu d'une colonne de platine (plateau et éléments fixes).
+    var columnContentHeight: CGFloat {
+        platter + (idiom == .mac ? Self.macColumnChrome : Self.tabletColumnChrome)
+    }
+
+    /// Marge sous le crossfader pour l'aligner sur la rangée de transport (au-dessus de la résistance).
+    var crossfaderBottomInset: CGFloat { resistanceHeight + rowSpacings[4] }
 }
