@@ -43,6 +43,7 @@ private struct PreviewLibrary: LibraryStoring {
     }
 
     func importFile(at url: URL) async throws -> ImportResult { throw LibraryError.unsupportedFormat }
+    func reconcile() async -> [LibraryEntry] { [] }
     func delete(id: UUID) async throws { throw LibraryError.demoCannotBeDeleted }
     func url(for id: UUID) async throws -> URL { throw LibraryError.notFound }
 }
