@@ -106,6 +106,7 @@ struct CrossfaderGrip {
 }
 
 /// Surface de saisie native : envoie `setCrossfader` pour chaque événement reçu (CA 6).
+@MainActor
 private struct CrossfaderSurface {
     let mixer: MixerViewModel
     let course: CGFloat
