@@ -27,15 +27,11 @@ struct DeckBandView: View {
     private var panel: some View {
         VStack(alignment: .leading, spacing: 12) {
             DeckHeaderView(model: model, intents: intents, width: LayoutMetrics.bandPanelWidth)
-            reserved(height: 56)                                                    // waveform (4.6)
-            reserved(height: 32)                                                    // overview (4.6)
+            ZoomedWaveformView(model: model, width: LayoutMetrics.bandPanelWidth, height: 56)
+            WaveformOverviewView(model: model, width: LayoutMetrics.bandPanelWidth, height: 32)
             TransportControls(model: model, metrics: metrics, grid: true)
             ResistanceSlider(model: model)
         }
         .frame(width: LayoutMetrics.bandPanelWidth)
-    }
-
-    private func reserved(height: CGFloat) -> some View {
-        Color.clear.frame(height: height).accessibilityHidden(true)
     }
 }

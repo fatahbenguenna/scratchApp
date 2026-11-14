@@ -42,7 +42,7 @@ struct CueButtons: View {
             .accessibilityInputLabels(["CUE"])
             .accessibilityIdentifier("\(id).cue")
         }
-        .onChange(of: model.setCueCount) {
+        .onChange(of: model.setCueAnnouncementCount) {
             AccessibilityNotification.Announcement(model.setCueAnnouncement).post()
         }
     }
