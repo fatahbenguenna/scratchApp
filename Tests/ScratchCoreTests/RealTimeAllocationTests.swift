@@ -4,14 +4,30 @@ import XCTest
 
 /// Règles temps réel du rendu (story 1.5 CA 9 ; NFR2 ; architecture §6.1) : aucune allocation et
 /// aucun comptage de références des clips sur le fil de rendu.
+///
+/// Le compteur est **exigé** : si les points d'entrée d'instrumentation de l'environnement Swift
+/// manquaient, les tests échoueraient au lieu d'être sautés (note de QA sur #27). Ne pas lancer ces
+/// tests sous ThreadSanitizer (crochets globaux lus par les autres fils).
 final class RealTimeAllocationTests: XCTestCase {
+    private struct CounterUnavailable: Error, CustomStringConvertible {
+        var description: String { "Swift runtime instrumentation hooks unavailable: the allocation counter cannot run" }
+    }
+
+    /// Échoue (sans sauter) si le compteur ne peut pas fonctionner dans cet environnement.
+    private func requireCounter() throws {
+        guard AllocationCounter.isAvailable else {
+            XCTFail("\(CounterUnavailable())")
+            throw CounterUnavailable()
+        }
+    }
+
     private final class Probe { var value = 1 }
     /// Garde l'objet vivant hors de la mesure : l'optimiseur ne peut pas le placer sur la pile.
     private static var sink: Probe?
 
     /// Le compteur voit une allocation d'objet Swift faite par le fil mesuré (contrôle de l'outil).
     func testAllocationCounterSeesAllocations() throws {
-        try XCTSkipUnless(AllocationCounter.isAvailable, "Swift runtime hooks unavailable")
+        try requireCounter()
         let counts = AllocationCounter.measure { Self.sink = Probe() }
         XCTAssertEqual(Self.sink?.value, 1)
         XCTAssertGreaterThanOrEqual(counts.allocations, 1)
@@ -24,7 +40,7 @@ final class RealTimeAllocationTests: XCTestCase {
     /// avec pitch, CUE, needle drop, START/STOP et chargements, table de mixage en mouvement continu :
     /// aucune allocation et aucun comptage de références d'un clip sur le fil de rendu.
     func testNoAllocationOnRenderThread_NFR2() throws {
-        try XCTSkipUnless(AllocationCounter.isAvailable, "Swift runtime hooks unavailable")
+        try requireCounter()
         let clipA = TestClips.sine(frequency: 700, seconds: 60)
         let clipB = TestClips.noise(frames: 48_000 * 30)
         let spares = [TestClips.sine(frequency: 300, seconds: 30), TestClips.noise(frames: 48_000 * 20)]
