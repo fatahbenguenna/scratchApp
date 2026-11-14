@@ -13,41 +13,47 @@ struct DeckHeaderView: View {
 
     var body: some View {
         let id = "deck.\(model.deck.rawValue.lowercased())"
-        HStack(alignment: .top, spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 8) {
-                    Text(verbatim: model.deck.rawValue)
-                        .font(Theme.deckLetter)
-                        .foregroundStyle(Theme.textOnAccent)
-                        .frame(width: 24, height: 24)
-                        .background(RoundedRectangle(cornerRadius: 6).fill(Theme.deckColor(model.deck)))
-                    Text(verbatim: model.title)
-                        .font(Theme.deckTitle)
-                        .foregroundStyle(model.hasTitle ? Theme.textPrimary : Theme.textSecondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    PositionText(model: model)
-                    Text(verbatim: "/").font(Theme.timeDuration).foregroundStyle(Theme.textSecondary)
-                    Text(verbatim: model.durationText).font(Theme.timeDuration).foregroundStyle(Theme.textSecondary)
-                    if model.isAtEnd { StatusPill(text: "Fin du son", showsProgress: false) }
-                    if let activity = model.activityText { StatusPill(text: activity, showsProgress: true) }
-                }
+        let showsImportText = width >= 320
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 8) {
+                Text(verbatim: model.deck.rawValue)
+                    .font(Theme.deckLetter)
+                    .foregroundStyle(Theme.textOnAccent)
+                    .frame(width: 24, height: 24)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Theme.deckColor(model.deck)))
+                Text(verbatim: model.title)
+                    .font(Theme.deckTitle)
+                    .foregroundStyle(model.hasTitle ? Theme.textPrimary : Theme.textSecondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(model.headerAccessibilityLabel)
-            .accessibilityValue(model.headerAccessibilityValue)
-            .accessibilityIdentifier("\(id).title")
-            Spacer(minLength: 0)
+            .padding(.trailing, showsImportText ? 112 : 48)   // room for the Import button
+            // The time readout never truncates; only the status pills give way.
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                PositionText(model: model).fixedSize().layoutPriority(2)
+                Text(verbatim: "/ " + model.durationText)
+                    .font(Theme.timeDuration)
+                    .foregroundStyle(Theme.textSecondary)
+                    .fixedSize()
+                    .layoutPriority(1)
+                if model.isAtEnd { StatusPill(text: "Fin du son", showsProgress: false) }
+                if let activity = model.activityText { StatusPill(text: activity, showsProgress: true) }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(model.headerAccessibilityLabel)
+        .accessibilityValue(model.headerAccessibilityValue)
+        .accessibilityIdentifier("\(id).title")
+        .overlay(alignment: .topTrailing) {
             Button { intents.importFile(on: model.deck) } label: {
-                if width >= 320 {
+                if showsImportText {
                     Label("Importer", systemImage: "square.and.arrow.down")
                 } else {
                     Image(systemName: "square.and.arrow.down")
                 }
             }
-            .buttonStyle(RaisedButtonStyle())
+            .buttonStyle(RaisedButtonStyle(compact: true))
             .disabled(!model.isImportEnabled)
             .accessibilityLabel("Importer, \(model.deckName)")
             .accessibilityIdentifier("\(id).import")

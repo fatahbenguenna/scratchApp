@@ -31,7 +31,10 @@ struct TurntableView: View {
                     Slipmat(deck: model.deck, disc: disc).equatable()
                 }
             }
-            Circle().fill(Theme.knob).frame(width: disc * 0.025, height: disc * 0.025)
+            Circle()
+                .fill(Theme.knob)
+                .overlay(Circle().stroke(Theme.bgApp, lineWidth: 1))
+                .frame(width: disc * 0.025, height: disc * 0.025)
             PlayheadMarker(platter: platter)
             Circle()
                 .strokeBorder(Theme.deckColor(model.deck), lineWidth: 3)
@@ -133,7 +136,8 @@ private struct Slipmat: View, Equatable {
     }
 }
 
-/// Étiquette : couleur de la platine, lettre (0,12 D) et titre sur deux lignes (0,035 D).
+/// Étiquette : couleur de la platine, lettre (0,12 D) au centre et titre sur deux lignes (0,035 D)
+/// au-dessous ; la moitié haute reste libre pour le repère (0,06 D à 0,16 D du centre).
 private struct DiscLabel: View, Equatable {
     let deck: DeckID
     let title: String
@@ -143,19 +147,20 @@ private struct DiscLabel: View, Equatable {
         let size = disc * 0.33
         ZStack {
             Circle().fill(Theme.labelColor(deck))
-            VStack(spacing: disc * 0.01) {
-                Text(verbatim: deck.rawValue).font(.system(size: disc * 0.12, weight: .bold, design: .rounded))
-                Text(verbatim: title)
-                    .font(.system(size: disc * 0.035, weight: .medium))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-                    .truncationMode(.middle)
-                    .frame(width: size * 0.7)
-            }
-            .foregroundStyle(Theme.textPrimary)
-            .offset(y: disc * 0.02)
+            Text(verbatim: deck.rawValue)
+                .font(.system(size: disc * 0.12, weight: .bold, design: .rounded))
+                .offset(y: -disc * 0.005)
+            Text(verbatim: title)
+                .font(.system(size: disc * 0.035, weight: .medium))
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .truncationMode(.middle)
+                .frame(width: size * 0.8)
+                .offset(y: disc * 0.088)
         }
+        .foregroundStyle(Theme.textPrimary)
         .frame(width: size, height: size)
+        .clipShape(Circle())
     }
 }
 

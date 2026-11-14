@@ -64,31 +64,34 @@ struct EmptyDeckOverlay: View {
     }
 }
 
-/// Bouton secondaire de l'écran principal : fond `bg.raised`, enfoncé `bg.pressed`, rayon 8.
+/// Bouton secondaire de l'écran principal : fond `bg.raised`, enfoncé `bg.pressed`, rayon 8, zone
+/// tactile de 44 pt. `compact` : visuel de 26 pt calé en haut de la zone (en-tête de platine).
 struct RaisedButtonStyle: ButtonStyle {
     var accent: Color = Theme.textPrimary
+    var compact = false
 
     func makeBody(configuration: Configuration) -> some View {
-        RaisedButtonBody(configuration: configuration, accent: accent)
+        RaisedButtonBody(configuration: configuration, accent: accent, compact: compact)
     }
 }
 
 private struct RaisedButtonBody: View {
     let configuration: ButtonStyleConfiguration
     let accent: Color
+    let compact: Bool
     @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
         configuration.label
             .font(Theme.body.weight(.semibold))
             .foregroundStyle(isEnabled ? accent : Theme.textDisabled)
-            .padding(.horizontal, 12)
-            .frame(minHeight: 32)
+            .padding(.horizontal, compact ? 10 : 12)
+            .frame(minHeight: compact ? 26 : 32)
             .background(
                 RoundedRectangle(cornerRadius: Theme.buttonRadius)
                     .fill(configuration.isPressed ? Theme.bgPressed : Theme.bgRaised)
             )
+            .frame(minHeight: 44, alignment: compact ? .top : .center)
             .contentShape(Rectangle())
-            .frame(minHeight: 44)
     }
 }
