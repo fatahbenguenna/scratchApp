@@ -8,34 +8,8 @@ import XCTest
 /// est remplacée par un double, et le graphe est vérifié en rendu manuel hors ligne.
 @MainActor
 final class AudioEngineHostTests: XCTestCase {
-    /// Double de la sortie matérielle : succès ou échec scriptés. Il note, à chaque démarrage, si
-    /// l'horloge de secours tournait encore.
-    private final class FakeOutput: AudioHardwareOutput {
-        var onConfigurationChange: (() -> Void)?
-        var failure: Error?
-        var info = AudioOutputInfo(name: "MPC Sample (USB)", sampleRate: 44_100, bufferFrames: 256, outputLatency: 0.004)
-        var isFallbackRunning: (() -> Bool)?
-        private(set) var fallbackRunningAtStart: [Bool] = []
-        private(set) var stopCount = 0
-        private(set) var deactivateCount = 0
-
-        func start(rendering engine: ScratchEngine) throws -> AudioOutputInfo {
-            fallbackRunningAtStart.append(isFallbackRunning?() ?? false)
-            if let failure { throw failure }
-            engine.send(.outputSampleRate(info.sampleRate))
-            return info
-        }
-
-        func stop() { stopCount += 1 }
-        func deactivate() { deactivateCount += 1 }
-    }
-
     private func makeHost(engine: ScratchEngine = ScratchEngine(), failing: Bool) -> (AudioEngineHost, FakeOutput) {
-        let output = FakeOutput()
-        if failing { output.failure = AudioOutputError.noOutput }
-        let host = AudioEngineHost(engine: engine, output: output)
-        output.isFallbackRunning = { [unowned host] in host.isFallbackRunning }
-        return (host, output)
+        FakeOutput.makeHost(engine: engine, failing: failing)
     }
 
     private static func sine(frequency: Double, seconds: Double, sampleRate: Double = 48_000) -> AudioClip {
@@ -115,20 +89,20 @@ final class AudioEngineHostTests: XCTestCase {
         XCTAssertTrue(host.isFallbackRunning)
 
         output.failure = nil
-        output.onConfigurationChange?() // e.g. a device appears or the default output changes
+        output.onSystemEvent?(.configurationChanged) // e.g. a device appears or the default output changes
         XCTAssertEqual(output.fallbackRunningAtStart, [false, false], "the clock stops before the output starts")
         XCTAssertFalse(host.isFallbackRunning)
         XCTAssertTrue(host.status.isRunning)
 
         output.failure = AudioOutputError.noOutput
-        output.onConfigurationChange?()
+        output.onSystemEvent?(.configurationChanged)
         XCTAssertTrue(host.isFallbackRunning, "the clock takes over when the output cannot restart")
         XCTAssertTrue(host.isRenderingAudio)
         if case .unavailable = host.status {} else { XCTFail("expected .unavailable, got \(host.status)") }
 
         host.stop()
         XCTAssertFalse(host.isFallbackRunning)
-        output.onConfigurationChange?()
+        output.onSystemEvent?(.configurationChanged)
         XCTAssertEqual(output.fallbackRunningAtStart.count, 3, "no restart once stopped")
     }
 
