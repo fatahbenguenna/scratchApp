@@ -39,18 +39,33 @@ final class OutputDeviceMonitorTests: XCTestCase {
         XCTAssertEqual(monitor.defaultOutputDevice, OutputDeviceMonitor.currentDefaultOutputDevice())
     }
 
-    /// Recommandation de la gate (#88) : une rafale plus longue que le délai de regroupement (trois
-    /// notifications espacées de 30 ms) donne encore un seul événement (délai relancé).
-    func testLongBurstGivesASingleEvent() async {
-        let monitor = OutputDeviceMonitor()
-        var events: [AudioSystemEvent] = []
-        monitor.onEvent = { events.append($0) }
-        for _ in 0..<3 {
+    /// Recommandation de la gate (#88) : une rafale plus longue que le délai de regroupement, avec des
+    /// notifications plus rapprochées que ce délai, donne un seul événement, parti après la dernière
+    /// (délai relancé ; une fenêtre fixe en donnerait deux). Les écarts réels sont mesurés : si le runner
+    /// les étire au-delà du délai, la vérification est sautée plutôt que fausse.
+    func testLongBurstGivesASingleEvent() async throws {
+        let delay = 0.3
+        let monitor = OutputDeviceMonitor(coalescingDelay: UInt64(delay * 1e9))
+        var eventTimes: [Date] = []
+        monitor.onEvent = { _ in eventTimes.append(Date()) }
+        var callTimes: [Date] = []
+        for index in 0..<3 {
+            if index > 0 { try? await Task.sleep(nanoseconds: 200_000_000) }
+            callTimes.append(Date())
             monitor.deviceConfigurationDidChange()
-            try? await Task.sleep(nanoseconds: 30_000_000)
         }
-        try? await Task.sleep(nanoseconds: 200_000_000)
-        XCTAssertEqual(events, [.configurationChanged])
+        let gaps = zip(callTimes.dropFirst(), callTimes).map { $0.timeIntervalSince($1) }
+        let span = callTimes.last!.timeIntervalSince(callTimes.first!)
+        for _ in 0..<200 where eventTimes.isEmpty { try? await Task.sleep(nanoseconds: 20_000_000) }
+        try? await Task.sleep(nanoseconds: 400_000_000)
+        guard gaps.allSatisfy({ $0 < delay }) else {
+            throw XCTSkip("runner too loaded: notification gaps \(gaps) exceed the \(delay) s delay")
+        }
+        XCTAssertGreaterThan(span, delay, "the burst is longer than the delay")
+        XCTAssertEqual(eventTimes.count, 1, "a single event for the whole burst")
+        if let event = eventTimes.first {
+            XCTAssertGreaterThanOrEqual(event.timeIntervalSince(callTimes.last!), delay * 0.9, "sent after the last notification")
+        }
     }
 
     /// CA3 — D-04 : présence du périphérique utilisé (contexte de la politique) ; un identifiant

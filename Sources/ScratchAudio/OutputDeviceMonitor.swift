@@ -9,7 +9,7 @@ import ScratchCore
 /// Traduit en `AudioSystemEvent`, sur le fil principal :
 /// - un changement du périphérique de sortie par défaut ou de la liste des périphériques (branchement,
 ///   retrait d'une interface USB) → `configurationChanged`. Les notifications d'une même rafale sont
-///   regroupées en un seul événement : il part `coalescingDelay` après la **dernière** notification
+///   regroupées en un seul événement : il part `coalescingDelay` (50 ms) après la **dernière** notification
 ///   (délai relancé à chaque notification). L'hôte demande alors à
 ///   `isDeviceInUseStillPresent` si le périphérique qu'il utilisait existe encore (contexte de
 ///   `AudioSystemPolicy`) ;
@@ -21,8 +21,11 @@ import ScratchCore
 /// `start()` et `stop()` : fil principal ; `stop()` doit être appelé avant de libérer le moniteur.
 @MainActor
 public final class OutputDeviceMonitor {
-    /// Délai de regroupement des notifications Core Audio d'une même rafale.
-    static let coalescingDelay: UInt64 = 50_000_000 // 50 ms
+    /// Délai de regroupement par défaut des notifications Core Audio d'une même rafale.
+    public nonisolated static let defaultCoalescingDelay: UInt64 = 50_000_000 // 50 ms
+
+    /// Délai de regroupement (ns), relancé à chaque notification.
+    let coalescingDelay: UInt64
 
     /// Appelé sur le fil principal pour chaque événement.
     public var onEvent: ((AudioSystemEvent) -> Void)?
@@ -37,7 +40,9 @@ public final class OutputDeviceMonitor {
     private var workspaceObservers: [NSObjectProtocol] = []
     private var configurationChangeGeneration = 0
 
-    public init() {}
+    public init(coalescingDelay: UInt64 = OutputDeviceMonitor.defaultCoalescingDelay) {
+        self.coalescingDelay = coalescingDelay
+    }
 
     /// Le périphérique utilisé est toujours connecté (vrai s'il n'y en a pas : rien n'a été perdu).
     public var isDeviceInUseStillPresent: Bool {
@@ -90,8 +95,9 @@ public final class OutputDeviceMonitor {
     func deviceConfigurationDidChange() {
         configurationChangeGeneration += 1
         let generation = configurationChangeGeneration
+        let delay = coalescingDelay
         Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: Self.coalescingDelay)
+            try? await Task.sleep(nanoseconds: delay)
             guard let self, generation == self.configurationChangeGeneration else { return }
             self.defaultOutputDevice = Self.currentDefaultOutputDevice()
             self.onEvent?(.configurationChanged)
