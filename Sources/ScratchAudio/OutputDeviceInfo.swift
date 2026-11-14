@@ -87,8 +87,10 @@ struct OutputDevice {
     /// Taille de tampon effective, en trames (relue, jamais la valeur demandée).
     var bufferFrameSize: UInt32? { value(kAudioDevicePropertyBufferFrameSize) }
 
-    /// Demande `frames` trames par tampon, ramenées à la plage du périphérique.
-    func requestBufferFrameSize(_ frames: UInt32) {
+    /// Demande `frames` trames par tampon, ramenées à la plage du périphérique. Renvoie le tampon
+    /// effectif relu, ou `nil` si le périphérique refuse la demande.
+    @discardableResult
+    func requestBufferFrameSize(_ frames: UInt32) -> UInt32? {
         var address = Self.address(kAudioDevicePropertyBufferFrameSizeRange)
         var range = AudioValueRange()
         var size = UInt32(MemoryLayout<AudioValueRange>.size)
@@ -97,7 +99,9 @@ struct OutputDevice {
             wanted = UInt32(min(max(Double(frames), range.mMinimum), range.mMaximum))
         }
         var sizeAddress = Self.address(kAudioDevicePropertyBufferFrameSize)
-        _ = AudioObjectSetPropertyData(id, &sizeAddress, 0, nil, UInt32(MemoryLayout<UInt32>.size), &wanted)
+        guard AudioObjectSetPropertyData(id, &sizeAddress, 0, nil, UInt32(MemoryLayout<UInt32>.size), &wanted) == noErr
+        else { return nil }
+        return bufferFrameSize
     }
 
     /// Libellé de la sortie (UX §5.17).

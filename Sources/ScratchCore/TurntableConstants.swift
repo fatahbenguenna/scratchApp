@@ -83,7 +83,9 @@ public enum TurntableConstants {
     /// Pas du crossfader au clavier (3.5) : 5 %.
     public static let keyboardCrossfaderStep: Double = 0.05
 
-    /// Taille de tampon audio visée (SF-78) : 256 trames à 48 kHz ≈ 5,3 ms.
+    /// Plafond du tampon audio (SF-78) : 256 trames à 48 kHz ≈ 5,3 ms. La sortie demande d'abord 128
+    /// trames et se replie sur cette valeur (`OutputBufferPolicy`, #91, D-54) ; l'horloge de secours
+    /// et la sonde sans sortie s'y tiennent.
     public static let preferredBufferFrames: Int = 256
 }
 
