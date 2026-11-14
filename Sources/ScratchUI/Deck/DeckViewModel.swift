@@ -6,7 +6,7 @@ import ScratchLibrary
 /// Modèle de présentation d'une platine (PRD 4.1 ; architecture §5.2).
 ///
 /// **Version de base (story 0.2), complétée en 4.1** (textes affichés, états des boutons, points
-/// d'accroche de l'`AppModel`) **et en 4.5**.
+/// d'accroche de l'`AppModel`), **en 4.5 et en 4.6** (forme d'onde, needle drop).
 ///
 /// Deux cadences :
 /// - `frame` : instantané complet de la platine, remplacé **à chaque image** par `AppModel.tick()`.
@@ -28,9 +28,19 @@ public final class DeckViewModel {
     /// Entrée de bibliothèque chargée (titre affiché), renseignée par l'`AppModel` au chargement, avec
     /// `loadedClip`. Effacée seulement quand l'instantané montre que ce clip a quitté la platine.
     public var loadedEntry: LibraryEntry?
-    /// Clip envoyé par `.load` (forme d'onde en 4.6), renseigné par l'`AppModel` en même temps que
-    /// `loadedEntry` (story 4.1 CA 7).
-    public var loadedClip: AudioClip?
+    /// Clip envoyé par `.load`, renseigné par l'`AppModel` en même temps que `loadedEntry` (story 4.1
+    /// CA 7). Chaque changement de clip lance l'analyse de sa forme d'onde, ou la reprend du cache
+    /// si l'autre platine affiche le même clip (4.6).
+    public var loadedClip: AudioClip? {
+        get { storedClip }
+        set {
+            storedClip = newValue
+            loadedClipDidChange()
+        }
+    }
+    private var storedClip: AudioClip?
+    /// Enveloppe de la forme d'onde du clip chargé (4.6) ; `nil` à vide et pendant l'analyse.
+    public private(set) var peaks: WaveformPeaks?
     /// Import ou chargement en cours, posé par l'`AppModel` (UX §5.10, §7.2).
     public var activity = DeckActivity.idle
 
@@ -48,6 +58,8 @@ public final class DeckViewModel {
     public private(set) var positionText = DeckFormatting.emptyTime
     /// Durée `mm:ss,d`, « --:--,- » sans son.
     public private(set) var durationText = DeckFormatting.emptyTime
+    /// Durée du son chargé (0 sans son), hors de la cadence par image : géométrie de l'aperçu (4.6).
+    public private(set) var durationSeconds: Double = 0
     /// Valeur VoiceOver du disque (UX §5.1), à la même cadence que `positionText`.
     public private(set) var discAccessibilityValue = "vide"
     /// Valeur VoiceOver de l'en-tête (UX §5.10), à la même cadence que `positionText`.
@@ -76,13 +88,20 @@ public final class DeckViewModel {
     /// Horloge monotone des confirmations (injectée par les tests).
     @ObservationIgnored var clock: () -> Double = { ProcessInfo.processInfo.systemUptime }
 
+    // Waveform analysis of the loaded clip (4.6).
+    @ObservationIgnored private let waveformCache: WaveformCache
+    @ObservationIgnored private var waveformClipID: AudioClip.ID?
+    @ObservationIgnored private var waveformTask: Task<Void, Never>?
+
     /// Saisie du disque (doigt, souris, trackpad) partagée par les surfaces de la story 4.3 ;
     /// `cancelAll` relâche le disque (rotation, changement de disposition, sélecteur de platine).
     public let discInput: DiscInputCoordinator
 
-    public init(deck: DeckID, engine: any EngineControlling) {
+    /// - Parameter waveformCache: cache des formes d'onde partagé par les platines (`.shared` par défaut).
+    public init(deck: DeckID, engine: any EngineControlling, waveformCache: WaveformCache? = nil) {
         self.deck = deck
         self.engine = engine
+        self.waveformCache = waveformCache ?? .shared
         discInput = DiscInputCoordinator(deck: deck)
         discInput.model = self
     }
@@ -138,6 +157,7 @@ public final class DeckViewModel {
     func apply(_ snapshot: DeckSnapshot) {
         if frame != snapshot { frame = snapshot }
         if isLoaded != snapshot.isLoaded { isLoaded = snapshot.isLoaded }
+        if durationSeconds != snapshot.durationSeconds { durationSeconds = snapshot.durationSeconds }
         // A commanded value stays shown until a snapshot confirms it (#57).
         let now = clock()
         var meter = channelMeter
@@ -182,6 +202,25 @@ public final class DeckViewModel {
         loadedEntry = nil
         loadedClip = nil
         confirmedClipID = nil
+    }
+
+    /// Forme d'onde du nouveau clip : rend la référence de l'ancien au cache, puis attend l'analyse
+    /// du nouveau (partagée avec l'autre platine si c'est le même clip, RM-57).
+    private func loadedClipDidChange() {
+        let id = storedClip?.id
+        guard id != waveformClipID else { return }
+        if let previous = waveformClipID { waveformCache.release(previous) }
+        waveformTask?.cancel()
+        waveformTask = nil
+        waveformClipID = id
+        if peaks != nil { peaks = nil }
+        guard let clip = storedClip else { return }
+        let analysis = waveformCache.retain(clip)
+        waveformTask = Task { [weak self] in
+            let result = await analysis.value
+            guard let self, self.waveformClipID == id else { return }
+            self.peaks = result
+        }
     }
 
     /// Met à jour les textes seulement quand le dixième affiché ou l'état change (UX §10.2).
@@ -302,10 +341,39 @@ public final class DeckViewModel {
         return "CUE à " + DeckFormatting.spokenTime(tenths: DeckFormatting.tenths(cueSeconds))
     }
 
-    /// Needle drop sur l'aperçu complet : `fraction` 0…1 de la durée (SF-71). Ignoré disque tenu.
+    // MARK: Aperçu et needle drop (story 4.6)
+
+    /// Disque tenu, d'après l'instantané ou un contact déjà reçu par la surface du disque : le needle
+    /// drop est alors ignoré (SF-71, D-33).
+    public var isDiscHeld: Bool { isHeld || discInput.isHolding }
+
+    /// Needle drop (SF-71, D-33) : place la tête à `seconds`, amorce comprise ([−2 s ; durée]), sans
+    /// changer l'état du moteur. Ignoré sur une platine vide ou disque tenu.
+    public func needleDrop(toSeconds seconds: Double) {
+        let duration = frame.durationSeconds
+        guard !isDiscHeld, duration > 0, seconds.isFinite else { return }
+        let target = seconds.clamped(to: -TurntableConstants.leadInSeconds...duration, fallback: 0)
+        engine.send(.seek(deck, seconds: target))
+    }
+
+    /// Needle drop en fraction 0…1 de la durée (SF-71). Ignoré disque tenu.
     public func needleDrop(fraction: Double) {
-        guard !isHeld, frame.durationSeconds > 0, fraction.isFinite else { return }
-        engine.send(.seek(deck, seconds: fraction.clamped(to: 0...1, fallback: 0) * frame.durationSeconds))
+        guard fraction.isFinite else { return }
+        needleDrop(toSeconds: fraction.clamped(to: 0...1, fallback: 0) * frame.durationSeconds)
+    }
+
+    /// Needle drop accessible (UX §5.8) : ± `steps` × 5 % de la durée depuis la position actuelle.
+    public func nudgeNeedle(steps: Int) {
+        let duration = frame.durationSeconds
+        needleDrop(toSeconds: frame.positionSeconds + Double(steps) * 0.05 * duration)
+    }
+
+    /// Valeur VoiceOver de l'aperçu : « position 12,3 secondes sur 3 minutes 45 secondes, CUE à
+    /// 4 secondes » (ou « aucun CUE ») ; à la cadence du dixième, comme l'en-tête (UX §10.2).
+    public var overviewAccessibilityValue: String {
+        guard isLoaded else { return headerAccessibilityValue }
+        let cue = cueSeconds.map { "CUE à " + DeckFormatting.spokenTime(tenths: DeckFormatting.tenths($0)) }
+        return headerAccessibilityValue + ", " + (cue ?? "aucun CUE")
     }
 
     // MARK: Geste sur le disque (angles de `GestureAngleTracker`, temps des événements)

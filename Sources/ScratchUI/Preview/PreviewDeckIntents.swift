@@ -42,8 +42,18 @@ public final class PreviewDeckIntents: DeckIntents {
         deckModel.loadedEntry = entry
     }
 
-    /// Clip silencieux à 100 Hz : la durée compte, pas les échantillons (le faux moteur ne joue rien).
+    /// Clip à 100 Hz : le faux moteur ne joue rien, mais les échantillons dessinent une forme d'onde
+    /// plausible (attaques toutes les demi-secondes, 4.6).
     nonisolated static func syntheticClip(title: String, duration: Double) -> AudioClip {
-        AudioClip(title: title, sampleRate: 100, frameCount: max(1, Int(duration * 100))) { _, _ in }
+        AudioClip(title: title, sampleRate: 100, frameCount: max(1, Int(duration * 100))) { left, right in
+            for index in left.indices {
+                let time = Double(index) / 100
+                let attack = exp(-time.truncatingRemainder(dividingBy: 0.5) / 0.12)
+                let level = Float((0.15 + 0.75 * attack) * (0.7 + 0.3 * sin(time * 0.9)))
+                let sample = index.isMultiple(of: 2) ? level : -level
+                left[index] = sample
+                right[index] = sample * 0.9
+            }
+        }
     }
 }
