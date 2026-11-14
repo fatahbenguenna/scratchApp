@@ -1,0 +1,47 @@
+schema: 1
+story: "bug-57"
+story_title: "Valeurs commandées et boucle d'affichage avec un instantané en retard (correctif de la 4.1)"
+pr: 70
+issue: 57
+reviewed_sha: "c4627d1"
+gate: PASS
+status_reason: >-
+  Les deux effets de #57 sont corrigés. Les valeurs commandées (platine et table) restent affichées
+  jusqu'à confirmation par l'instantané, 100 ms au plus. La boucle d'affichage ne se suspend qu'après
+  100 ms de repos continu. Tests avec un moteur à instantané retardé d'une et de deux images. CI
+  Linux et macOS verte ; fusion sans conflit avec main et #71. La condition (2) de D-52 est levée
+  pour la 6.2.
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues: []
+checks:
+  - item: "Platine : motorOn, speed, pitch, resistance"
+    result: "CommandedValue, confirmation par égalité ou délai de 0,1 s ; START/STOP stable à chaque image avec un retard d'une et de deux images."
+  - item: "Table : crossfader, courbe, hamster, faders, coupures"
+    result: "Faders et coupures suivis par paire ; testSettingsAndMixerHoldCommandedValues."
+  - item: "Délai dépassé"
+    result: "L'instantané fait foi à 100 ms (commande refusée ou bornée)."
+  - item: "Boucle d'affichage"
+    result: "Suspension après idleGracePeriod = 0,1 s de repos continu (horodatage CADisplayLink) ; wake() et toute image active remettent le compte à zéro ; pas de suspension tant que l'instantané en retard reste au repos."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Sans objet."
+  performance:
+    status: PASS
+    notes: "Coût constant par image ; boucle toujours suspendable au repos."
+  reliability:
+    status: PASS
+    notes: "Plus de clignotement ni de disque figé avec l'hôte réel."
+  maintainability:
+    status: PASS
+    notes: "Mécanisme générique et pur, réutilisable en 4.5 ; horloges injectables."
+evidence:
+  linux_tests: "scripts/linux-test.sh sur c4627d1 : 152/152 (cœur inchangé)"
+  ci: "Rapport CI 37d0e34 (fusion dans 0dcb974) : Linux ✅, macOS ✅ ; aucun changement de ScratchUI sur main depuis"
+  merge_check: "git merge-tree avec origin/main et avec story/6.1-app-model-loading : sans conflit"
+recommendations:
+  immediate: []
+  future:
+    - action: "6.2 : brancher DisplayWakingEngine avec l'hôte ; appeler wake() pour les changements qui ne passent pas par une commande (statut de sortie, interruption)."
+    - action: "Fusionner #70 avant #72, qui contient ce commit."
