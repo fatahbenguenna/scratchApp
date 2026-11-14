@@ -621,9 +621,10 @@ final class DeckPhysicsTests: XCTestCase {
             XCTAssertEqual(harness.physics.discAngle, before.discAngle)
             XCTAssertEqual(harness.physics.discVelocity, before.discVelocity)
             XCTAssertEqual(harness.physics.positionSeconds, before.positionSeconds)
-            let tau = harness.physics.holdTimeConstant
             let next = harness.step()
-            // The step is bounded by the dynamics of the new τ: no jump of angle, speed or position.
+            // The step is bounded by the dynamics of the τ applied to it (slewed toward the new
+            // resistance, #54): no jump of angle, speed or position.
+            let tau = harness.physics.appliedHoldTimeConstant
             let error = abs(before.holdTrackingError)
             let acceleration = error / (tau * tau) + 2 * abs(before.discVelocity) / tau
             XCTAssertLessThanOrEqual(abs(next.discVelocity - before.discVelocity), acceleration * harness.dt * 1.05)
@@ -898,6 +899,91 @@ final class DeckPhysicsTests: XCTestCase {
             finals.append(start.positions + stop.positions + [harness.physics.platterAngle])
         }
         for other in finals.dropFirst() { XCTAssertEqual(other, finals[0]) }
+    }
+
+    /// #54 — SF-23, D-46 (6.7 « Modifier la résistance pendant le scratch ») : un changement brutal de
+    /// résistance pendant un geste à 2,8 × ωref est lissé : de 100 % à 0 %, la vitesse de lecture reste
+    /// sous 1,5 × celle du geste (sans lissage : 16×) ; de 0 % à 100 %, pas d'inversion ni d'arrêt.
+    /// `θd`, `ωd` et `p` restent continus et τ rejoint la valeur visée.
+    func testAbruptResistanceChangeIsSmoothed_SF23() {
+        let gesture = 2.8
+        for (from, to) in [(1.0, 0.0), (1.0, 0.5), (0.0, 1.0)] {
+            let label = "\(from) → \(to)"
+            let harness = PhysicsHarness()
+            harness.physics.seek(to: 10)
+            harness.physics.setResistance(from)
+            let start = harness.time
+            harness.schedule(from: start, to: start + 2, release: false) { gesture * self.reference * ($0 - start) }
+            harness.run(seconds: 0.6)
+            let before = harness.step()
+            XCTAssertEqual(before.rate, gesture, accuracy: 0.01, "steady gesture, \(label)")
+            harness.physics.setResistance(to)
+            let trace = harness.record(seconds: 0.5)
+            let rates = trace.map(\.rate)
+            if to < from {
+                XCTAssertLessThan(rates.max() ?? 99, 1.5 * gesture, "no catch-up burst, \(label)")
+            } else {
+                XCTAssertGreaterThan(rates.min() ?? -99, 0.5 * gesture, "no inversion nor stop, \(label)")
+            }
+            XCTAssertLessThan(abs(trace[0].discVelocity - before.discVelocity), 1e-3 * reference, "ωd continuous, \(label)")
+            XCTAssertLessThan(abs(trace[0].position - before.position), gesture * harness.dt * 1.01, "p continuous, \(label)")
+            XCTAssertLessThan(abs(trace[0].discAngle - before.discAngle), gesture * reference * harness.dt * 1.01)
+            XCTAssertEqual(harness.physics.appliedHoldTimeConstant, harness.physics.holdTimeConstant, "slew finished")
+            XCTAssertEqual(trace.last?.rate ?? 0, gesture, accuracy: 0.01, "back to the gesture speed, \(label)")
+        }
+        // Grabbing applies the requested τ at once (no slew when the disc is free).
+        let harness = PhysicsHarness()
+        harness.physics.setResistance(1)
+        let start = harness.time
+        harness.schedule(from: start, to: start + 1, release: false) { _ in 0 }
+        harness.step()
+        XCTAssertEqual(harness.physics.appliedHoldTimeConstant, 0.035, accuracy: 1e-15)
+    }
+
+    /// CA8 — RM-12, D-48 (scénario « Doigt fixe après un geste rapide ») : après un geste à 16 × ωref,
+    /// |ωd| ≤ 10⁻³ × ωref au plus 12,5 τ après l'immobilisation de la cible, de 0 % à 100 %.
+    func testFixedFingerStopsDiscAfterFastGesture_RM12() {
+        for resistance in [0.0, 0.5, 1.0] {
+            let harness = PhysicsHarness()
+            harness.physics.seek(to: 5)
+            harness.physics.setResistance(resistance)
+            let tau = harness.physics.holdTimeConstant
+            let start = harness.time
+            let moveEnd = start + 0.6
+            let finalAngle = 16 * reference * (moveEnd - start)
+            harness.schedule(from: start, to: start + 4, release: false) { 16 * self.reference * (min($0, moveEnd) - start) }
+            harness.run(seconds: 0.6)
+            XCTAssertEqual(harness.physics.discVelocity, 16 * reference, accuracy: 2e-5 * 16 * reference, "at 16 × ωref")
+            XCTAssertNotNil(harness.stepUntil(maximumSeconds: 0.1) { $0.fingerAngle == finalAngle }, "target frozen")
+            let settled = harness.record(samples: Int(12.5 * tau * 48_000))
+            XCTAssertLessThanOrEqual(abs(settled.last?.discVelocity ?? 1), 1e-3 * reference,
+                                     "|ωd| ≤ 1e-3 ωref within 12.5 τ, resistance \(resistance)")
+        }
+    }
+
+    /// CA12 (variante proposée par la QA) : disque tenu, geste, changements de résistance (lissage) et
+    /// relâchement : sortie identique à l'échantillon près pour des blocs de 1, 37, 256 et 512 trames
+    /// (commandes appliquées aux mêmes échantillons, rejeu du doigt à retard constant).
+    func testHeldOutputDoesNotDependOnBlockSize() {
+        let segment = 18_944 // lcm(37, 512): every command lands on a boundary of every block size
+        var outputs = [[Double]]()
+        for block in [1, 37, 256, 512] {
+            let harness = PhysicsHarness()
+            harness.physics.setMotor(true)
+            var positions = harness.run(samples: segment, block: block).positions
+            let start = harness.time
+            // Touches at 500 Hz: the newest event always stays ahead of the 14 ms replay, even with
+            // 512-frame blocks (no starvation, whose timing would depend on the block size).
+            harness.schedule(from: start, to: start + 0.8, touchRate: 500) { 2 * sin(2 * .pi * 2 * ($0 - start)) }
+            positions += harness.run(samples: segment, block: block).positions
+            harness.physics.setResistance(1)
+            positions += harness.run(samples: segment, block: block).positions
+            harness.physics.setResistance(0)
+            positions += harness.run(samples: segment, block: block).positions
+            XCTAssertFalse(harness.physics.isHeld, "released and caught up")
+            outputs.append(positions)
+        }
+        for other in outputs.dropFirst() { XCTAssertEqual(other, outputs[0]) }
     }
 
     func testInvalidInputsAreIgnored() {
