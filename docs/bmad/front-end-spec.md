@@ -7,14 +7,14 @@
 | **Date** | 14 novembre 2026 |
 | **Auteur** | 🎨 Sally, UX Expert BMAD |
 | **Statut** | Proposition, à valider par 📝 Sarah (PO) |
-| **Référence** | [`scratchapp_specifications_v2_0.md`](../specs/scratchapp_specifications_v2_0.md), section 3 (fait foi) et [`REVUE_v1.9_vers_v2.0.md`](../specs/REVUE_v1.9_vers_v2.0.md) |
+| **Référence** | [`scratchapp_specifications_v2_0.md`](../specs/scratchapp_specifications_v2_0.md), section 3 (fait foi) et [`REVUE_v1.9_vers_v2.0.md`](../specs/REVUE_v1.9_vers_v2.0.md) ; artefacts fusionnés : [brief](project-brief.md) (IC-05, IC-07, IC-08, IC-09) et [PRD](prd.md) (point A10, stories EP4 et EP5) |
 | **Destinataires** | 💻 Léa (EP4 Interface, EP5 Commandes Mac et accessibilité), 🏗️ Winston (instantané moteur), 💻 Hugo (import, bibliothèque), 🧪 Quinn (recette), 🏃 Bob (stories) |
 
 ## Journal des modifications
 
 | Date | Version | Description | Auteur |
 |---|---|---|---|
-| 2026-11-14 | 1.0 | Première version : principes, architecture de l'information, parcours, dispositions iPhone/iPad/Mac, composants, gestes, états, textes, style, animation, accessibilité, questions pour le PO. | Sally |
+| 2026-11-14 | 1.0 | Première version : principes, architecture de l'information, parcours, dispositions iPhone/iPad/Mac, composants, gestes, états, textes, style, animation, accessibilité, questions pour le PO ; réponses aux points délégués par le brief (IC-05, IC-07, IC-08, IC-09) et le PRD (A10). | Sally |
 
 ## Sommaire
 
@@ -103,7 +103,7 @@ flowchart TD
     main --> deckA["Platine A"]
     main --> mixer["Table de mixage"]
     main --> deckB["Platine B"]
-    main --> badge["Badge de sortie audio"]
+    mixer --> badge["Badge de sortie audio et SAT"]
     main --> lib["Feuille Bibliothèque<br/>bouton ou ⌘L"]
     main --> settings["Réglages<br/>feuille iOS, fenêtre ⌘, sur Mac"]
     deckA --> pickA["Sélecteur d'import<br/>Fichiers ou panneau d'ouverture"]
@@ -129,7 +129,7 @@ flowchart TD
 - **Pas de pile de navigation** sur l'écran principal : tout est visible ou à un geste. Les feuilles se ferment par « OK » (iOS), par balayage vers le bas (iOS) ou par Échap (Mac).
 - **Pendant qu'une feuille ou une alerte est ouverte**, les platines continuent de jouer ; leurs commandes et les raccourcis de performance sont inactifs (6.4).
 - **iPhone portrait :** le **sélecteur de platine** (A | B) en haut à gauche bascule la platine affichée ; la table reste en bas (spec 6.8 « Passer d'une platine à l'autre »).
-- **Mac :** barre d'outils (badge de sortie, bouton Bibliothèque), menus et raccourcis ; **une seule fenêtre principale** (pas de « Nouvelle fenêtre ») [Choix UX, Q22]. Fermer la fenêtre quitte l'app (SF-81).
+- **Mac :** barre d'outils (bouton Bibliothèque), menus et raccourcis ; **une seule fenêtre principale** (pas de « Nouvelle fenêtre ») [Choix UX, Q22]. Fermer la fenêtre quitte l'app (SF-81).
 
 ### 2.4 Menus Mac (SF-79, spec 3.5)
 
@@ -334,6 +334,8 @@ flowchart TD
 
 **Zones tactiles.** Toute commande a une zone tactile ≥ 44 × 44, y compris si son visuel est plus petit ; deux zones tactiles ne se chevauchent jamais, sauf au-dessus d'un élément non interactif (forme d'onde zoomée, libellé).
 
+**Éléments globaux.** Le badge de sortie et l'indicateur SAT appartiennent à la table de mixage (spec 3.2, PRD 6.2) dans toutes les dispositions. Les boutons Bibliothèque et Réglages sont en tête de la table, sauf en iPhone portrait (barre supérieure) et sur Mac (barre d'outils et menu ScratchApp › Réglages…).
+
 **Pitch à droite du disque**, comme sur une platine réelle, dans toutes les dispositions ; les deux platines ont la même anatomie (pas de miroir des commandes, sauf l'arrangement en bande).
 
 **Gestes système.** Sur iPhone et iPad, l'écran principal diffère les gestes système du bord inférieur (`defersSystemGestures(on: .bottom)`) pour protéger le crossfader et les faders proches du bord. Les feuilles ne les diffèrent pas.
@@ -346,7 +348,7 @@ Référence : iPhone 15/16, 393 × 852, zones sûres 59 (haut) et 34 (bas). Le s
 
 ```text
 ┌─────────────────────────────────────────────────┐
-│ [ A● | B○ ]  Haut-parleur  SAT  [Bibl.] [Régl.] │  44  barre supérieure
+│ [ A● | B○ ]                     [Bibl.] [Régl.] │  44  barre supérieure
 ├─────────────────────────────────────────────────┤
 │ A  voix_funk.wav                    [Importer]  │  44  en-tête de platine
 │    00:12,3 / 03:45,0                            │
@@ -369,6 +371,7 @@ Référence : iPhone 15/16, 393 × 852, zones sûres 59 (haut) et 34 (bas). Le s
 │ Résistance du vinyle                      50 %  │  44  résistance
 │ Léger ━━━━━━━━━━━━━━━●━━━━━━━━━━━━━━━━━ Lourd   │
 ├─────────────────────────────────────────────────┤
+│ SAT ○   Haut-parleur                            │  24  en-tête de table : SAT, badge de sortie
 │ VOIE A ━━━━━━━━━━━━━━━━━━━━━━━━━━━● 100 %  [≡]  │  44  fader de voie (platine affichée), [≡] = Table
 │ A ▮ ├─·──────────────────●──────────────·─┤ ▮ B │  56  crossfader, course 305
 └─────────────────────────────────────────────────┘
@@ -376,7 +379,7 @@ Référence : iPhone 15/16, 393 × 852, zones sûres 59 (haut) et 34 (bas). Le s
 
 | Zone (haut → bas) | Hauteur | Largeur | Détail |
 |---|---|---|---|
-| Barre supérieure | 44 | 361 | Sélecteur A \| B (2 × 56 × 36, tactile 44), badge de sortie (souple), indicateur SAT (28), Bibliothèque et Réglages (44 × 44 chacun) |
+| Barre supérieure | 44 | 361 | Sélecteur A \| B (2 × 56 × 36, tactile 44) à gauche ; Bibliothèque et Réglages (44 × 44 chacun) à droite |
 | En-tête de platine | 44 | 361 | Lettre, titre, « Importer » (44 × 44, icône seule), position / durée |
 | Forme d'onde zoomée | 48 | 361 | ±1,8 s autour de la tête |
 | Aperçu (needle drop) | 28 visuel, 44 tactile | 361 | La zone tactile déborde de 16 vers le haut, au-dessus de la forme d'onde zoomée |
@@ -384,25 +387,26 @@ Référence : iPhone 15/16, 393 × 852, zones sûres 59 (haut) et 34 (bas). Le s
 | Transport | 44 | 361 | START 80, 33⅓ / 45 96 (2 × 48), SET CUE 88, CUE 64, espacements 11 |
 | Résistance | 44 | 361 | Libellé et valeur (14), piste (30) |
 | Séparateur | 12 | — | Filet `stroke.subtle` |
+| En-tête de table | 24 | 361 | Indicateur SAT, badge de sortie (capsule de 24, jusqu'à 280 de large) |
 | Fader de voie | 44 | 361 | « VOIE A » 52, piste 197, valeur 44, bouton Table 44 × 44 |
 | Crossfader | 56 | 361 | Lettre + VU-mètre 28 de chaque côté, **course 305** |
 | Marge basse | 8 | — | Au-dessus de l'indicateur d'accueil (gestes différés) |
 
-Espacements : 8 entre blocs, 4 entre forme d'onde et aperçu, 4 entre fader de voie et crossfader. Les 30 pt restants sur 393 × 852 sont répartis au-dessus et au-dessous du disque.
+Espacements : 8 entre blocs ; 4 entre forme d'onde et aperçu, entre en-tête de table et fader de voie, et entre fader de voie et crossfader. Sur 393 × 852, la hauteur permettrait P = 311 : c'est la largeur qui fixe P = 309.
 
-**Variante compacte** (hauteur utile < 700 pt, iPhone SE) : forme d'onde 36, aperçu 24, espacements 6. P = 257.
+**Variante compacte** (hauteur utile < 700 pt, iPhone SE) : forme d'onde 36, aperçu 24, espacements 6. P = 229.
 
 | Appareil | Taille | P | D |
 |---|---|---|---|
-| iPhone SE (3e gén.) | 375 × 667 | 257 (compacte) | 236 |
-| iPhone 13 mini | 375 × 812 | 291 | 268 |
+| iPhone SE (3e gén.) | 375 × 667 | 229 (compacte) | 211 |
+| iPhone 13 mini | 375 × 812 | 280 | 258 |
 | iPhone 15/16 | 393 × 852 | 309 | 284 |
 | iPhone 16 Pro | 402 × 874 | 318 | 293 |
 | iPhone 16 Pro Max | 440 × 956 | 356 | 328 |
 
-**Ergonomie.** iPhone posé ou tenu à deux mains : la main droite (ou le pouce droit) sur le disque, le pouce gauche sur le crossfader, qui occupe toute la largeur en bas ; un gaucher fait l'inverse sans changement de disposition. Le bas du disque est à environ 200 pt du crossfader : on scratche d'une main et on coupe de l'autre sans croiser les mains. Le fader de pitch, voisin du bord droit du disque, ne se saisit que par son bouton (5.4) : un scratch au bord du disque ne le décale pas.
+**Ergonomie.** iPhone posé ou tenu à deux mains : la main droite (ou le pouce droit) sur le disque, le pouce gauche sur le crossfader, qui occupe toute la largeur en bas ; un gaucher fait l'inverse sans changement de disposition. Le bas du disque est à environ 220 pt du crossfader : on scratche d'une main et on coupe de l'autre sans croiser les mains. Le fader de pitch, voisin du bord droit du disque, ne se saisit que par son bouton (5.4) : un scratch au bord du disque ne le décale pas.
 
-**Contacts simultanés.** En portrait, les trois contacts de SF-19 sont : disque affiché, crossfader, fader de voie (Q4). La platine masquée continue de jouer ; ses VU-mètre et état restent visibles (VU-mètre à l'extrémité du crossfader, pastille du sélecteur).
+**Contacts simultanés.** En portrait, les trois contacts de SF-19 sont : disque affiché, crossfader, fader de voie (Q4). La platine masquée continue de jouer ; son VU-mètre et son état restent visibles (VU-mètre à l'extrémité du crossfader, pastille du sélecteur).
 
 ### 4.3 iPhone paysage : deux platines réduites
 
@@ -452,12 +456,10 @@ Référence : iPhone 15/16, 852 × 393, zones sûres 59 à gauche et à droite, 
 
 ### 4.4 iPad portrait : platines empilées
 
-Référence : iPad (10e gén.), 820 × 1180, zones sûres 24 et 20. Haut → bas : barre supérieure 44, bande de la platine A 454, table 136 (12 au-dessus et au-dessous), bande de la platine B 454.
+Référence : iPad (10e gén.), 820 × 1180, zones sûres 24 et 20. Haut → bas : bande de la platine A 456, table 176 (12 au-dessus et au-dessous), bande de la platine B 456. Pas de barre supérieure : les éléments globaux sont dans la table.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────────────────┐
-│ Haut-parleur                                        [Bibliothèque] [Réglages]    │
-├──────────────────────────────────────────────────────────────────────────────────┤
 │            ooooooo▼oooooo            PITCH    A  voix_funk.wav        [Importer] │
 │        oooo░░░░░░░░░░░░░░oooo        +0,0 %      00:12,3 / 03:45,0               │
 │     ooo░░░░░░░░░░░░░░░░░░░░░░ooo       +8     ▁▂▅▇▆▃▁▂▄▇█▆▃▁▂│▅▇▆▃▂▁▃▅▇▆▄▂▁▂▃    │
@@ -474,7 +476,8 @@ Référence : iPad (10e gén.), 820 × 1180, zones sûres 24 et 20. Haut → bas
 │        oooo░░░░░░░░░░░░░░oooo                                                    │
 │            oooooooooooooo                                                        │
 ├──────────────────────────────────────────────────────────────────────────────────┤
-│ A ▮▮▮▮▮▯▯ VOIE A ━━━━━━━━━● 100%  SAT○  VOIE B ━━━━━━━━● 100% ▮▮▮▯▯▯ B           │
+│ [Bibliothèque]               SAT ○   Haut-parleur                   [Réglages]   │
+│ A ▮▮▮▮▮▯▯ VOIE A ━━━━━━━━━● 100%        VOIE B ━━━━━━━━● 100% ▮▮▮▯▯▯ B           │
 │ Courbe ━━━━━━━● Franche    A ├─·───────●───────·─┤ B    Hamster (○  )            │
 ├──────────────────────────────────────────────────────────────────────────────────┤
 │ B  beat_90.wav          [Importer]             ooooooo▼oooooo            PITCH   │
@@ -497,31 +500,29 @@ Référence : iPad (10e gén.), 820 × 1180, zones sûres 24 et 20. Haut → bas
 
 | Zone | Dimensions | Détail |
 |---|---|---|
-| Barre supérieure | 780 × 44 | Badge de sortie à gauche ; « Bibliothèque » et « Réglages » (icône + texte) à droite |
-| Bande de platine | 780 × 454 | A : [plateau **P = 432** \| 8 \| pitch 44] 16 [panneau 280]. B : miroir [panneau 280] 16 [plateau \| 8 \| pitch] |
+| Bande de platine | 780 × 456 | A : [plateau **P = 432** \| 8 \| pitch 44] 16 [panneau 280]. B : miroir [panneau 280] 16 [plateau \| 8 \| pitch] |
 | Panneau | 280 | En-tête 52, forme d'onde 56, aperçu 32 (tactile 44), grille 2 × 2 de boutons 136 × 56 (START/STOP, 33⅓ / 45, SET CUE, CUE), résistance 44 |
-| Table, ligne 1 | 780 × 44 | « A », VU-mètre 80 × 8, VOIE A (piste 140, valeur 44) · SAT 56 · VOIE B · VU-mètre · « B » |
-| Table, ligne 2 | 780 × 56 | Courbe (libellé 52, curseur 150) · **crossfader 360, course 312** · Hamster (libellé 64, interrupteur 51) |
+| Table, ligne 1 | 780 × 44 | « Bibliothèque » (icône + texte) · SAT · badge de sortie · « Réglages » |
+| Table, ligne 2 | 780 × 44 | « A », VU-mètre 80 × 8, VOIE A (piste 140, valeur 44) · VOIE B · VU-mètre · « B » |
+| Table, ligne 3 | 780 × 56 | Courbe (libellé 52, curseur 150) · **crossfader 360, course 312** · Hamster (libellé 64, interrupteur 51) |
 
 | Appareil | Taille | P | D |
 |---|---|---|---|
 | iPad (6e gén.) | 768 × 1024 | 380 | 350 |
 | iPad mini (6e gén.) | 744 × 1133 | 356 | 328 |
 | iPad (10e gén.), iPad Air 11" | 820 × 1180 | 432 | 397 |
-| iPad Pro 13" | 1032 × 1376 | 552 | 508 |
+| iPad Pro 13" | 1032 × 1376 | 554 | 510 |
 
 **Ergonomie.** Les deux disques sont en diagonale : main gauche sur A (en haut à gauche), main droite sur B (en bas à droite) ; le crossfader, au centre de l'écran, est atteint par le pouce de l'une ou l'autre main. Pour scratcher A et couper : main gauche sur A, main droite sur le crossfader. Trois contacts (A, B, crossfader) sont possibles (SF-19).
 
 ### 4.5 iPad paysage : A | table | B
 
-Référence : iPad (10e gén.), 1180 × 820. Colonnes : platine A 414 | 16 | table 280 | 16 | platine B 414, sous une barre supérieure de 44.
+Référence : iPad (10e gén.), 1180 × 820. Colonnes : platine A 414 | 16 | table 280 | 16 | platine B 414. Pas de barre supérieure : Bibliothèque, Réglages, badge et SAT sont en tête de la table.
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ Haut-parleur                                                                [Bibliothèque] [Réglages]          │
-├────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ A  voix_funk.wav            [Importer]   │                          │ B  beat_90.wav              [Importer]   │
-│    00:12,3 / 03:45,0                     │         SAT ○            │    01:02,7 / 03:45,0                     │
+│ A  voix_funk.wav            [Importer]   │ [Bibl.]          [Régl.] │ B  beat_90.wav              [Importer]   │
+│    00:12,3 / 03:45,0                     │ Haut-parleur      SAT ○  │    01:02,7 / 03:45,0                     │
 │ ▁▂▅▇▆▃▁▂▄▇█▆▃▁▂▅▇│▆▃▂▁▃▅▇▆▄▂▁▂▃▅▆▇       │                          │ ▁▂▅▇▆▃▁▂▄▇█▆▃▁▂▅▇│▆▃▂▁▃▅▇▆▄▂▁▂▃▅▆▇       │
 │ ▂▃▄▅▆▅▄▃▂▃▄▅▆▇▆▅▄|▃▂▁▂▃▄▅▆▅▄▃▂▁▲▃▄       │    VOIE A      VOIE B    │ ▂▃▄▅▆▅▄▃▂▃▄▅▆▇▆▅▄|▃▂▁▂▃▄▅▆▅▄▃▂▁▲▃▄       │
 │          ooooo▼oooooo           PITCH    │  ▮▮ ━╋━          ━╋━ ▮▮  │          ooooo▼oooooo           PITCH    │
@@ -550,12 +551,12 @@ Référence : iPad (10e gén.), 1180 × 820. Colonnes : platine A 414 | 16 | tab
 |---|---|---|
 | Colonne de platine | 414 de large | En-tête 52, forme d'onde 64, aperçu 32 (tactile 44), plateau **P = 362** + pitch 44, transport 56, résistance 44, espacements 12 |
 | Transport | 414 × 56 | START 104, 33⅓ / 45 112 (2 × 56), SET CUE 104, CUE 70, espacements 8 |
-| Table | 280 de large | SAT 28, faders de voie verticaux (piste ≈ 300) avec VU-mètres 8 de large à l'extérieur, valeurs, courbe 44, hamster 44, **crossfader 56, course 212**, aligné sur la rangée de transport |
+| Table | 280 de large | Bibliothèque et Réglages 44, badge de sortie et SAT 28, faders de voie verticaux (piste ≈ 300) avec VU-mètres 8 de large à l'extérieur, valeurs, courbe 44, hamster 44, **crossfader 56, course 212**, aligné sur la rangée de transport |
 
 | Appareil | Taille | P | Course du crossfader |
 |---|---|---|---|
 | iPad (6e gén.) | 1024 × 768 | 284 | 212 |
-| iPad mini (6e gén.) | 1133 × 744 | 312 | 212 |
+| iPad mini (6e gén.) | 1133 × 744 | 338 | 212 |
 | iPad (10e gén.), iPad Air 11" | 1180 × 820 | 362 | 212 |
 | iPad Pro 13" | 1376 × 1032 | 448 | 235 (table 303) |
 
@@ -569,10 +570,10 @@ Taille minimale de la **zone de contenu** : **960 × 600** (barre de titre et ba
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ ● ● ●   ScratchApp                      Haut-parleurs MacBook Pro               [Bibliothèque]                 │
+│ ● ● ●   ScratchApp                                                                       [Bibliothèque]        │
 ├────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
 │ A  voix_funk.wav            [Importer]   │                          │ B  beat_90.wav              [Importer]   │
-│    00:12,3 / 03:45,0                     │         SAT ○            │    01:02,7 / 03:45,0                     │
+│    00:12,3 / 03:45,0                     │ Haut-parleurs Ma…  SAT ○ │    01:02,7 / 03:45,0                     │
 │ ▁▂▅▇▆▃▁▂▄▇█▆▃▁▂▅▇│▆▃▂▁▃▅▇▆▄▂▁▂▃▅▆▇       │                          │ ▁▂▅▇▆▃▁▂▄▇█▆▃▁▂▅▇│▆▃▂▁▃▅▇▆▄▂▁▂▃▅▆▇       │
 │ ▂▃▄▅▆▅▄▃▂▃▄▅▆▇▆▅▄|▃▂▁▂▃▄▅▆▅▄▃▂▁▲▃▄       │    VOIE A      VOIE B    │ ▂▃▄▅▆▅▄▃▂▃▄▅▆▇▆▅▄|▃▂▁▂▃▄▅▆▅▄▃▂▁▲▃▄       │
 │          ooooo▼oooooo           PITCH    │  ▮▮ ━╋━          ━╋━ ▮▮  │          ooooo▼oooooo           PITCH    │
@@ -613,7 +614,7 @@ Taille minimale de la **zone de contenu** : **960 × 600** (barre de titre et ba
 - **Une saisie en cours survit au redimensionnement** (spec 6.14) : le centre du disque est relu à chaque événement et l'angle du pointeur est recalé pour que l'angle virtuel du doigt reste continu (aucun saut).
 - La fenêtre ne peut pas descendre sous 960 × 600 (`.frame(minWidth: 960, minHeight: 600)` et `.windowResizability(.contentMinSize)`).
 
-**Ergonomie.** Main droite sur la souris ou le trackpad (disque), main gauche sur le clavier : `F` (coupure A), `Q` (START A), `A`/`S` (CUE A). La barre d'outils porte le badge de sortie et le bouton « Bibliothèque » ; elle ne recouvre jamais les platines.
+**Ergonomie.** Main droite sur la souris ou le trackpad (disque), main gauche sur le clavier : `F` (coupure A), `Q` (START A), `A`/`S` (CUE A). La barre d'outils porte le bouton « Bibliothèque » ; le badge de sortie et SAT sont en tête de la table de mixage.
 
 ### 4.7 Multitâche iPad
 
@@ -625,32 +626,32 @@ Split View, Slide Over et Stage Manager suivent la règle de 4.1 : en dessous de
 
 ### 5.0 Vue d'ensemble et règles communes
 
-| Composant | Nom Swift proposé | Épopée | Exigences |
+| Composant | Nom Swift proposé | Story du PRD | Exigences |
 |---|---|---|---|
-| Disque (platine) | `TurntableView` | EP4 | SF-06 à SF-10, SF-69, RM-53, RM-55, RM-60, RM-61 |
-| START/STOP | `StartStopButton` | EP4 | SF-04, SF-05, PO-01 |
-| Sélecteur 33⅓ / 45 | `SpeedSelector` | EP4 | SF-04, RM-02, RM-50 |
-| Fader de pitch | `PitchFader` | EP4 | SF-11 |
-| Curseur de résistance | `ResistanceSlider` | EP4 | SF-21 à SF-24 |
-| SET CUE, CUE | `CueButtons` | EP4 | SF-13 |
-| Forme d'onde zoomée | `ZoomedWaveformView` | EP4 | SF-70 |
-| Aperçu complet | `WaveformOverviewView` | EP4 | SF-70, SF-71 |
-| Zone de dépôt | `DeckDropZone` | EP5 | SF-73 |
-| En-tête de platine | `DeckHeaderView` | EP4 | spec 3.1, SF-03 |
-| Fader de voie | `ChannelFader` | EP4 | SF-65 |
-| Crossfader | `CrossfaderView` | EP4 | SF-12, SF-66, SF-67 |
-| Courbe | `CrossfaderCurveControl` | EP4 | SF-66 |
-| Hamster | `HamsterToggle` | EP4 | SF-67 |
-| VU-mètre | `VUMeterView` | EP4 | SF-65 |
-| Indicateur de saturation | `SaturationIndicator` | EP4 | SF-65 |
-| Badge de sortie | `OutputBadge` | EP4 | SF-16, SF-82 |
-| Sélecteur de platine (iPhone) | `DeckSelector` | EP4 | spec 2 et 6.8 |
-| Feuille et lignes de bibliothèque | `LibrarySheet`, `LibraryRow` | EP4 (UI), EP3 (données) | SF-74 |
-| Réglages | `SettingsView` | EP4 | spec 3.3, SF-68 |
-| Bandeau d'information | `ToastView` | EP4 | SF-18, SF-75, SF-82 |
-| Aide des raccourcis (Mac) | `KeyboardHelpView` | EP5 | spec 3.3 et 3.5 |
-| Panneau Table (iPhone) | `MixerSettingsPopover` | EP4 | spec 3.2 et 3.4 |
-| Conteneurs | `MainLayoutView`, `DeckView`, `MixerView` | EP4 | spec 3.4 |
+| Disque (platine) | `TurntableView` | 4.1, 4.3 | SF-06 à SF-10, SF-69, RM-53, RM-55, RM-60, RM-61 |
+| START/STOP | `StartStopButton` | 4.1 | SF-04, SF-05, PO-01 |
+| Sélecteur 33⅓ / 45 | `SpeedSelector` | 4.1 | SF-04, RM-02, RM-50 |
+| Fader de pitch | `PitchFader` | 4.5 | SF-11 |
+| Curseur de résistance | `ResistanceSlider` | 4.5 | SF-21 à SF-24 |
+| SET CUE, CUE | `CueButtons` | 4.5 | SF-13 |
+| Forme d'onde zoomée | `ZoomedWaveformView` | 4.6 | SF-70 |
+| Aperçu complet | `WaveformOverviewView` | 4.6 | SF-70, SF-71 |
+| Zone de dépôt | `DeckDropZone` | 5.2 | SF-73 |
+| En-tête de platine | `DeckHeaderView` | 4.1 | spec 3.1, SF-03 |
+| Fader de voie | `ChannelFader` | 4.2 | SF-65 |
+| Crossfader | `CrossfaderView` | 4.2 | SF-12, SF-66, SF-67 |
+| Courbe | `CrossfaderCurveControl` | 4.2 | SF-66 |
+| Hamster | `HamsterToggle` | 4.2 | SF-67 |
+| VU-mètre | `VUMeterView` | 4.2 | SF-65 |
+| Indicateur de saturation | `SaturationIndicator` | 4.2 | SF-65 |
+| Badge de sortie | `OutputBadge` | 4.2, 6.2 | SF-16, SF-82 |
+| Sélecteur de platine (iPhone) | `DeckSelector` | 4.4 | spec 2 et 6.8 |
+| Feuille et lignes de bibliothèque | `LibrarySheet`, `LibraryRow` | 3.5 (Hugo) | SF-74 |
+| Réglages | `SettingsView` | 3.4 (Hugo) | spec 3.3, SF-68 |
+| Bandeau d'information | `ToastView` | 4.1, 6.1 | SF-18, SF-75, SF-82 |
+| Aide des raccourcis (Mac) | `KeyboardHelpView` | 5.1 | spec 3.3 et 3.5 |
+| Panneau Table (iPhone) | `MixerSettingsPopover` | 4.2, 4.4 | spec 3.2 et 3.4 |
+| Conteneurs | `MainLayoutView`, `DeckView`, `MixerView` | 4.1, 4.4 | spec 3.4 |
 
 **Règles communes aux faders** (pitch, résistance, voies, courbe) :
 
@@ -682,14 +683,14 @@ Split View, Slide Over et Stage Manager suivent la règle de 4.1 : en dessous de
 | Anneau « tenu » | Trait de 3 pt sur le bord du vinyle | Couleur de la platine | Opacité 1 quand le disque est tenu (apparition immédiate, disparition en 80 ms) |
 | Superpositions | Ø D | État vide (boutons), chargement (indicateur), dépôt (5.9) | — |
 
-**Angles.** Sens horaire positif (une platine tourne dans le sens horaire vu du dessus ; avancer = horaire). Angle d'affichage du repère : `discAngle − 2π × cue / 1,8 s` (avec `cue = 0` sans CUE). L'instantané du moteur fournit `discAngle` égal à `2π × position / 1,8 s` hors sillon fermé, de sorte que **le repère passe sous le repère de lecture quand la tête est au CUE** (SF-69, spec 6.11). En sillon fermé ou en butée d'amorce, `discAngle` continue d'évoluer avec le disque (RM-55) ; le recalage au retour dans le son est à arbitrer (Q13).
+**Angles.** Sens horaire positif (une platine tourne dans le sens horaire vu du dessus ; avancer = horaire). L'étiquette est dessinée à l'angle du disque publié (`discAngle`) et le repère à l'angle du repère publié (contrat 0.2, PRD 5.3), soit `discAngle − 2π × cue / 1,8 s` avec `cue = 0` sans CUE. Règle attendue du moteur (IC-09) : `discAngle` vaut `2π × position / 1,8 s` à une constante près, et cette constante est **recalée après chaque saut de position** (CUE, needle drop, chargement, retour depuis le sillon fermé ou la butée d'amorce), de sorte que **le repère passe toujours sous le repère de lecture quand la tête est au CUE** (SF-69, spec 6.11). En sillon fermé ou en butée d'amorce, le disque et le repère continuent de tourner (RM-55). Au recalage, l'étiquette et le repère sautent d'un angle ; un disque tenu reste sous le doigt sans saut de son (Q13).
 
 **Zones de saisie.** Cercle de rayon `min(R + 6, P / 2)` ; zone centrale (RM-61) de rayon `0,12 × R`. Les coins du cadre carré et l'anneau du plateau au-delà de R + 6 ne saisissent pas le disque.
 
 | P | D | Étiquette | Zone centrale (rayon) | Zone de saisie (rayon) |
 |---|---|---|---|---|
 | 174 (iPhone paysage) | 160 | 53 | 10 | 86 |
-| 257 (iPhone SE) | 236 | 78 | 14 | 124 |
+| 229 (iPhone SE) | 211 | 70 | 13 | 111 |
 | 309 (iPhone 15) | 284 | 94 | 17 | 148 |
 | 362 (iPad paysage) | 333 | 110 | 20 | 172 |
 | 396 (Mac par défaut) | 364 | 120 | 22 | 188 |
@@ -710,7 +711,7 @@ Split View, Slide Over et Stage Manager suivent la règle de 4.1 : en dessous de
 
 **Interactions.** Voir 6.1 (saisie), 6.3 (souris, trackpad). Le disque d'une platine vide n'est pas saisissable (il n'y a pas de vinyle). Clic secondaire : sans effet.
 
-**VoiceOver.** Libellé « Disque, platine A ». Valeur : « vide », « à l'arrêt », « en rotation, 33 tours un tiers » (ou « 45 tours »), « tenu », « fin du son ». Trait **interaction directe** (`.allowsDirectInteraction`) pour scratcher au doigt avec VoiceOver actif. Indication : « Interaction directe. Posez un doigt pour retenir le disque, tournez pour scratcher. » La position n'est pas dans la valeur (elle est dans l'en-tête), pour éviter des annonces continues.
+**VoiceOver.** Libellé « Disque, platine A ». Valeur : état du moteur et position (PRD 5.3), ex. « en rotation, 33 tours un tiers, position 12,3 secondes », « à l'arrêt, position 0 seconde », « tenu, position 8,2 secondes », « fin du son », « vide ». Valeur lue au focus, **sans** trait « mise à jour fréquente » (pas d'annonces continues pendant le jeu). Trait **interaction directe** (`.allowsDirectInteraction`) pour scratcher au doigt avec VoiceOver actif. Indication : « Interaction directe. Posez un doigt pour retenir le disque, tournez pour scratcher. »
 
 **Clavier Mac.** Aucun raccourci propre ; le disque n'est pas dans la boucle de tabulation.
 
@@ -779,7 +780,7 @@ Split View, Slide Over et Stage Manager suivent la règle de 4.1 : en dessous de
 ### 5.8 Aperçu complet et needle drop
 
 - **Rôle.** Vue du son entier, position de la tête et du CUE ; toucher place la tête (SF-71).
-- **Plage.** [0 ; durée] sur toute la largeur. En amorce, la tête est dessinée au bord gauche ; en sillon fermé, au bord droit.
+- **Plage.** [−2 s ; durée] sur toute la largeur : l'amorce est représentée au début par une zone hachurée proportionnelle (PRD 4.6) ; en sillon fermé, la tête est au bord droit. Un toucher dans la zone hachurée place la tête dans l'amorce.
 - **Rendu.** Enveloppe couleur de la platine : opaque à gauche de la tête, à 50 % à droite ; tête : trait blanc de 2 pt ; CUE : triangle `color.cue` de 8 pt sur le bord inférieur.
 - **Hauteurs.** Visuel 28 (iPhone portrait), 24 (compacte), 20 (iPhone paysage), 32 (iPad), 28 (Mac) ; **zone tactile 44** (débordement vers le haut).
 - **Interaction** [Choix UX, Q11] :
@@ -790,7 +791,7 @@ Split View, Slide Over et Stage Manager suivent la règle de 4.1 : en dessous de
   5. **Disque de cette platine tenu** au moment de l'appui ou du relâchement : geste ignoré, aucune tête fantôme, position inchangée (SF-71).
   - Mac : même comportement au clic ; au survol, trait fin et bulle de temps (devrait).
 - **États.** Désactivé (platine vide ou en chargement) : enveloppe absente, aucun geste.
-- **VoiceOver.** « Aperçu du son, platine A », valeur « position 12,3 secondes sur 3 minutes 45 secondes » ; ajustable : ±5 % de la durée par balayage (needle drop accessible) ; sans effet pendant que le disque est tenu.
+- **VoiceOver.** « Aperçu du son, platine A », valeur « position 12,3 secondes sur 3 minutes 45 secondes, CUE à 4 secondes » (ou « aucun CUE ») (PRD 4.6) ; ajustable : ±5 % de la durée par balayage (needle drop accessible) ; sans effet pendant que le disque est tenu.
 
 ### 5.9 Zone de dépôt
 
@@ -871,13 +872,13 @@ Split View, Slide Over et Stage Manager suivent la règle de 4.1 : en dessous de
 
 - **Rôle.** Indiquer l'action du limiteur de sortie et un éventuel écrêtage (SF-65, spec 6.8).
 - **Visuel.** Témoin rond de 10 pt et libellé « SAT » (11 pt gras capitales). Éteint : `vu.off`. **Limiteur actif** (réduction ≥ 1 dB) : `warning`. **Écrêtage** (crête ≥ 0 dBFS après limiteur, ne devrait pas arriver) : `danger`. Maintien 1 s.
-- **Emplacement.** Barre supérieure (iPhone portrait, masqué quand la sortie est indisponible), table de mixage (autres dispositions).
+- **Emplacement.** Table de mixage, à côté du badge de sortie, dans toutes les dispositions.
 - **VoiceOver.** « Saturation de la sortie », valeur « aucune », « limiteur actif » ou « écrêtage ».
 
 ### 5.17 Badge de sortie audio
 
 - **Rôle.** Afficher la sortie active (spec 3.2, SF-16) et l'état « Sortie audio indisponible » (SF-82).
-- **Visuel.** Capsule de 28 de haut, icône 15 + nom 13 semi-gras, fond `bg.raised` ; largeur maximale 140 (iPhone), 240 (iPad), 260 (Mac) ; troncature en fin. Non interactif ; sur Mac, bulle d'aide avec le nom complet.
+- **Visuel.** Capsule de 28 de haut (24 sur iPhone), icône 15 + nom 13 semi-gras, fond `bg.raised` ; largeur maximale 280 (iPhone portrait), 200 (iPhone paysage), 240 (iPad, Mac) ; troncature en fin. Placée en tête de la table de mixage (4.1). Non interactif ; sur Mac, bulle d'aide avec le nom complet.
 - **Libellés.**
 
 | Sortie | iOS / iPadOS | macOS | Icône |
@@ -889,7 +890,7 @@ Split View, Slide Over et Stage Manager suivent la règle de 4.1 : en dessous de
 | HDMI, AirPlay | « <nom> (HDMI) », « <nom> (AirPlay) » | Idem | `tv`, `airplayaudio` |
 | Indisponible | « Sortie audio indisponible » | Idem | `speaker.slash` |
 
-- **État indisponible.** Fond `danger.deep`, texte `text.primary` (9,2:1), icône `danger` ; sur iPhone, le libellé peut passer sur deux lignes (12 pt).
+- **État indisponible.** Fond `danger.deep`, texte `text.primary` (9,2:1), icône `danger` ; en iPhone paysage, le libellé peut passer sur deux lignes (12 pt).
 - **VoiceOver.** « Sortie audio », valeur = libellé ; changement annoncé par le bandeau (5.21).
 
 ### 5.18 Sélecteur de platine (iPhone portrait)
@@ -932,7 +933,7 @@ Split View, Slide Over et Stage Manager suivent la règle de 4.1 : en dessous de
 ### 5.21 Bandeau d'information
 
 - **Rôle.** Message bref, sans décision ni blocage.
-- **Visuel.** Capsule `bg.raised` (95 %), filet `stroke.subtle`, icône + texte 15 (deux lignes au plus), largeur ≤ 480 (iPhone : largeur − 32), sous la barre supérieure (ou en haut de la zone de contenu sur Mac).
+- **Visuel.** Capsule `bg.raised` (95 %), filet `stroke.subtle`, icône + texte 15 (deux lignes au plus), largeur ≤ 480 (iPhone : largeur − 32), en haut de l'écran principal (sous la barre supérieure en iPhone portrait), au-dessus des en-têtes de platine.
 - **Comportement.** 4 s (6 s au-delà de 80 caractères), toucher pour fermer ; un seul à la fois, le plus récent remplace le précédent ; n'intercepte aucune touche hors de son cadre et ne recouvre jamais un disque. Entrée et sortie en 200 ms (glissement + fondu, fondu seul avec « Réduire les animations »). Annoncé par VoiceOver.
 
 ### 5.22 Aide des raccourcis clavier (Mac)
@@ -1280,7 +1281,7 @@ SF Pro (police système) pour les textes ; **SF Mono** (`.monospaced`) pour tous
 ### 10.1 Boucle d'affichage pilotée par l'instantané du moteur
 
 - Le moteur publie un **instantané atomique** par platine et pour la table (CONTRIBUTING : audio → interface par instantané atomique). L'interface le lit **une fois par image** et n'anime rien d'autre que ce qu'il contient.
-- **Champs attendus** (à formaliser par Winston) : par platine `discAngle`, `platterAngle`, `position`, `cuePosition` (optionnelle), `isHeld`, `motorCommandedOn`, `isAtEnd`, `isInLeadIn`, `peakLevel` ; pour la table `crossfaderPosition` (si pilotée par le clavier), `limiterReduction`, `clipped`, état de la sortie.
+- **Champs attendus** (à formaliser par Winston, contrat 0.2) : par platine `discAngle`, `platterAngle`, angle du repère, `position`, `cuePosition` (optionnelle), `isHeld`, `motorCommandedOn`, `isAtEnd`, `isInLeadIn`, `peakLevel` ; pour la table `crossfaderPosition` (si pilotée par le clavier), `limiterReduction`, `clipped`, état de la sortie.
 - **Horloge.** `TimelineView(.animation)` (ou `CADisplayLink`) synchronisé sur l'écran : 60 Hz, **120 Hz** sur les écrans ProMotion (iPhone Pro, iPad Pro, MacBook Pro). Sur iPhone, la clé `CADisableMinimumFrameDurationOnPhone` est requise dans l'Info.plist (Hugo). Plage demandée : 80 à 120 Hz pendant une rotation ou un geste.
 - **Repos.** Quand aucun moteur ne tourne, qu'aucun disque n'est tenu ni en mouvement et que les VU-mètres sont à zéro, la boucle est suspendue (économie d'énergie) ; elle reprend au premier événement.
 - **Rotation.** `discAngle` et `platterAngle` sont appliqués par transformation (`rotationEffect`) sur des couches déjà rendues, **sans animation SwiftUI** (transaction sans animation) : aucune interpolation n'ajoute de retard.
@@ -1360,8 +1361,8 @@ SF Pro (police système) pour les textes ; **SF Mono** (`.monospaced`) pour tous
 
 ### 11.3 Ordre de lecture et de focus
 
-- **VoiceOver, iPad et Mac** : barre supérieure (badge, Bibliothèque, Réglages) → platine A (en-tête, Importer, disque, aperçu, START/STOP, 33⅓, 45, SET CUE, CUE, pitch, pitch à 0, résistance) → table (fader A, VU A, fader B, VU B, courbe, hamster, crossfader, SAT) → platine B (même ordre).
-- **VoiceOver, iPhone portrait** : barre supérieure (sélecteur, badge, SAT, Bibliothèque, Réglages) → platine affichée → fader de voie, Table, crossfader.
+- **VoiceOver, iPad, iPhone paysage et Mac** : platine A (en-tête, Importer, disque, aperçu, START/STOP, 33⅓, 45, SET CUE, CUE, pitch, pitch à 0, résistance) → table (Bibliothèque, Réglages ou Table, badge, SAT, fader A, VU A, fader B, VU B, courbe, hamster, crossfader) → platine B (même ordre) ; sur Mac, la barre d'outils en dernier.
+- **VoiceOver, iPhone portrait** : barre supérieure (sélecteur, Bibliothèque, Réglages) → platine affichée → table (SAT, badge, fader de voie, Table, crossfader).
 - **Tabulation sur Mac** : voir 6.4 (A → table → B, conforme à la spec 6.16).
 
 ### 11.4 Interaction directe sur le disque
@@ -1418,8 +1419,8 @@ Le trait d'interaction directe permet de scratcher au doigt sans désactiver Voi
 ### 13.1 Actions immédiates
 
 1. **Sarah (PO)** : trancher les questions de la section 14, en priorité Q5, Q6, Q13, Q14 (elles touchent le moteur ou les raccourcis).
-2. **Winston** : intégrer à l'architecture les champs de l'instantané (10.1), la définition de `discAngle` (5.1, Q13) et le transport des touchers horodatés (6.1).
-3. **Bob** : découper EP4 et EP5 selon l'inventaire (5.0) ; suggestion d'ordre : conteneurs et règle de disposition → `TurntableView` et saisie → transport, pitch, CUE → table de mixage → formes d'onde → bibliothèque et réglages → commandes Mac → accessibilité et finitions.
+2. **Winston** : intégrer au contrat 0.2 les champs de l'instantané (10.1), le recalage de l'angle du disque et du repère après un saut de position (5.1, Q13) et le transport des touchers horodatés (6.1).
+3. **Bob** : rattacher chaque composant aux stories du PRD selon la colonne « Story du PRD » de 5.0, et citer les sections de ce document dans les critères des stories 3.4, 3.5, 4.1 à 4.6, 5.1 à 5.3 et 6.1 ; aligner les critères 4.1-4 (format de position), 5.1-1 (butées au clavier) et 5.2-4 (dépôt multiple) sur les décisions de la section 14 une fois tranchées.
 4. **Hugo** : clé `CADisableMinimumFrameDurationOnPhone`, `UIFileSharingEnabled`, types de documents acceptés, scène `Window` unique et menus Mac.
 5. **Quinn** : scénarios de recette multitouch (6.2), VoiceOver (11.4), raccourcis pendant une saisie (6.4), redimensionnement (4.6).
 
@@ -1441,11 +1442,26 @@ Le trait d'interaction directe permet de scratcher au doigt sans désactiver Voi
 
 Chaque question porte une **proposition** appliquée dans ce document en attendant l'arbitrage.
 
+### Réponses aux points délégués à l'UX
+
+Le brief (IC-05, IC-07, IC-08, IC-09) et le PRD (point A10) confient ces décisions à la spec UX ; les critères cités s'y alignent.
+
+| Point | Origine | Décision | Section |
+|---|---|---|---|
+| Gain du défilement trackpad → rotation | PRD A10, critère 1.2-7 | La surface du disque sous le pointeur suit les doigts (formule de 6.3) ; inertie ignorée ; molette : 15° par cran ; relâchement 80 ms après le dernier événement ; calibrage sur appareil | 6.3, Q8 |
+| Flèches quand un curseur a le focus | PRD A10, critère 5.3-3 ; IC-07 | La commande réglable qui a le focus reçoit toutes les flèches ; sinon, les flèches pilotent le crossfader ; Échap les lui rend | 6.4, Q7 |
+| Claviers AZERTY et QWERTY | PRD A10, critère 5.1-1 ; IC-08 | Position physique (codes de touche QWERTY) ; caractères affichés selon la disposition active | 6.3, 5.22, Q6 |
+| Répétition des touches | PRD A10, critère 5.1-3 | Acceptée pour `Z`, `X`, `,`, `.`, `←`, `→` (cadence du système) ; ignorée pour `⇧←`, `⇧↓`, `⇧→`, START/STOP, SET CUE, CUE et coupures | 6.3 |
+| VU-mètre avant ou après le crossfader | PRD A10, critère 1.4-8 | Après le fader de voie, avant le crossfader (identique à la proposition du PRD) | 5.15, Q15 |
+| Dépôt de plusieurs fichiers | PRD A10, critère 5.2-4 | Refusé au survol, **contrairement à la proposition du PRD** (charger le premier fichier) | 5.9, Q17 |
+| SF-19 en iPhone portrait | IC-05 | Trois contacts : disque affiché, crossfader, fader de voie ; deux disques en paysage et sur iPad | 4.2, 6.2, Q4 |
+| Repère après un saut de position | IC-09 | Angle du repère recalé par le moteur après chaque saut (CUE, needle drop, chargement, sortie du sillon fermé) | 5.1, Q13 |
+
 ### Dispositions
 
 | # | Question | Proposition | Réf. |
 |---|---|---|---|
-| Q1 | iPad portrait : « empilées ou côte à côte selon la largeur ». En plein écran, la disposition empilée donne toujours le plus grand disque (380 à 552 pt contre 284 à 448 côte à côte). | Empilée dès que la fenêtre est plus haute que large ; côte à côte sinon. | spec 3.4 ; 4.1, 4.4 |
+| Q1 | iPad portrait : « empilées ou côte à côte selon la largeur ». En plein écran, la disposition empilée donne toujours le plus grand disque (356 à 554 pt contre 284 à 448 côte à côte). | Empilée dès que la fenêtre est plus haute que large ; côte à côte sinon. | spec 3.4 ; 4.1, 4.4 |
 | Q2 | Multitâche iPad (Split View, Slide Over, Stage Manager) : faut-il le prendre en charge et le recetter en V1 ? | Oui, par la règle de 4.1 (largeur < 600 → une platine), recette en « devrait ». | 4.7 |
 | Q3 | Sur iPhone, la courbe et le hamster (spec 3.2) n'ont pas de place à l'écran ; la spec 3.4 ne cite que le crossfader et le fader de voie. | Panneau Table (popover) depuis la table de mixage, en portrait et en paysage. | 5.23 |
 | Q4 | SF-19 en iPhone portrait : un seul disque est visible. | Les trois contacts sont disque + crossfader + fader de voie ; deux disques en paysage et sur iPad. | 4.2, 6.2 |
@@ -1454,7 +1470,7 @@ Chaque question porte une **proposition** appliquée dans ce document en attenda
 
 | # | Question | Proposition | Réf. |
 |---|---|---|---|
-| Q5 | Hamster et clavier : la spec 3.5 associe `⇧←` à la « butée A ». Hamster actif, la butée A est à droite. | Les flèches suivent la **position physique** : `⇧←` butée gauche, `⇧→` butée droite, `←`/`→` déplacent le bouton dans leur sens ; idem pour les actions VoiceOver. | 5.12, 6.3 |
+| Q5 | Hamster et clavier : la spec 3.5 (et le critère PRD 5.1-1) associe `⇧←` à la « butée A ». Hamster actif, la butée A est à droite. | Les flèches suivent la **position physique** : `⇧←` butée gauche, `⇧→` butée droite, `←`/`→` déplacent le bouton dans leur sens ; idem pour les actions VoiceOver. | 5.12, 6.3 |
 | Q6 | Disposition du clavier : sur AZERTY, `.` exige ⇧ et le dessin en miroir de la spec 3.5 est cassé. | Correspondance par **position physique** (codes de touche QWERTY), caractères affichés selon la disposition active dans l'aide et les menus. | 6.3, 5.22 |
 | Q7 | Accès clavier complet : un curseur qui a le focus doit recevoir les flèches, qui servent aussi au crossfader (spec 3.5). | La commande réglable qui a le focus reçoit les flèches ; Échap les rend au crossfader. | 6.4 |
 | Q8 | Trackpad : faut-il tenir compte de l'inertie du défilement ? Quel gain de rotation ? | Inertie ignorée ; la surface du disque suit les doigts (formule 6.3) ; molette : 15° par cran ; calibrage sur appareil. | 6.3 |
@@ -1467,7 +1483,7 @@ Chaque question porte une **proposition** appliquée dans ce document en attenda
 
 | # | Question | Proposition | Réf. |
 |---|---|---|---|
-| Q13 | Repère et sillon fermé : en sillon fermé le disque continue de tourner (RM-55) ; au retour dans le son, l'angle du disque et la position ne correspondent plus. Le repère doit-il rester solidaire du disque (et ne plus être aligné sur le CUE) ou être recalé ? | Le moteur recale `discAngle` sur la position au retour dans le son : le repère reste aligné sur le CUE ; l'étiquette saute alors d'un angle, sous le doigt de l'utilisateur. | 5.1 |
+| Q13 | Repère et sauts de position (IC-09) : au retour du sillon fermé (RM-55), au rappel du CUE disque tenu (spec 6.6) et au needle drop (SF-71), l'angle du disque et la position ne correspondent plus. Le repère doit-il rester solidaire du disque (et ne plus être aligné sur le CUE) ou être recalé ? | Le moteur recale l'angle publié après chaque saut de position : le repère reste aligné sur le CUE ; l'étiquette saute d'un angle (sous le doigt si le disque est tenu). | 5.1 |
 | Q14 | « Sortie audio indisponible » : la physique est intégrée dans le fil de rendu audio (5.1 de la spec). Sans moteur audio, les disques ne bougent pas. « L'interface reste utilisable » suffit-il ainsi ? | Oui : commandes, import, bibliothèque et réglages fonctionnent, disques immobiles jusqu'au retour d'une sortie. Sinon, l'architecture doit prévoir une horloge de secours. | 7.3 |
 | Q15 | VU-mètres : niveau avant ou après le crossfader ? | Après le fader de voie, avant le crossfader. | 5.15 |
 
@@ -1475,8 +1491,8 @@ Chaque question porte une **proposition** appliquée dans ce document en attenda
 
 | # | Question | Proposition | Réf. |
 |---|---|---|---|
-| Q16 | Format de position : la spec écrit `mm:ss.d`. | `mm:ss,d` avec la virgule décimale française (« 00:12,3 »), comme les autres nombres de l'app. | 8.1 |
-| Q17 | Dépôt de plusieurs fichiers sur une platine. | Refusé au survol (« Un seul fichier à la fois »). | 5.9 |
+| Q16 | Format de position : la spec (et le critère PRD 4.1-4) écrit `mm:ss.d`. | `mm:ss,d` avec la virgule décimale française (« 00:12,3 »), comme les autres nombres de l'app. | 8.1 |
+| Q17 | Dépôt de plusieurs fichiers sur une platine. Le PRD (critère 5.2-4) propose de charger le premier fichier audio et de le signaler. | **Refusé au survol** (« Un seul fichier à la fois ») : l'ordre des fichiers d'une sélection Finder n'est pas visible, charger « le premier » surprendrait. À aligner dans le critère 5.2-4. | 5.9 |
 | Q18 | Valeurs de l'« origine » d'un son dans la bibliothèque (SF-74) en V1. | « Import » et « Intégré » (démo) ; « Micro » viendra avec la banque P2. | 5.19 |
 | Q19 | Licence du son de démonstration (PO-14) : où l'afficher ? | Une ligne « À propos du son de démonstration » en pied des Réglages, si la licence l'exige. | 5.20 |
 | Q20 | Verrouillage automatique de l'écran (iOS) pendant une session. | Désactivé tant qu'un moteur tourne ou qu'un disque est tenu. | 6.2 |
