@@ -13,6 +13,10 @@ struct TurntableView: View {
     /// Diamètre du plateau P.
     let platter: CGFloat
 
+    /// Indication VoiceOver d'un disque chargé ; le disque d'une platine vide n'est pas saisissable.
+    private static let directInteractionHint =
+        "Interaction directe. Posez un doigt pour retenir le disque, tournez pour scratcher."
+
     var body: some View {
         let disc = platter * 0.92
         ZStack {
@@ -46,7 +50,7 @@ struct TurntableView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Disque, \(model.deckName)")
         .accessibilityValue(model.discAccessibilityValue)
-        .accessibilityHint("Interaction directe. Posez un doigt pour retenir le disque, tournez pour scratcher.")
+        .accessibilityHint(model.isLoaded ? Self.directInteractionHint : "")
         #if os(iOS)
         .accessibilityAddTraits(.allowsDirectInteraction)
         #endif
