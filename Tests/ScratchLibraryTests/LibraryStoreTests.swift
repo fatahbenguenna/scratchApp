@@ -375,17 +375,29 @@ final class LibraryStoreTests: XCTestCase {
         XCTAssertEqual(after, [demo, voix])
     }
 
-    /// CA9 : l'import reste hors périmètre (story 3.2) et lève une erreur sans rien écrire.
-    func testImportIsNotImplementedYet() async throws {
-        let source = sandbox.root.appendingPathComponent("source.wav")
-        try Data(repeating: 0, count: 4).write(to: source)
-        do {
-            _ = try await makeStore().importFile(at: source)
-            XCTFail("import arrives with story 3.2")
-        } catch {
-            guard case .writeFailed = error as? LibraryError else { return XCTFail("\(error)") }
+    /// #51 — NFR12, 5.3 : un index lisible dont une entrée est ignorée n'est mis de côté qu'une fois ;
+    /// l'index est réécrit avec les seules entrées valides, et les lancements suivants n'ajoutent
+    /// aucune copie `library.json.corrupt_N`.
+    func testPartiallyReadableIndexIsSetAsideOnlyOnce_51() async throws {
+        let valid = sandbox.entry(fileName: "boucle.wav", size: 12)
+        try sandbox.writeCopy("boucle.wav", size: 12)
+        let validJSON = String(decoding: try LibraryIndex.makeEncoder().encode(valid), as: UTF8.self)
+        let original = #"{"version": 1, "entries": [\#(validJSON), {"id": "x"}]}"#
+        try sandbox.writeRawIndex(original)
+
+        for launch in 1 ... 3 {
+            let store = makeStore()
+            let entries = await store.entries
+            let removed = await store.reconcile()
+            let partial = await store.indexWasPartiallyReadable
+            XCTAssertEqual(entries, [demo, valid], "launch \(launch)")
+            XCTAssertEqual(removed, [], "launch \(launch)")
+            XCTAssertEqual(partial, launch == 1, "only the first launch reads a partial index")
         }
-        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: sandbox.locations.soundBankDirectory.path), [])
-        XCTAssertFalse(FileManager.default.fileExists(atPath: sandbox.locations.libraryIndexURL.path))
+        let supportFiles = try FileManager.default.contentsOfDirectory(atPath: sandbox.locations.supportDirectory.path)
+        XCTAssertEqual(supportFiles.sorted(), ["library.json", "library.json.corrupt"])
+        let corrupt = sandbox.locations.supportDirectory.appendingPathComponent("library.json.corrupt")
+        XCTAssertEqual(try String(contentsOf: corrupt, encoding: .utf8), original, "the original is kept as it was")
+        XCTAssertEqual(try sandbox.indexedIDs(), [valid.id], "library.json holds only the valid entries")
     }
 }

@@ -12,7 +12,8 @@ import ScratchCore
 ///   est déplacé vers `library.json.corrupt` (`library.json.corrupt_2`, `_3`… si ce nom est pris,
 ///   sans jamais écraser un document déjà mis de côté) et la bibliothèque repart vide. Une entrée
 ///   isolée illisible, en double ou qui se présente comme la démo est ignorée ; le document
-///   d'origine est alors copié de la même façon, pour qu'aucune donnée ne soit perdue.
+///   d'origine est alors copié de la même façon, pour qu'aucune donnée ne soit perdue, et
+///   `LoadResult.isPartial` demande au magasin de réécrire l'index nettoyé (une seule mise de côté).
 struct LibraryIndex: Sendable {
     /// Version du format écrit et seule version lue.
     static let currentVersion = 1
@@ -26,6 +27,9 @@ struct LibraryIndex: Sendable {
         var entries: [LibraryEntry]
         /// Copie mise de côté du document lu, s'il était illisible en tout ou en partie.
         var setAsideURL: URL?
+        /// Le document était lisible mais des entrées ont été ignorées : il doit être réécrit avec
+        /// les seules entrées lues, pour n'être mis de côté qu'une fois (#51).
+        var isPartial = false
     }
 
     /// Lit l'index. Ne lève jamais d'erreur : un index absent donne une liste vide.
@@ -47,11 +51,13 @@ struct LibraryIndex: Sendable {
             entries.append(entry)
         }
         let skippedSome = entries.count != document.entries.count
-        return LoadResult(entries: entries, setAsideURL: skippedSome ? setAside(keepingOriginal: true) : nil)
+        return LoadResult(entries: entries, setAsideURL: skippedSome ? setAside(keepingOriginal: true) : nil,
+                          isPartial: skippedSome)
     }
 
     /// Écrit l'index de façon atomique (le son de démonstration est toujours exclu).
-    /// Lève `LibraryError.writeFailed` si le dossier ou le fichier ne peut pas être écrit.
+    /// Lève `LibraryError.insufficientStorage` si le disque est plein, `writeFailed` pour tout autre
+    /// échec d'écriture du dossier ou du fichier.
     func save(_ entries: [LibraryEntry]) throws {
         let stored = entries.filter { $0.origin != .demo && $0.id != LibraryEntry.demoID }
         do {
@@ -60,7 +66,7 @@ struct LibraryIndex: Sendable {
                                                     withIntermediateDirectories: true)
             try data.write(to: url, options: .atomic)
         } catch {
-            throw LibraryError.writeFailed(reason: "library.json : \(error)")
+            throw LibraryError.writing(error, context: "library.json")
         }
     }
 

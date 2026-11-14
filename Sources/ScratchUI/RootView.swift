@@ -1,44 +1,58 @@
-import SwiftUI
 import ScratchCore
+import SwiftUI
 
-/// Vue racine de ScratchApp : platine A, table de mixage, platine B (spec v2.0 — 3.4).
+/// Vue racine de ScratchApp : platine A, table de mixage, platine B (spec 3.4), animée par l'horloge
+/// d'affichage qui appelle `AppModel.tick()` une fois par image (UX §10.1).
 ///
-/// Version de départ (sprint 0) : simple maquette statique. Les vraies vues (disque, commandes,
-/// table de mixage, dispositions iPhone/iPad/Mac) sont livrées par les stories de l'épopée UI.
+/// `RootView()` affiche l'environnement d'aperçu (faux moteur, `PreviewDeckIntents`) tant que la
+/// story 6.1 n'injecte pas le vrai modèle par `init(model:intents:)`. Pour que la boucle se suspende
+/// au repos, l'`AppModel` reçoit un `DisplayWakingEngine` à la place du moteur.
 public struct RootView: View {
-    public init() {}
+    @State private var session: RootSession
+
+    /// Environnement d'aperçu (faux moteur), en attendant la story 6.1.
+    public init() {
+        let environment = PreviewEnvironment()
+        self.init(model: environment.model, intents: environment.intents)
+    }
+
+    public init(model: AppModel, intents: any DeckIntents) {
+        _session = State(initialValue: RootSession(model: model, intents: intents))
+    }
 
     public var body: some View {
-        HStack(spacing: 24) {
-            DeckPlaceholder(deck: .a)
-            VStack(spacing: 12) {
-                Text("Table de mixage").font(.headline)
-                Text("Crossfader A ↔ B").font(.caption).foregroundStyle(.secondary)
-            }
-            .frame(minWidth: 160)
-            DeckPlaceholder(deck: .b)
-        }
-        .padding(24)
-        .frame(minWidth: 320, minHeight: 320)
+        MainLayoutView(model: session.model, intents: session.intents)
+            .background(DisplayLinkHost(driver: session.driver).accessibilityHidden(true))
     }
 }
 
-private struct DeckPlaceholder: View {
-    let deck: DeckID
+/// Modèle, intentions et horloge d'une fenêtre, gardés ensemble par `@State`.
+@MainActor
+final class RootSession {
+    let model: AppModel
+    let intents: any DeckIntents
+    let driver: DisplayLinkDriver
 
-    var body: some View {
-        VStack(spacing: 12) {
-            Text("Platine \(deck.rawValue)").font(.title2.bold())
-            Circle()
-                .fill(Color.black)
-                .overlay(Circle().fill(Color.orange).frame(width: 60, height: 60))
-                .aspectRatio(1, contentMode: .fit)
-                .accessibilityLabel("Disque de la platine \(deck.rawValue)")
-            Text("33⅓ RPM").font(.caption.monospacedDigit())
+    init(model: AppModel, intents: any DeckIntents) {
+        self.model = model
+        self.intents = intents
+        let driver = DisplayLinkDriver { [weak model] in
+            guard let model else { return true }
+            model.tick()
+            let frames = EngineSnapshot(decks: DeckPair(a: model.deckA.frame, b: model.deckB.frame),
+                                        mixer: model.mixer.frame)
+            return frames.isIdle
+        }
+        self.driver = driver
+        if let waking = model.engine as? DisplayWakingEngine {
+            waking.onCommand = { [weak driver] in MainActor.assumeIsolated { driver?.wake() } }
+            driver.allowsSuspension = true
         }
     }
 }
 
-#Preview {
-    RootView()
+#if DEBUG
+#Preview("Premier lancement") {
+    RootView().frame(width: 960, height: 600)
 }
+#endif
