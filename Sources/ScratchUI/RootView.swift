@@ -33,6 +33,7 @@ public struct RootView: View {
             #if os(macOS)
             .background(KeyboardHost(controller: session.keyboard).accessibilityHidden(true))
             #endif
+            .onAppear { session.connectWakeSource() }
     }
 }
 
@@ -62,20 +63,26 @@ final class RootSession {
     }
     #endif
 
-    /// Horloge d'affichage : `tick()` à chaque image, suspendue au repos si le moteur la réveille.
+    /// Horloge d'affichage : `tick()` à chaque image.
     private static func makeDriver(for model: AppModel) -> DisplayLinkDriver {
-        let driver = DisplayLinkDriver { [weak model] in
+        DisplayLinkDriver { [weak model] in
             guard let model else { return true }
             model.tick()
             let frames = EngineSnapshot(decks: DeckPair(a: model.deckA.frame, b: model.deckB.frame),
                                         mixer: model.mixer.frame)
             return frames.isIdle
         }
-        if let waking = model.engine as? DisplayWakingEngine {
-            waking.onCommand = { [weak driver] in MainActor.assumeIsolated { driver?.wake() } }
-            driver.allowsSuspension = true
-        }
-        return driver
+    }
+
+    /// Branche le `DisplayWakingEngine` du modèle sur l'horloge de cette session, qui peut alors se
+    /// suspendre au repos. Appelé par la vue affichée (`onAppear`), jamais à la construction :
+    /// SwiftUI reconstruit `RootView` à chaque réévaluation de la vue parente, et `@State` ne garde
+    /// que la première session. Une session construite puis jetée détournerait sinon les réveils vers
+    /// une horloge jamais affichée, et la boucle affichée resterait suspendue (6.2).
+    func connectWakeSource() {
+        guard let waking = model.engine as? DisplayWakingEngine else { return }
+        waking.onCommand = { [weak driver] in MainActor.assumeIsolated { driver?.wake() } }
+        driver.allowsSuspension = true
     }
 }
 

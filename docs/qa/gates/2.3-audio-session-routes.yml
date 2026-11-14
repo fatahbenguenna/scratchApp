@@ -4,38 +4,40 @@ story_title: "Session audio et routes"
 scope: "Partie 1 (PR #88) : politique pure AudioSystemPolicy et OutputDeviceMonitor (macOS) ; CA 7 et intégration dans l'hôte en partie 2"
 pr: 88
 issue: 26
-reviewed_sha: "07a7d38"
-gate: CONCERNS
+reviewed_sha: "01d8c67"
+review_history:
+  - sha: "07a7d38"
+    gate: CONCERNS
+    note: "Événements reçus pendant une interruption (#96) ; CONCERNS refusée par le PO (D-55)."
+  - sha: "9af2634"
+    gate: FAIL
+    note: "Correctif de #96 juste et complet ; CI macOS rouge (testLongBurstGivesASingleEvent dépendant du minutage)."
+  - sha: "01d8c67"
+    gate: PASS
+    note: "Délai de regroupement injectable, test à 100 ms de marge avec saut mesuré ; CI verte."
+gate: PASS
 status_reason: >-
-  Gate partielle. Table de politique conforme à l'architecture §7.3, IC-04 et D-04 ; aucune action
-  ne démarre un moteur (garanti par le type) ; bandeaux identiques à l'UX §8.5, avis « indisponible »
-  à la transition seulement ; rafales Core Audio regroupées. CONCERNS : le contexte ignore l'état
-  « interrompu », si bien qu'un routeChanged(true) ou un mediaServicesReset pendant une interruption iOS
-  demande un pump() alors que l'horloge de secours rend (deux fils de rendu), et que la sortie peut
-  redémarrer en plein appel (#96). Défaut latent, rien n'exécute encore la politique : fusion possible,
-  correction exigée avant la partie 2.
+  Gate partielle (partie 1). Table de politique conforme à l'architecture §7.3, IC-04 et D-04 ; aucune
+  action ne démarre un moteur ; bandeaux de l'UX §8.5. Correctif de #96 (D-55) : isInterrupted et
+  isFallbackRendering dans AudioHostContext ; pendant une interruption, STOP appliqué par l'horloge de
+  secours (jamais de pump), aucun startOutput, nouvel essai ni avis « indisponible » avant
+  interruptionEnded ; test sur tous les événements, sortie indisponible ou non. Moniteur : veille
+  transmise de façon synchrone, délai de regroupement relancé à chaque notification, test robuste.
+  CI verte ; fusion possible selon D-55.
 reviewer: Quinn
 updated: "2026-11-14"
-top_issues:
-  - id: "POLICY-INTERRUPTED"
-    severity: medium
-    finding: "Événements reçus pendant une interruption : applyPendingCommands avec l'horloge de secours en marche (routeChanged(true), mediaServicesReset) et startOutput avant interruptionEnded (ces deux-là et configurationChanged)."
-    suggested_action: "isInterrupted (ou isFallbackRendering) dans AudioHostContext ; [.stopAllMotors] seul quand l'horloge rend ; aucun startOutput ni nouvel essai avant interruptionEnded ; test sur allEvents (#96)."
-  - id: "COALESCING-WINDOW"
-    severity: low
-    finding: "Regroupement par fenêtre fixe de 50 ms à partir de la première notification : une rafale plus longue donne deux configurationChanged."
-    suggested_action: "Délai relancé à chaque notification, fusionné avec AVAudioEngineConfigurationChange en partie 2."
+top_issues: []
 checks:
   - item: "Table de politique (§7.3, IC-04, D-04)"
     result: "Conforme pour chaque ligne ; STOP appliqué (stopOutput, stopAllMotors, pump) avant la nouvelle route ; changement volontaire sur Mac sans STOP, périphérique disparu avec STOP ; suspendu : STOP seulement."
   - item: "Aucun démarrage de moteur"
     result: "AudioHostAction sans cas de démarrage ; testStopRuleIsConsistentAcrossPlatforms."
   - item: "Un seul fil de rendu"
-    result: "pump jamais avec isOutputUnavailable (testé) ; lacune pendant une interruption (sonde QA sous Linux, #96)."
+    result: "pump jamais quand l'horloge de secours rend (isFallbackRendering), y compris pendant une interruption ; testEventsDuringAnInterruption_96 sur tous les événements (#96 corrigé)."
   - item: "Bandeaux (UX §8.5)"
     result: "Quatre textes identiques ; pas de répétition à chaque essai manqué ; « retrouvée » avec le nom."
   - item: "Regroupement Core Audio"
-    result: "Un seul configurationChanged par rafale rapprochée ; présence du périphérique relue dans l'état courant du HAL."
+    result: "Délai relancé à chaque notification (compteur de génération), injectable ; testLongBurstGivesASingleEvent (300 ms, écarts de 200 ms, saut si le runner les étire) ; présence du périphérique relue dans l'état courant du HAL."
 nfr_validation:
   security:
     status: PASS
@@ -44,19 +46,20 @@ nfr_validation:
     status: PASS
     notes: "Logique pure ; rafales regroupées."
   reliability:
-    status: CONCERNS
-    notes: "Fil de rendu unique non garanti pour les événements pendant une interruption (#96)."
+    status: PASS
+    notes: "Fil de rendu unique garanti pendant une interruption (#96 corrigé et testé) ; regroupement relancé à chaque notification."
   maintainability:
     status: PASS
     notes: "Politique pure, sans #if, exhaustive et testée pour les deux plateformes ; moniteur testable par événements simulés."
 evidence:
-  ci: "Rapport CI efee4e1 (07a7d38 fusionné dans d51f147) : Linux ✅, macOS ✅ ; 10 + 4 tests"
-  linux_tests: "scripts/linux-test.sh sur la fusion avec main (f2a9e25) : 234/234"
-  merge_check: "git merge-tree avec origin/main, #84, #82 et #89 : sans conflit"
+  ci: "Rapport CI 31f704a (01d8c67) : Linux ✅, macOS ✅ ; 9af2634 : macOS ❌ (test dépendant du minutage), corrigé"
+  linux_tests: "scripts/linux-test.sh sur la fusion de 9af2634 avec main (f87e589) : 237/237"
+  merge_check: "git merge-tree de 01d8c67 avec origin/main (caa0046), #95, #99 et #100 : sans conflit"
   policy_probe: "Politique rejouée sous Linux, iOS interrompu : routeChanged(true) → stopOutput, stopAllMotors, applyPendingCommands, notify, startOutput"
 recommendations:
   immediate:
-    - action: "Corriger #96 dans cette PR si possible, sinon avant le branchement de la partie 2 (exigé)."
+    - action: "Fusionner (D-55) ; #96 close à la fusion, #26 reste ouverte pour la partie 2."
   future:
-    - action: "Partie 2 : fusionner OutputDeviceMonitor et AVAudioEngineConfigurationChange ; fixer deviceInUse à chaque démarrage (test d'intégration) ; documenter l'arrêt de l'ancienne sortie avant startOutput ; veille traitée de façon synchrone ; unifier la lecture du périphérique par défaut avec OutputDevice."
-    - action: "Recette (#44) : casque débranché pendant la lecture (aucun son sur le haut-parleur), retrait d'une interface USB, veille et réveil."
+    - action: "Partie 2 (critères D-55) : un seul configurationChanged pour les deux sources ; deviceInUse fixé à chaque démarrage avec test d'intégration ; STOP synchrone avant la veille ; ancienne sortie arrêtée avant la nouvelle ; utilitaire unique du périphérique par défaut."
+    - action: "Partie 2 : fin d'interruption non garantie par iOS ; sortir de l'état interrompu au retour au premier plan et après mediaServicesReset, retenter la sortie sans moteur, avec test d'intégration."
+    - action: "Recette (#44) : casque débranché pendant la lecture et pendant un appel, retrait d'une interface USB, veille et réveil."
