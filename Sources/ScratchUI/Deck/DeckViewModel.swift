@@ -4,8 +4,8 @@ import ScratchLibrary
 
 /// Modèle de présentation d'une platine (PRD 4.1 ; architecture §5.2).
 ///
-/// **Version de base (story 0.2), complétée par Léa en 4.1 et 4.5** (formats d'affichage, états des
-/// boutons, faux moteur des aperçus).
+/// **Version de base (story 0.2), complétée en 4.1** (textes affichés, états des boutons, points
+/// d'accroche de l'`AppModel`) **et en 4.5**.
 ///
 /// Deux cadences :
 /// - `frame` : instantané complet de la platine, remplacé **à chaque image** par `AppModel.tick()`.
@@ -24,8 +24,15 @@ public final class DeckViewModel {
     /// Instantané de la platine, mis à jour à chaque image.
     public private(set) var frame = DeckSnapshot.initial
 
-    /// Entrée de bibliothèque chargée (titre affiché), renseignée par l'`AppModel` au chargement.
+    /// Entrée de bibliothèque chargée (titre affiché), renseignée par l'`AppModel` au chargement, avec
+    /// `loadedClip`. Effacée seulement quand l'instantané montre que ce clip a quitté la platine.
     public var loadedEntry: LibraryEntry?
+    /// Clip envoyé par `.load` (forme d'onde en 4.6), renseigné par l'`AppModel` en même temps que
+    /// `loadedEntry` (story 4.1 CA 7).
+    public var loadedClip: AudioClip?
+    /// Import ou chargement en cours, posé par l'`AppModel` (UX §5.10, §7.2).
+    public var activity = DeckActivity.idle
+
     public private(set) var isLoaded = false
     public private(set) var motorOn = false
     public private(set) var speed = TurntableSpeed.rpm33
@@ -33,10 +40,76 @@ public final class DeckViewModel {
     public private(set) var resistance = TurntableConstants.defaultResistance
     public private(set) var cueSeconds: Double?
     public private(set) var isHeld = false
+    /// Tête bloquée en fin de son : pastille « Fin du son » (RM-55, UX §5.10).
+    public private(set) var isAtEnd = false
+
+    /// Position `mm:ss,d` (D-28) ; ne change que lorsque le dixième change.
+    public private(set) var positionText = DeckFormatting.emptyTime
+    /// Durée `mm:ss,d`, « --:--,- » sans son.
+    public private(set) var durationText = DeckFormatting.emptyTime
+    /// Valeur VoiceOver du disque (UX §5.1), à la même cadence que `positionText`.
+    public private(set) var discAccessibilityValue = "vide"
+    /// Valeur VoiceOver de l'en-tête (UX §5.10), à la même cadence que `positionText`.
+    public private(set) var headerAccessibilityValue = "aucun son"
+    /// Incrémenté à chaque START sur une platine vide : la vue met alors en avant « Importer » et
+    /// « Charger la démo » et VoiceOver l'annonce (PO-01, UX §5.2).
+    public private(set) var emptyDeckHighlightCount = 0
+
+    @ObservationIgnored private var displayKey: DisplayKey?
+    /// Clip attendu (`loadedClip`) déjà vu dans un instantané.
+    @ObservationIgnored private var confirmedClipID: AudioClip.ID?
+    @ObservationIgnored private var previousClipID: AudioClip.ID?
 
     public init(deck: DeckID, engine: any EngineControlling) {
         self.deck = deck
         self.engine = engine
+    }
+
+    // MARK: Textes et états affichés (story 4.1)
+
+    /// « platine A » : suffixe des libellés VoiceOver (UX §5.0).
+    public var deckName: String { "platine \(deck.rawValue)" }
+
+    /// Titre : nom de l'entrée, c'est-à-dire de la copie locale (D-12), « Aucun son » à vide.
+    public var title: String {
+        if let title = loadedEntry?.title, !title.isEmpty { return title }
+        if let title = loadedClip?.title, !title.isEmpty { return title }
+        return isLoaded ? "Son sans titre" : "Aucun son"
+    }
+
+    /// Un titre de son est affiché (sinon « Aucun son », en texte secondaire).
+    public var hasTitle: Bool { isLoaded || loadedEntry != nil || loadedClip != nil }
+
+    /// Libellé VoiceOver de l'en-tête : « Platine A, « titre » » (UX §5.10).
+    public var headerAccessibilityLabel: String {
+        hasTitle ? "Platine \(deck.rawValue), \(DeckFormatting.quoted(title))" : "Platine \(deck.rawValue)"
+    }
+
+    /// Pastille d'activité : « Import de « nom »… », « Chargement… ».
+    public var activityText: String? {
+        switch activity {
+        case .idle: return nil
+        case let .importing(fileName): return "Import de \(DeckFormatting.quoted(fileName))…"
+        case .loading: return "Chargement…"
+        }
+    }
+
+    /// « Importer » est désactivé pendant un import ou un chargement (UX §7.2).
+    public var isImportEnabled: Bool { activity == .idle }
+
+    /// La platine vide propose « Importer » et « Charger la démo » (SF-01) ; pendant un import ou
+    /// un chargement, un indicateur les remplace (UX §5.1).
+    public var showsEmptyActions: Bool { !isLoaded && activity == .idle }
+
+    /// Texte du bouton : il suit la commande du moteur, pas la vitesse réelle (UX §5.2) :
+    /// « START » pendant le freinage, « STOP » pendant l'accélération.
+    public var startStopTitle: String { motorOn ? "STOP" : "START" }
+    public var startStopAccessibilityLabel: String { "\(startStopTitle), \(deckName)" }
+    public var startStopAccessibilityValue: String { motorOn ? "moteur en marche" : "moteur arrêté" }
+
+    /// Annonce VoiceOver d'un START sur une platine vide (UX §8.6).
+    public var emptyStartAnnouncement: String {
+        "Aucun son chargé sur la platine \(deck.rawValue). Importez un fichier ou chargez la démo."
     }
 
     /// Applique l'instantané de l'image (appelé par `AppModel.tick()`).
@@ -49,7 +122,64 @@ public final class DeckViewModel {
         if resistance != snapshot.resistance { resistance = snapshot.resistance }
         if cueSeconds != snapshot.cueSeconds { cueSeconds = snapshot.cueSeconds }
         if isHeld != snapshot.isHeld { isHeld = snapshot.isHeld }
-        if !snapshot.isLoaded, loadedEntry != nil { loadedEntry = nil }
+        if isAtEnd != snapshot.isAtEnd { isAtEnd = snapshot.isAtEnd }
+        reconcileLoadedClip(with: snapshot.clipID)
+        updateTexts(for: snapshot)
+    }
+
+    /// N'efface `loadedEntry` et `loadedClip` que lorsque l'instantané montre que le clip attendu a
+    /// quitté la platine, jamais sur une image rendue avant l'application de `.load` (CA 7).
+    /// Les identifiants de clip sont croissants : un clip plus ancien que celui attendu signifie que
+    /// le chargement n'est pas encore appliqué.
+    private func reconcileLoadedClip(with shown: AudioClip.ID?) {
+        defer { previousClipID = shown }
+        guard let expected = loadedClip?.id else {
+            // Entry without a clip: clear it only when the deck content changes.
+            if loadedEntry != nil, previousClipID != nil, shown != previousClipID { loadedEntry = nil }
+            return
+        }
+        if shown == expected {
+            confirmedClipID = expected
+        } else if let shown, shown > expected {
+            clearLoadedClip()   // superseded by a newer load
+        } else if confirmedClipID == expected {
+            clearLoadedClip()   // our clip was unloaded or replaced
+        }
+    }
+
+    private func clearLoadedClip() {
+        loadedEntry = nil
+        loadedClip = nil
+        confirmedClipID = nil
+    }
+
+    /// Met à jour les textes seulement quand le dixième affiché ou l'état change (UX §10.2).
+    private func updateTexts(for snapshot: DeckSnapshot) {
+        let loaded = snapshot.isLoaded
+        let key = DisplayKey(
+            isLoaded: loaded,
+            positionTenths: loaded ? DeckFormatting.tenths(snapshot.positionSeconds) : 0,
+            durationTenths: loaded ? DeckFormatting.tenths(snapshot.durationSeconds) : 0,
+            status: DeckFormatting.DiscStatus(snapshot)
+        )
+        guard key != displayKey else { return }
+        displayKey = key
+        let position = loaded ? DeckFormatting.clockText(tenths: key.positionTenths) : DeckFormatting.emptyTime
+        let duration = loaded ? DeckFormatting.clockText(tenths: key.durationTenths) : DeckFormatting.emptyTime
+        let discValue = DeckFormatting.discValue(status: key.status, positionTenths: key.positionTenths)
+        let headerValue = DeckFormatting.headerValue(
+            isLoaded: loaded, positionTenths: key.positionTenths, durationTenths: key.durationTenths)
+        if positionText != position { positionText = position }
+        if durationText != duration { durationText = duration }
+        if discAccessibilityValue != discValue { discAccessibilityValue = discValue }
+        if headerAccessibilityValue != headerValue { headerAccessibilityValue = headerValue }
+    }
+
+    private struct DisplayKey: Equatable {
+        var isLoaded: Bool
+        var positionTenths: Int
+        var durationTenths: Int
+        var status: DeckFormatting.DiscStatus
     }
 
     // MARK: Transport
@@ -59,8 +189,12 @@ public final class DeckViewModel {
         setMotor(!motorOn)
     }
 
+    /// Permis sur une platine vide : le plateau tourne sans son (PO-01) et les actions de l'état vide
+    /// sont mises en avant.
     public func setMotor(_ on: Bool) {
-        if engine.send(.motor(deck, on: on)) { motorOn = on }
+        guard engine.send(.motor(deck, on: on)) else { return }
+        motorOn = on
+        if on, !isLoaded { emptyDeckHighlightCount &+= 1 }
     }
 
     /// 33⅓ / 45 RPM (SF-04).
