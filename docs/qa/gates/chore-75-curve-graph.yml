@@ -1,0 +1,33 @@
+schema: 1
+story: "4.2-followup-75"
+story_title: "Mini-graphique de la courbe du crossfader (suivi #75 de la gate 4.2)"
+pr: 109
+issue: 75
+reviewed_sha: "53114f3"
+gate: PASS
+status_reason: >-
+  Graphique 44 × 28 des gains A et B tracés depuis CrossfaderCurve.gains (fonction du rendu), equatable,
+  masqué pour VoiceOver, abscisse inversée avec le hamster ; repères de cut-in sur la largeur du cœur
+  (CrossfaderCurve.cutInWidth rendue publique, changement additif hors Contracts/). Écart accepté :
+  pas de graphique dans la table de l'iPad portrait (« devrait », hauteur de 176 pt).
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues: []
+checks:
+  - item: "Graphique"
+    result: "CurveGraphModel pur et testé (extrémités, coupure franche à 3 %, −3 dB au centre, monotonie, hamster) ; Canvas equatable."
+  - item: "ScratchCore"
+    result: "cutInWidth public ; (1 − c) + c × w, algébriquement égale à l'ancienne formule de MixerViewModel ; testCutInMarksUseTheCoreWidth."
+nfr_validation:
+  security: {status: PASS, notes: "Sans objet."}
+  performance: {status: PASS, notes: "Redessiné seulement quand la courbe ou le hamster change."}
+  reliability: {status: PASS, notes: "Une seule formule de cut-in."}
+  maintainability: {status: PASS, notes: "Logique pure séparée de la vue."}
+evidence:
+  ci: "wait-ci sur 53114f3 : Linux ✅, macOS ✅"
+  linux_tests: "scripts/linux-test.sh sur la fusion avec main : 241/241"
+  merge_check: "Sans conflit avec main, #95, #100, #111"
+recommendations:
+  immediate:
+    - action: "Fusionner (ferme #75)."
+  future: []

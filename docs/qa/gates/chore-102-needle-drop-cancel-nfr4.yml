@@ -1,0 +1,33 @@
+schema: 1
+story: "4.6-followup-102"
+story_title: "Needle drop annulé par le système et NFR4 en CI release (suivi #102 de la gate 4.6)"
+pr: 111
+issue: 102
+reviewed_sha: "b520239"
+gate: PASS
+status_reason: >-
+  @GestureState remis à faux à la fin et à l'annulation : à l'annulation (geste encore actif), reset()
+  efface la tête fantôme et la bulle sans rien placer ; testAnalysisTime_NFR4 exécuté dans l'étape
+  release, mesure au rapport (0,013 puis 0,008 s pour 10 min avec Accelerate). Point de recette : une
+  fin normale place toujours la tête (ordre onEnded puis remise à zéro de l'état).
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues: []
+checks:
+  - item: "Annulation par le système"
+    result: "onChange(of: isDragging) : reset() si le geste est encore actif ; testSystemCancellationHidesTheGhost_102."
+  - item: "NFR4 en CI"
+    result: "Filtre release étendu ; ligne NFR4 dans render-metrics.log et au rapport."
+nfr_validation:
+  security: {status: PASS, notes: "Sans objet."}
+  performance: {status: PASS, notes: "NFR4 mesuré : 0,008 à 0,013 s pour 10 min en release."}
+  reliability: {status: PASS, notes: "Plus de tête fantôme figée après une annulation."}
+  maintainability: {status: PASS, notes: "Mesure publiée à chaque PR."}
+evidence:
+  ci: "wait-ci sur b520239 : Linux ✅, macOS ✅ (rapport 6bde24a)"
+  merge_check: "Sans conflit avec main ; conflit prévisible avec #115 sur le filtre release de ci.yml (filtres à combiner)"
+recommendations:
+  immediate:
+    - action: "Fusionner (ferme #102) ; combiner le filtre release avec #115 selon l'ordre de fusion."
+  future:
+    - action: "Recette (#44) : fin normale du needle drop qui place la tête, et rotation pendant un needle drop, sur Mac et sur iPad."
