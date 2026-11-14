@@ -109,7 +109,7 @@ jobs:
           open "$APP" --args --demo-scene
           sleep 6
           screencapture -x ci-output/screenshot.png || true
-          # L'app reste lancée sans sortie audio (horloge de secours, D-35).
+          # L'app reste lancée : sortie virtuelle du runner, ou horloge de secours sans sortie (D-35).
           sleep 6
           pgrep -x ScratchApp > /dev/null && echo "ScratchApp est en cours d'exécution" | tee ci-output/launch.txt
           pgrep -x ScratchApp > /dev/null
