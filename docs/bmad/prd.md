@@ -1,6 +1,6 @@
 # ScratchApp — PRD (Product Requirements Document)
 
-- **Version :** 1.1
+- **Version :** 1.2
 - **Date :** 14 novembre 2026
 - **Auteur :** 📋 John, Product Manager BMAD
 - **Statut :** validé par 📝 Sarah (PO) le 14 novembre 2026, avec réserves : [`po-validation.md`](po-validation.md) (registre D-01 à D-47)
@@ -58,6 +58,7 @@ Le développement suit BMAD (charte `TEAM.md`) : trois développeurs travaillent
 | Version | Date | Auteur | Modification |
 |---|---|---|---|
 | 1.0 | 2026-11-14 | John (PM) | Création : objectifs, FR1 à FR32, NFR1 à NFR14, hypothèses techniques, épopées EP1 à EP6, 26 stories, plan en cinq vagues, points à arbitrer A1 à A14 (dont IC-01, IC-02, Q-01 et Q-02 du brief). |
+| 1.2 | 2026-11-14 | Bob (SM) | Réaffectations de l'orchestrateur : 1.2 → Léa, 2.2 → Hugo, 5.2 → Hugo (agents en 7.1, 7.2 et 7.5, propriété des fichiers en 5.4) ; ordre de travail, chemin critique, vagues et récapitulatif mis à jour (8.1, 8.2, 8.5) avec les numéros d'issues ; stories détaillées dans `docs/stories/`. |
 | 1.1 | 2026-11-14 | Sarah (PO) | Validation PO : critères des stories 1.1 à 1.4, 2.1, 2.3, 3.1 à 3.3, 4.1 à 4.3, 4.6, 5.1 à 5.3 et 6.1 à 6.3 alignés sur les décisions D-01 à D-47 (`po-validation.md`, section 5) ; NFR1 et NFR14 précisés ; références vers la spec v2.1. |
 
 ## 2. Exigences fonctionnelles
@@ -179,11 +180,13 @@ Pour paralléliser sans conflits, chaque dossier a un propriétaire. Toute modif
 | Chemin | Propriétaire | Stories |
 |---|---|---|
 | `Sources/ScratchCore/Contracts/` | 🏗️ Winston (0.2) ; changements par story dédiée ou avec son accord | 0.2 |
-| `Sources/ScratchCore/{Physics,Gesture,Voice,Mixer,Engine,Diagnostics}/`, `TurntableConstants.swift` | 💻 James | 1.1 à 1.5 |
-| `Sources/ScratchAudio/` | 💻 James | 2.1 à 2.4 |
+| `Sources/ScratchCore/{Physics,Voice,Mixer,Engine,Diagnostics}/`, `TurntableConstants.swift` | 💻 James | 1.1, 1.3 à 1.5 |
+| `Sources/ScratchCore/Gesture/` | 💻 Léa (réaffectation de 1.2) ; emploi des touches prédites dans `Physics/FingerTrajectory.swift` relu par James (D-16) | 1.2 |
+| `Sources/ScratchAudio/` (sauf le décodeur) | 💻 James | 2.1, 2.3, 2.4 |
+| `Sources/ScratchAudio/AudioFileDecoder.swift` et fichiers du décodeur, `Tests/ScratchAudioTests/AudioFileDecoderTests.swift` | 💻 Hugo (réaffectation de 2.2) | 2.2 |
 | `Sources/ScratchLibrary/` | 💻 Hugo | 3.1 à 3.4 |
-| `Sources/ScratchUI/{Deck,Mixer,Input,Layout,Waveform,Mac,Preview}/`, `RootView.swift` | 💻 Léa | 4.1 à 4.6, 5.1 à 5.3 |
-| `Sources/ScratchUI/{App,Library,Settings}/` | 💻 Hugo | 3.4, 3.5, 6.1, 6.2 |
+| `Sources/ScratchUI/{Deck,Mixer,Input,Layout,Waveform,Mac,Preview}/`, `RootView.swift` | 💻 Léa | 4.1 à 4.6, 5.1, 5.3 |
+| `Sources/ScratchUI/{App,Library,Settings}/` | 💻 Hugo | 3.4, 3.5, 5.2 (zone de dépôt dans `Library/`, réaffectation), 6.1, 6.2 |
 | `App/`, `project.yml`, `.github/workflows/` | 💻 Hugo | 6.1, 6.2 |
 | `Package.swift` | architecte (orchestrateur) | — |
 | `docs/qa/` | 🧪 Quinn | 6.3 |
@@ -191,7 +194,8 @@ Pour paralléliser sans conflits, chaque dossier a un propriétaire. Toute modif
 Points de contact entre développeurs, tous définis par une story amont :
 
 - le **protocole d'intentions** de l'interface (importer, charger la démo, déposer un fichier, ouvrir la bibliothèque ou les réglages) est défini par Léa en 4.1 et implémenté par Hugo en 6.1 ;
-- le **suivi d'angle** (1.2, James) est consommé par la saisie du disque (4.3, Léa) ;
+- le **suivi d'angle** (1.2, Léa depuis la réaffectation) est consommé par la saisie du disque (4.3, Léa) ; l'emploi des touches prédites par le moteur (1.2, D-16) touche `FingerTrajectory` (James), relu par lui ;
+- la **zone de dépôt** (5.2, Hugo) s'applique à la vue de platine de Léa (une ligne dans `Deck/DeckView.swift`, signalée) ;
 - les **commandes de menu** et la **vue d'aide des raccourcis** (5.1, Léa) sont attachées à la scène en 6.2 et intégrées aux réglages en 3.4 (Hugo) ;
 - le **scénario de scratch hors ligne** (1.5, James, dans `ScratchCore/Diagnostics/`) est réutilisé par le self-test (2.4) avec le son de démonstration (3.3, Hugo).
 
@@ -247,7 +251,7 @@ Toutes les stories de l'épopée sont du Swift pur, testées sous Linux, et ne f
 
 #### Story 1.2 — Suivi d'angle du geste
 
-- **Agent :** 💻 James · **Module :** ScratchCore (`Gesture/`) · **Priorité :** P0 · **Taille :** ~500 lignes
+- **Agent :** 💻 Léa (réaffectée, v1.2) · **Module :** ScratchCore (`Gesture/`) · **Priorité :** P0 · **Taille :** ~650 lignes (touches prédites comprises, D-16)
 - **Dépendances :** 0.2
 - **Récit :** En tant que DJ, je veux que la rotation de mon doigt, de ma souris ou de mon trackpad soit convertie fidèlement en angle de disque, afin que le scratch suive exactement mon geste, sans saut.
 - **Critères d'acceptation :**
@@ -334,7 +338,7 @@ Toutes les stories de l'épopée sont du Swift pur, testées sous Linux, et ne f
 
 #### Story 2.2 — Décodeur AVFoundation
 
-- **Agent :** 💻 James · **Module :** ScratchAudio · **Priorité :** P0 · **Taille :** ~600 lignes
+- **Agent :** 💻 Hugo (réaffectée, v1.2) · **Module :** ScratchAudio (`AudioFileDecoder`) · **Priorité :** P0 · **Taille :** ~600 lignes
 - **Dépendances :** 0.2
 - **Récit :** En tant qu'utilisateur, je veux que mes fichiers WAV, AIFF, MP3 et M4A soient décodés fidèlement, ou refusés avec un message clair, afin de scratcher mes propres sons sans mauvaise surprise.
 - **Critères d'acceptation :**
@@ -550,7 +554,7 @@ Les stories de l'épopée avancent sur la façade moteur du contrat 0.2 et sur u
 
 #### Story 5.2 — Glisser-déposer sur une platine
 
-- **Agent :** 💻 Léa · **Module :** ScratchUI (`Deck/`) · **Priorité :** P1 · **Taille :** ~300 lignes
+- **Agent :** 💻 Hugo (réaffectée, v1.2) · **Module :** ScratchUI (`Library/`, une ligne dans `Deck/`) · **Priorité :** P1 · **Taille :** ~300 lignes
 - **Dépendances :** 4.1, 6.1
 - **Récit :** En tant qu'utilisateur d'iPad ou de Mac, je veux déposer un fichier audio directement sur une platine, afin de le charger sans passer par le sélecteur.
 - **Critères d'acceptation :**
@@ -628,22 +632,23 @@ Les stories de l'épopée avancent sur la façade moteur du contrat 0.2 et sur u
 - **Chaque développeur reste dans ses dossiers** (5.4). Les seuls contacts entre développeurs passent par des protocoles définis dans une story amont.
 - **L'interface avance sur le faux moteur** (4.1) et l'AppModel sur des doubles (6.1) ; le branchement réel n'intervient qu'en 6.2.
 - **Dans chaque vague, les stories P0 passent avant les P1.** Le jalon « V1 — P0 jouable » ne dépend d'aucune story P1 : si une story P1 glisse, l'intégration 6.2 avance quand même.
-- **Chemin critique :** 0.2 → 1.1, 1.3 et 1.4 (réalisées l'une après l'autre par James) → 1.5 → 2.1 → 6.2 → 6.3. Le cœur audio est le plus long à construire ; les stories P1 de James (2.3) et l'interface avancent en parallèle.
+- **Chemin critique :** 0.2 → 1.1 → 1.3 → 1.4 (réalisées l'une après l'autre par James) → 1.5 → 2.1 → 2.4 et 6.2 → 6.3. Pour le raccourcir, l'orchestrateur a réaffecté 1.2 à Léa, 2.2 et 5.2 à Hugo (v1.2) : James n'a plus que sept stories, toutes dans le cœur audio et l'hôte ; sa story P1 (2.3) vient en dernier.
+- **Ordre de travail recommandé :** James 1.1 → 1.3 → 1.4 → 1.5 → 2.1 → 2.4 → 2.3 ; Léa 4.1 → 1.2 → 4.2 → 4.3 → 5.1 → 4.4 → 4.5 → 4.6 → 5.3 ; Hugo 3.1 → 3.3 → 2.2 → 3.2 → 6.1 → 5.2 → 3.4 → 3.5 → 6.2 ; Quinn : gate de chaque PR, puis 6.3. Une story P0 débloquée passe devant les P1 restantes du même développeur (en particulier 6.2 devant 3.4 et 3.5 si 1.5, 2.1, 4.4 et 5.1 sont fusionnées plus tôt).
 
 ### 8.2 Vagues
 
 | Vague | Démarre quand | 💻 James | 💻 Léa | 💻 Hugo | 🧪 Quinn |
 |---|---|---|---|---|---|
-| 0 | — | 0.1 squelette et CI (fusionnée, #1) ; 0.2 contrats d'architecture (🏗️ Winston) | — | — | — |
-| 1 | fusion de 0.2 | 1.1 Modèle physique → 1.2 Suivi d'angle | 4.1 Platine et faux moteur | 3.1 Index et SHA-256 → 3.3 Démo | gates |
-| 2 | au fil des fusions de V1 (8.5) | 1.3 Voix de lecture → 1.4 Table de mixage (cœur) | 4.2 Table de mixage (vue) → 4.3 Saisie du disque | 3.2 Import | gates |
-| 3 | au fil des fusions de V2 (8.5) | 1.5 ScratchEngine → 2.1 Hôte AVAudioEngine | 5.1 Clavier et menus → 4.4 Dispositions iPhone/iPad | 6.1 AppModel et chargement | gates |
-| 4 | au fil des fusions de V3 (8.5) | 2.2 Décodeur → 2.3 Session et routes (P1) | 4.5 Pitch, CUE, résistance (P1) → 4.6 Forme d'onde (P1) | 3.4 Préférences et réglages (P1) → 3.5 Bibliothèque (P1) | gates, préparation de la recette avec Hugo |
-| 5 (dernière) | dépendances fusionnées ; 6.3 en dernier | 2.4 Self-test de scratch complet | 5.2 Glisser-déposer (P1) → 5.3 Accessibilité (P1) | 6.2 Intégration complète | 6.3 Recette macOS, après 6.2 et 2.4 |
+| 0 | — | 0.1 squelette et CI (fusionnée, #1) ; 0.2 contrats d'architecture (🏗️ Winston, fusionnée, #11) | — | — | — |
+| 1 | fusion de 0.2 | 1.1 Modèle physique (#19) → 1.3 Voix de lecture (#21) | 4.1 Platine et faux moteur (#33) → 1.2 Suivi d'angle (#20) | 3.1 Index et SHA-256 (#28) → 3.3 Démo (#30) | gates |
+| 2 | au fil des fusions de V1 (8.5) | 1.4 Table de mixage, cœur (#22) → 1.5 ScratchEngine (#23) | 4.2 Table de mixage, vue (#34) → 4.3 Saisie du disque (#35) | 2.2 Décodeur AVFoundation (#25) → 3.2 Import (#29) | gates |
+| 3 | au fil des fusions de V2 (8.5) | 2.1 Hôte AVAudioEngine (#24) → 2.4 Self-test de scratch (#27) | 5.1 Clavier et menus (#39) → 4.4 Dispositions iPhone/iPad (#36) | 6.1 AppModel et chargement (#42) → 5.2 Glisser-déposer, P1 (#40) | gates |
+| 4 | au fil des fusions de V3 (8.5) | 2.3 Session et routes, P1 (#26) | 4.5 Pitch, CUE, résistance, P1 (#37) → 4.6 Forme d'onde, P1 (#38) | 3.4 Préférences et réglages, P1 (#31) → 3.5 Bibliothèque, P1 (#32) | gates, préparation de la recette avec Hugo |
+| 5 (dernière) | dépendances fusionnées ; 6.3 en dernier | appui à l'intégration et aux anomalies | 5.3 Accessibilité, P1 (#41) | 6.2 Intégration complète (#43), avancée en vague 4 si possible (8.1) | 6.3 Recette macOS (#44), après 6.2, 2.4 et les P1 |
 
-Charge par développeur : James 9 stories (~5 750 lignes), Léa 9 (~5 050), Hugo 7 (~4 300) plus l'appui à la recette, Quinn 1 plus les gates de chaque PR.
+Charge par développeur (v1.2) : James 7 stories (~4 650 lignes), Léa 9 (~5 400), Hugo 9 (~5 250) plus l'appui à la recette, Quinn 1 plus les gates de chaque PR.
 
-La dernière vague réunit l'intégration complète dans l'app (6.2), le self-test de scratch complet en CI (2.4 : rendu hors ligne de START → retenir → scratch → relâcher → coupures au crossfader, avec vérifications) et la recette macOS (6.3).
+Le self-test de scratch complet en CI (2.4 : rendu hors ligne de START → retenir → scratch → relâcher → coupures au crossfader, avec vérifications) arrive en vague 3, juste après l'hôte (2.1) ; la dernière vague réunit l'intégration complète dans l'app (6.2) et la recette macOS (6.3).
 
 ### 8.3 Graphe des dépendances
 
@@ -708,34 +713,36 @@ graph LR
 
 ### 8.5 Récapitulatif des stories
 
-| Story | Titre | Agent | Module | Prio | Dépend de (outre 0.2) | Vague | Taille | Slug proposé |
-|---|---|---|---|---|---|---|---|---|
-| 1.1 | Modèle physique de la platine | James | core | P0 | — | 1 | ~700 | `platter-disc-physics` |
-| 1.2 | Suivi d'angle du geste | James | core | P0 | — | 1 | ~500 | `gesture-angle-tracking` |
-| 1.3 | Voix de lecture | James | core | P0 | — | 2 | ~850 | `playback-voice` |
-| 1.4 | Table de mixage (cœur) | James | core | P0 | — | 2 | ~600 | `mixer-core` |
-| 1.5 | ScratchEngine | James | core | P0 | 1.1, 1.3, 1.4 | 3 | ~900 | `scratch-engine` |
-| 2.1 | Hôte AVAudioEngine | James | audio | P0 | 1.5 | 3 | ~500 | `audio-engine-host` |
-| 2.2 | Décodeur AVFoundation | James | audio | P0 | — | 4 | ~600 | `avfoundation-decoder` |
-| 2.3 | Session audio et routes | James | audio | P1 | 2.1 | 4 | ~600 | `audio-session-routes` |
-| 2.4 | Self-test de scratch complet | James | audio, ci | P0 | 1.5, 2.1, 3.3 | 5 | ~500 | `scratch-selftest` |
-| 3.1 | Index et SHA-256 | Hugo | library | P0 | — | 1 | ~600 | `library-index-sha256` |
-| 3.2 | Import | Hugo | library | P0 | 3.1 | 2 | ~800 | `import-pipeline` |
-| 3.3 | Son de démonstration | Hugo | library | P0 | — | 1 | ~400 | `demo-sound` |
-| 3.4 | Préférences et réglages | Hugo | library, ui | P1 | 6.1, 5.1 | 4 | ~600 | `preferences-settings` |
-| 3.5 | Écran Bibliothèque | Hugo | ui | P1 | 3.1, 3.3, 6.1 | 4 | ~500 | `library-screen` |
-| 4.1 | Platine et faux moteur | Léa | ui | P0 | — | 1 | ~850 | `deck-view` |
-| 4.2 | Table de mixage (vue) | Léa | ui | P0 | 4.1 | 2 | ~500 | `mixer-view` |
-| 4.3 | Saisie du disque | Léa | ui | P0 | 1.2, 4.1 | 2 | ~700 | `disc-input` |
-| 4.4 | Dispositions iPhone/iPad | Léa | ui | P0 | 4.1, 4.2, 4.3 | 3 | ~500 | `adaptive-layouts` |
-| 4.5 | Pitch, CUE et résistance | Léa | ui | P1 | 4.1 | 4 | ~400 | `pitch-cue-resistance` |
-| 4.6 | Forme d'onde et needle drop | Léa | ui | P1 | 4.1 | 4 | ~700 | `waveform-needle-drop` |
-| 5.1 | Clavier et menus Mac | Léa | ui | P0 | 4.1, 4.2 | 3 | ~700 | `mac-keyboard-menus` |
-| 5.2 | Glisser-déposer | Léa | ui | P1 | 4.1, 6.1 | 5 | ~300 | `drag-and-drop` |
-| 5.3 | Accessibilité | Léa | ui | P1 | 4.1 à 4.6, 5.1 | 5 | ~400 | `accessibility` |
-| 6.1 | AppModel et chargement | Hugo | ui, app | P0 | 3.2, 3.3, 4.1 | 3 | ~800 | `app-model-loading` |
-| 6.2 | Intégration complète | Hugo | app, ci | P0 | 1.5, 2.1, 2.2, 4.1 à 4.4, 5.1, 6.1 | 5 | ~600 | `app-integration` |
-| 6.3 | Recette V1 sur macOS | Quinn (+ Hugo) | app | P0 | 2.4, 6.2, stories P1 | 5 | ~300 | `acceptance-macos` |
+| Story | Titre | Agent | Module | Prio | Dépend de (outre 0.2) | Vague | Taille | Slug | Issue |
+|---|---|---|---|---|---|---|---|---|---|
+| 1.1 | Modèle physique de la platine | James | core | P0 | — | 1 | ~700 | `platter-disc-physics` | #19 |
+| 1.2 | Suivi d'angle du geste | **Léa** | core | P0 | — | 1 | ~650 | `gesture-angle-tracking` | #20 |
+| 1.3 | Voix de lecture | James | core | P0 | — | 1 | ~850 | `playback-voice` | #21 |
+| 1.4 | Table de mixage (cœur) | James | core | P0 | — | 2 | ~600 | `mixer-core` | #22 |
+| 1.5 | ScratchEngine | James | core | P0 | 1.1, 1.3, 1.4 | 2 | ~900 | `scratch-engine` | #23 |
+| 2.1 | Hôte AVAudioEngine | James | audio | P0 | 1.5 | 3 | ~500 | `audio-engine-host` | #24 |
+| 2.2 | Décodeur AVFoundation | **Hugo** | audio | P0 | — | 2 | ~600 | `avfoundation-decoder` | #25 |
+| 2.3 | Session audio et routes | James | audio | P1 | 2.1 | 4 | ~600 | `audio-session-routes` | #26 |
+| 2.4 | Self-test de scratch complet | James | audio, ci | P0 | 1.5, 2.1, 3.3 | 3 | ~500 | `scratch-selftest` | #27 |
+| 3.1 | Index et SHA-256 | Hugo | library | P0 | — | 1 | ~650 | `library-index-sha256` | #28 |
+| 3.2 | Import | Hugo | library | P0 | 3.1 | 2 | ~800 | `import-pipeline` | #29 |
+| 3.3 | Son de démonstration | Hugo | library | P0 | — | 1 | ~400 | `demo-sound` | #30 |
+| 3.4 | Préférences et réglages | Hugo | library, ui | P1 | 6.1, 5.1 | 4 | ~600 | `preferences-settings` | #31 |
+| 3.5 | Écran Bibliothèque | Hugo | ui | P1 | 3.1, 3.3, 6.1 | 4 | ~500 | `library-screen` | #32 |
+| 4.1 | Platine et faux moteur | Léa | ui | P0 | — | 1 | ~850 | `deck-view` | #33 |
+| 4.2 | Table de mixage (vue) | Léa | ui | P0 | 4.1 | 2 | ~500 | `mixer-view` | #34 |
+| 4.3 | Saisie du disque | Léa | ui | P0 | 1.2, 4.1 | 2 | ~700 | `disc-input` | #35 |
+| 4.4 | Dispositions iPhone/iPad | Léa | ui | P0 | 4.1, 4.2, 4.3 | 3 | ~500 | `adaptive-layouts` | #36 |
+| 4.5 | Pitch, CUE et résistance | Léa | ui | P1 | 4.1 | 4 | ~400 | `pitch-cue-resistance` | #37 |
+| 4.6 | Forme d'onde et needle drop | Léa | ui | P1 | 4.1 | 4 | ~700 | `waveform-needle-drop` | #38 |
+| 5.1 | Clavier et menus Mac | Léa | ui | P0 | 4.1, 4.2 | 3 | ~700 | `mac-keyboard-menus` | #39 |
+| 5.2 | Glisser-déposer | **Hugo** | ui | P1 | 4.1, 6.1 | 3 | ~300 | `drag-and-drop` | #40 |
+| 5.3 | Accessibilité | Léa | ui | P1 | 4.1 à 4.6, 5.1 | 5 | ~400 | `accessibility` | #41 |
+| 6.1 | AppModel et chargement | Hugo | ui, app | P0 | 3.2, 3.3, 4.1 | 3 | ~800 | `app-model-loading` | #42 |
+| 6.2 | Intégration complète | Hugo | app, ci | P0 | 1.5, 2.1, 2.2, 4.1 à 4.4, 5.1, 6.1 | 5 | ~600 | `app-integration` | #43 |
+| 6.3 | Recette V1 sur macOS | Quinn (+ Hugo) | app | P0 | 2.4, 6.2, stories P1 | 5 | ~300 | `acceptance-macos` | #44 |
+
+En gras : agents changés par la réaffectation (v1.2). Épopées : EP1 #13, EP2 #14, EP3 #15, EP4 #16, EP5 #17, EP6 #18. Fichiers : `docs/stories/<story>.<slug>.md` ; index : [`docs/stories/README.md`](../stories/README.md).
 
 Total : **26 stories** — EP1 : 5, EP2 : 4, EP3 : 5, EP4 : 6, EP5 : 3, EP6 : 3 ; 19 P0 et 7 P1.
 
