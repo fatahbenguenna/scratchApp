@@ -64,7 +64,7 @@ public enum KeyboardShortcutMap {
         static let a: UInt16 = 0, s: UInt16 = 1, f: UInt16 = 3, z: UInt16 = 6, x: UInt16 = 7
         static let q: UInt16 = 12, p: UInt16 = 35, l: UInt16 = 37, j: UInt16 = 38, k: UInt16 = 40
         static let comma: UInt16 = 43, period: UInt16 = 47, escape: UInt16 = 53
-        static let leftArrow: UInt16 = 123, rightArrow: UInt16 = 124, downArrow: UInt16 = 125
+        static let leftArrow: UInt16 = 123, rightArrow: UInt16 = 124, downArrow: UInt16 = 125, upArrow: UInt16 = 126
     }
 
     public static let entries: [Entry] = [

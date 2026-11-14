@@ -31,9 +31,10 @@ struct ResistanceSlider: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Résistance du vinyle, \(model.deckName)")
         .accessibilityValue(model.resistanceText)
-        .accessibilityAdjustableAction { direction in
-            model.setResistance(model.resistance + (direction == .increment ? 0.05 : -0.05))
-        }
+        .accessibilityAdjustableAction { model.nudgeResistance(steps: $0 == .increment ? 1 : -1) }
         .accessibilityIdentifier("deck.\(model.deck.rawValue.lowercased()).resistance")
+        .keyboardAdjustable(id: "deck.\(model.deck.rawValue.lowercased()).resistance") {
+            model.nudgeResistance(steps: $0)
+        }
     }
 }

@@ -1,0 +1,31 @@
+schema: 1
+story: "2.4-followup-90"
+story_title: "SelfTest sur ScratchAudioGraph.offline (suivi #90 des gates 2.4 et 2.1)"
+pr: 107
+issue: 90
+reviewed_sha: "8912d46"
+gate: PASS
+status_reason: >-
+  SelfTest.run passe par ScratchAudioGraph.offline (branchement direct sur outputNode) ; makeSourceNode
+  et le TODO(2.1) sont supprimés ; testSelfTestMatchesTheDirectRender prouve l'identité au rendu direct
+  (11 vérifications égales, mesures finies égales exactement) ; tests existants verts ; CI verte.
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues: []
+checks:
+  - item: "Graphe partagé"
+    result: "ScratchAudioGraph.offline(maximumFrameCount: 512) ; format vérifié (deux canaux, désentrelacé) ; tranches de 256 trames ; CA 1 de la 2.4 tenu sans réserve."
+  - item: "Identité au rendu direct"
+    result: "Vérifications et mesures finies identiques au rendu direct du même scénario, démo sur A et B."
+nfr_validation:
+  security: {status: PASS, notes: "Sans objet."}
+  performance: {status: PASS, notes: "Inchangée."}
+  reliability: {status: PASS, notes: "Un seul graphe pour l'app, le self-test et la sonde."}
+  maintainability: {status: PASS, notes: "Code dupliqué supprimé."}
+evidence:
+  ci: "wait-ci sur 8912d46 : Linux ✅, macOS ✅ (self-test de l'app compris)"
+  merge_check: "Sans conflit avec main"
+recommendations:
+  immediate:
+    - action: "Fusionner (ferme #90)."
+  future: []

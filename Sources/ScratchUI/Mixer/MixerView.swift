@@ -46,6 +46,7 @@ struct MixerView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
+        .macFocusSection()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Table de mixage")
     }
