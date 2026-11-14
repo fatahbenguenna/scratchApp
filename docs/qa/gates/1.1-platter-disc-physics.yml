@@ -1,0 +1,87 @@
+schema: 1
+story: "1.1"
+story_title: "Modèle physique de la platine : plateau, feutrine, disque et résistance"
+pr: 50
+issue: 19
+reviewed_sha: "70a9e58"
+gate: CONCERNS
+status_reason: >-
+  Les 12 critères d'acceptation sont implémentés et testés par des valeurs numériques.
+  scripts/linux-test.sh passe (97/97) et la CI Linux et macOS est verte. Temps réel respecté,
+  contrats intacts. Réserves : la formulation du CA8 n'est vraie que pour un geste de 2 × ωref au
+  plus, et la ligne Gherkin de la dérive est inatteignable à 350 ms (#53). Un changement brutal de
+  résistance produit un transitoire audible, à lisser au calibrage (#54). Aucune correction de code
+  n'est exigée dans la PR.
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues:
+  - id: "SPEC-001"
+    severity: medium
+    finding: >-
+      CA8 : |ωd| ≤ 10⁻³ ωref à 10 τ n'est vrai que pour un geste de 2,0 × ωref au plus (11e⁻¹⁰ × 2 =
+      0,9988 × 10⁻³). À 16 × ωref, le seuil est atteint à 12,3 τ. Sur la ligne Gherkin de la dérive,
+      il reste 1,83 échantillon à 10 τ, et la dérive passe sous 1 échantillon à partir de 10,7 τ.
+    refs: ["docs/stories/1.1.platter-disc-physics.md (CA8, scénario « Doigt fixe à résistance 100 % »)"]
+    suggested_owner: po
+    follow_up: "#53"
+  - id: "SPEC-002"
+    severity: low
+    finding: >-
+      Tableau des tests de la story : « pas de saut de θd − θf » contredit le CA10 et la spec 5.4.
+      L'invariant continu est θd − (θf + gripOffset).
+    refs: ["docs/stories/1.1.platter-disc-physics.md (tableau des tests)"]
+    suggested_owner: sm
+    follow_up: "#53"
+  - id: "PHY-001"
+    severity: low
+    finding: >-
+      Changement brutal de résistance pendant la tenue : le retard est rattrapé avec le nouveau τ.
+      Sur un geste à 2,8 × ωref, 100 % → 0 % donne une vitesse de lecture de 16 pendant 18 ms, et
+      100 % → 50 % une vitesse de 4,6 pendant 28 ms. Les pas de 1 % et de 5 % de l'interface sont
+      sans effet audible.
+    refs: ["Sources/ScratchCore/Physics/DeckPhysics.swift (holdCoefficients dans process)"]
+    suggested_owner: dev
+    follow_up: "#54"
+deviations:
+  - id: "DEV-1"
+    description: "Ligne Gherkin du CA8 (moins d'un échantillon par seconde) vérifiée à partir de 15 τ."
+    verdict: PASS
+    rationale: "Inatteignable à 350 ms avec le modèle de la spec ; le test vérifie ensuite le repos exact ; formulation à corriger (#53)."
+  - id: "DEV-2"
+    description: "Marge de 10⁻³ ωref : 0,9985 × 10⁻³ mesuré à 10 τ."
+    verdict: CONCERNS
+    rationale: "Test déterministe, donc non fragile ; mais le CA8 général est faux au-delà de 2 × ωref (#53)."
+  - id: "DEV-3"
+    description: "Continuité mesurée sur θd − (θf + gripOffset) plutôt que sur θd − θf."
+    verdict: PASS
+    rationale: "Invariant imposé par le CA10 et la spec 5.4 (l'étiquette saute au recalage) ; tableau des tests de la story à corriger (#53)."
+  - id: "DEV-4"
+    description: "Changement brutal de résistance pendant un geste."
+    verdict: CONCERNS
+    rationale: "CA9 et SF-23 respectés (continuité, aucune inversion) ; transitoire audible pour un grand saut ; lissage de τ au calibrage D-46 (#54)."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Calcul pur ; entrées non finies ignorées."
+  performance:
+    status: PASS
+    notes: "Travail borné par échantillon ; exp et expm1 une fois par bloc ; aucune allocation dans process."
+  reliability:
+    status: CONCERNS
+    notes: "Déterminisme et absence de dénormaux testés ; réserves PHY-001 (#54) et SPEC-001 (#53)."
+  maintainability:
+    status: PASS
+    notes: "Modèle documenté point par point ; tests comparés aux solutions analytiques ; noms des tests liés aux CA."
+evidence:
+  linux_tests: "scripts/linux-test.sh sur 70a9e58 : 97/97"
+  ci: "Rapport CI 31c28c3 (fusion dans f52a3f1) : Linux ✅, macOS ✅, self-test passed"
+  independent_checks: "Valeurs du filtre critique recalculées (Python) ; sonde Linux sur le changement brutal de résistance"
+recommendations:
+  immediate: []
+  future:
+    - action: "PO et SM : préciser le CA8, la ligne Gherkin de la dérive et le tableau des tests (#53)."
+    - action: "James : lisser τ lors d'un changement de résistance, avec un test (#54, calibrage D-46)."
+    - action: "Ajouter une variante disque tenu à testOutputDoesNotDependOnBlockSize."
+      refs: ["Tests/ScratchCoreTests/DeckPhysicsTests.swift"]
+    - action: "1.2 : décider si une reprise rapide doit écourter le rejeu du relâchement (touchBegan ignoré pendant 14 à 21 ms ; note sur #20)."
+    - action: "4.3 : la saisie utilise l'angle cumulé du doigt, jamais l'angle affiché du disque (l'étiquette saute au recalage, disque tenu)."
