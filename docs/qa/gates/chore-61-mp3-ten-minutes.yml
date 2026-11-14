@@ -1,0 +1,32 @@
+schema: 1
+story: "2.2-followup-61"
+story_title: "Décodage d'un MP3 de 10 min en debug et en release (suivi #61 de la gate 2.2)"
+pr: 115
+issue: 61
+reviewed_sha: "e17263a"
+gate: PASS
+status_reason: >-
+  MP3 de 599,8 s construit sans encodeur à partir de la fixture (41 trames, trame Info retirée, 574
+  répétitions) ; durées vérifiées, mono sur les deux voies, sinusoïde au milieu ; mesures au rapport :
+  MP3 1,25 s en debug et 0,34 s en release, WAV 0,68 et 0,06 s (objectif du CA 7 : 3 s en release).
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues: []
+checks:
+  - item: "Construction du MP3"
+    result: "Découpage MPEG-1 Layer III couvrant toute la fixture ; Info/Xing reconnue et retirée ; 574 × 40 × 1 152 / 44 100 = 599,8 s."
+  - item: "Mesures"
+    result: "MP3 : 1,25 s (debug), 0,34 s (release) ; WAV : 0,68 s (debug), 0,06 s (release)."
+nfr_validation:
+  security: {status: PASS, notes: "Sans objet."}
+  performance: {status: PASS, notes: "CA 7 tenu avec une large marge en release."}
+  reliability: {status: PASS, notes: "Décodage complet vérifié par la sinusoïde au milieu du fichier."}
+  maintainability: {status: PASS, notes: "Mesures publiées au rapport CI."}
+evidence:
+  ci: "wait-ci sur e17263a : Linux ✅, macOS ✅ ; section « Décodage » au rapport"
+  merge_check: "Sans conflit avec main et #109 ; conflit prévisible avec #111 sur le filtre release de ci.yml (filtres à combiner)"
+recommendations:
+  immediate:
+    - action: "Fusionner (ferme #61) ; combiner le filtre release avec #111 selon l'ordre de fusion."
+  future:
+    - action: "Recette (#44) : un vrai MP3 stéréo à 320 kbit/s de 10 min (environ deux fois le coût du mono)."
