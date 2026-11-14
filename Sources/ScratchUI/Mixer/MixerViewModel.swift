@@ -1,8 +1,10 @@
 import Observation
 import ScratchCore
 
-/// Modèle de présentation de la table de mixage (architecture §5.4). Mêmes cadences que
+/// Modèle de présentation de la table de mixage (PRD 4.2 ; architecture §5.2). Mêmes cadences que
 /// `DeckViewModel` : `frame` à chaque image (VU-mètres, saturation), le reste sur changement.
+///
+/// **Version de base (story 0.2), complétée par Léa en 4.2 et 5.1.**
 @MainActor
 @Observable
 public final class MixerViewModel {

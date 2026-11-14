@@ -2,7 +2,7 @@ import Foundation
 
 /// Préférences dans `UserDefaults` (5.3), sous la forme d'un document JSON unique (clé `key`).
 ///
-/// **Squelette (story EP3, Hugo) : renvoie les valeurs par défaut et n'enregistre rien.**
+/// **Squelette (story 3.4, Hugo) : renvoie les valeurs par défaut et n'enregistre rien.**
 /// À implémenter : encodage JSON d'`AppPreferences` sous `key`, décodage tolérant puis
 /// `sanitized()`, valeurs par défaut si la clé est absente ou illisible.
 public final class UserDefaultsPreferencesStore: PreferencesStoring, @unchecked Sendable {

@@ -10,7 +10,7 @@
 /// prend aucun verrou, n'alloue rien et ne libère aucun objet.
 ///
 /// Version minimale (story 0.2) : les commandes sont appliquées et reflétées dans l'instantané,
-/// le rendu produit du silence. La physique et le DSP arrivent avec les stories de l'épopée EP1.
+/// le rendu produit du silence. La physique et le DSP arrivent avec les stories 1.1 à 1.5 (James).
 public final class ScratchEngine: EngineControlling, @unchecked Sendable {
     /// Capacité de la file de commandes (plus de 2 s de touches regroupées à 240 Hz sur deux disques).
     public static let commandCapacity = 1024
@@ -153,7 +153,8 @@ public final class ScratchEngine: EngineControlling, @unchecked Sendable {
         case let .pitch(deck, value): withDeck(deck) { $0.physics.setPitch(value) }
         case let .resistance(deck, value): withDeck(deck) { $0.physics.setResistance(value) }
         case let .touchBegan(deck, angle, time): withDeck(deck) { $0.physics.touchBegan(angle: angle, time: time) }
-        case let .touchMoved(deck, angle, time): withDeck(deck) { $0.physics.touchMoved(angle: angle, time: time) }
+        case let .touchMoved(deck, angle, time, predicted):
+            withDeck(deck) { $0.physics.touchMoved(angle: angle, time: time, predicted: predicted) }
         case let .touchEnded(deck, time): withDeck(deck) { $0.physics.touchEnded(time: time) }
         case let .setCue(deck): withDeck(deck) { $0.physics.setCue() }
         case let .recallCue(deck): withDeck(deck) { $0.physics.recallCue() }
@@ -209,8 +210,9 @@ public final class ScratchEngine: EngineControlling, @unchecked Sendable {
                 hamster: mixer.hamster,
                 lineFaders: mixer.lineFaders,
                 momentaryCuts: mixer.momentaryCuts,
+                channelGains: mixer.channelGains,
                 outputPeak: mixer.outputPeak,
-                limiterActive: mixer.limiterActive
+                limiterReduction: mixer.limiterReduction
             ),
             motorTimings: motorTimings,
             outputSampleRate: outputSampleRate,
@@ -267,7 +269,7 @@ struct DeckChannel {
             playbackRate: physics.playbackRate,
             discAngle: physics.discAngle,
             platterAngle: physics.platterAngle,
-            markerAngle: physics.markerAngle,
+            stickerAngle: physics.stickerAngle,
             isHeld: physics.isHeld,
             motorOn: physics.motorOn,
             speed: physics.speed,

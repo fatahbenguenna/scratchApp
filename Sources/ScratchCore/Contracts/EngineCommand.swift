@@ -1,4 +1,4 @@
-/// Commande envoyée par le fil principal au moteur audio (architecture §5.1).
+/// Commande envoyée par le fil principal au moteur audio (PRD 5.3 point 2 ; architecture §5.1).
 ///
 /// Conventions communes :
 /// - **Angles** en radians, **cumulés** (dépliés, sans saut à ±π), positifs dans le sens horaire,
@@ -34,7 +34,10 @@ public enum EngineCommand: Equatable, Sendable {
     case touchBegan(DeckID, angle: Double, time: Double)
     /// Nouvelle position du doigt. Envoyer **chaque** touche regroupée (coalesced), dans l'ordre
     /// chronologique ; les temps non croissants sont ignorés. Ignoré si le disque n'est pas tenu.
-    case touchMoved(DeckID, angle: Double, time: Double)
+    /// `predicted` marque une touche prédite (`UIEvent.predictedTouches`) : provisoire, remplacée par
+    /// les touches réelles suivantes (PRD 1.2 critère 6, NFR1). Son exploitation par le moteur
+    /// (comblement des famines du rejeu, ADR-07) est calibrée en story 1.2 ; d'ici là, elle est ignorée.
+    case touchMoved(DeckID, angle: Double, time: Double, predicted: Bool = false)
     /// Fin du geste (relâchement, ou toucher annulé par le système : RM-60).
     case touchEnded(DeckID, time: Double)
     /// SET CUE : mémorise la position courante de la tête (SF-13).

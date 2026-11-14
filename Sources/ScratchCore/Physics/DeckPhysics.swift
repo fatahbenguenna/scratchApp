@@ -1,8 +1,9 @@
 /// Physique d'une platine : moteur, plateau, feutrine, disque tenu, tête de lecture, CUE et repère
 /// (spec 5.1 ; architecture §6.3). Fil audio uniquement, aucune allocation.
 ///
-/// **Squelette (story EP1, James).** Les réglages et les états discrets sont tenus et bornés, mais
-/// rien ne bouge : `process` renvoie une position constante et une vitesse nulle. À implémenter :
+/// **Squelette (story 1.1, James).** Les réglages et les états discrets sont tenus et bornés, les
+/// sauts de position recalent le disque et le repère (IC-09), mais rien ne tourne : `process` renvoie
+/// une position constante et une vitesse nulle. À implémenter (PRD 1.1, 1.3 critère 1, 1.5) :
 /// 1. Plateau : `ωp` → `ωt = 2π × RPM/60 × (1 + pitch)` moteur actif, → 0 sinon, pentes
 ///    `ωt / startDuration` et `ωt / brakeDuration` (SF-04, SF-05, 6.2 : START pendant le freinage
 ///    repart de la vitesse courante).
@@ -13,8 +14,11 @@
 ///    τ de 2 ms (résistance 0) à 35 ms (résistance 1) ; `θf` vient de `FingerTrajectory`. Le
 ///    changement de résistance ne crée aucun saut (SF-23). `gripOffset` est fixé à la prise.
 /// 4. Tête : `p += ωd / (2π) × 1,8 s × dt` à chaque échantillon, bornée à [−2 s ; durée] ; en butée
-///    le disque continue de tourner et un mouvement inverse revient immédiatement dans le son (RM-55).
-/// 5. Vitesse de lecture `ωd / ωref` bornée à ±16 (SF-77) ; repère selon `DeckSnapshot.markerAngle`.
+///    le disque continue de tourner et un mouvement inverse revient immédiatement dans le son (RM-55) ;
+///    à la sortie de butée, `realignDisc()` (IC-09).
+/// 5. Vitesse de lecture `ωd / ωref` bornée à ±16 (SF-77).
+/// 6. Recalage disque tenu : décaler `gripOffset` de la même correction que `discAngle`, pour que le
+///    disque reste sous le doigt sans saut de son (UX §5.1, Q13) ; CUE disque tenu ré-ancre le geste.
 struct DeckPhysics {
     private(set) var sampleRate: Double
     private(set) var motorTimings = MotorTimings.defaults
@@ -29,7 +33,6 @@ struct DeckPhysics {
     private(set) var playbackRate: Double = 0
     private(set) var discAngle: Double = 0
     private(set) var platterAngle: Double = 0
-    private(set) var markerAngle: Double = 0
     private(set) var cueSeconds: Double?
 
     private var finger: FingerTrajectory
@@ -40,6 +43,11 @@ struct DeckPhysics {
     }
 
     var isHeld: Bool { finger.isActive }
+
+    /// Angle d'écran du repère (`DeckSnapshot.stickerAngle`) : calculé, jamais cumulé.
+    var stickerAngle: Double {
+        discAngle - 2 * Double.pi * (cueSeconds ?? 0) / TurntableConstants.secondsPerRevolution
+    }
     var isAtEnd: Bool { durationSeconds > 0 && positionSeconds >= durationSeconds }
     var isInLeadIn: Bool { positionSeconds < 0 }
 
@@ -79,7 +87,6 @@ struct DeckPhysics {
         positionSeconds = 0
         playbackRate = 0
         discAngle = 0
-        markerAngle = 0
         cueSeconds = nil
         motorOn = false
         finger.cancel()
@@ -92,7 +99,9 @@ struct DeckPhysics {
         finger.begin(angle: angle, time: time)
     }
 
-    mutating func touchMoved(angle: Double, time: Double) {
+    mutating func touchMoved(angle: Double, time: Double, predicted: Bool) {
+        // Predicted touches are accepted by the contract; their use is calibrated in story 1.2.
+        guard !predicted else { return }
         finger.append(angle: angle, time: time)
     }
 
@@ -119,6 +128,18 @@ struct DeckPhysics {
     private mutating func jump(to seconds: Double) {
         guard seconds.isFinite else { return }
         positionSeconds = seconds.clamped(to: -TurntableConstants.leadInSeconds...max(0, durationSeconds), fallback: 0)
+        realignDisc()
+    }
+
+    /// IC-09 : ramène `discAngle` à `2π × position / 1,8 (mod 2π)` par la plus petite correction
+    /// (au plus ±π), après un saut de position ou à la sortie d'une butée.
+    mutating func realignDisc() {
+        let twoPi = 2 * Double.pi
+        let expected = twoPi * positionSeconds / TurntableConstants.secondsPerRevolution
+        var correction = (expected - discAngle).truncatingRemainder(dividingBy: twoPi)
+        if correction > Double.pi { correction -= twoPi }
+        if correction <= -Double.pi { correction += twoPi }
+        discAngle += correction
     }
 
     // MARK: Rendu

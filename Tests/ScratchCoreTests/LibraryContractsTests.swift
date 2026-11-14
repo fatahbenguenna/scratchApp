@@ -1,5 +1,5 @@
 import XCTest
-@testable import ScratchLibrary
+@testable import ScratchCore
 
 final class LibraryEntryTests: XCTestCase {
     private func encoder() -> JSONEncoder {
@@ -21,13 +21,14 @@ final class LibraryEntryTests: XCTestCase {
             id: UUID(uuidString: "11111111-2222-3333-4444-555555555555")!,
             contentHash: String(repeating: "ab", count: 32),
             fileName: "voix_funk.wav",
+            fileSize: 123_456,
             title: "voix_funk",
             duration: 3.5,
             importedAt: Date(timeIntervalSince1970: 1_794_000_000),
             origin: .imported
         )
         let json = String(decoding: try encoder().encode(entry), as: UTF8.self)
-        XCTAssertEqual(json, #"{"contentHash":"\#(String(repeating: "ab", count: 32))","duration":3.5,"fileName":"voix_funk.wav","id":"11111111-2222-3333-4444-555555555555","importedAt":"2026-11-06T21:20:00Z","origin":"imported","title":"voix_funk"}"#)
+        XCTAssertEqual(json, #"{"contentHash":"\#(String(repeating: "ab", count: 32))","duration":3.5,"fileName":"voix_funk.wav","fileSize":123456,"id":"11111111-2222-3333-4444-555555555555","importedAt":"2026-11-06T21:20:00Z","origin":"imported","title":"voix_funk"}"#)
         XCTAssertEqual(try decoder().decode(LibraryEntry.self, from: Data(json.utf8)), entry)
     }
 
@@ -38,6 +39,7 @@ final class LibraryEntryTests: XCTestCase {
         XCTAssertEqual(demo.origin, .demo)
         XCTAssertFalse(demo.isDeletable)
         XCTAssertTrue(demo.fileName.isEmpty)
+        XCTAssertEqual(demo.fileSize, 0)
     }
 
     func testOriginRawValuesAreStable() {
@@ -76,24 +78,5 @@ final class LibraryErrorTests: XCTestCase {
         for error in errors { XCTAssertFalse(error.userMessage.isEmpty, "\(error)") }
         XCTAssertEqual(LibraryError.insufficientStorage.userMessage, "Espace de stockage insuffisant.") // 6.1
         XCTAssertTrue(LibraryError.tooLong(duration: 1500).userMessage.contains("10 minutes")) // 6.1
-    }
-
-    func testStoreSkeletonExposesTheDemoAndProtectsIt() async throws {
-        struct Validator: AudioFileValidating {
-            func validate(url: URL) async throws -> AudioFileInfo { throw LibraryError.unsupportedFormat }
-        }
-        let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
-        let store = LibraryStore(locations: LibraryLocations(documentsDirectory: root, supportDirectory: root),
-                                 validator: Validator())
-        let entries = await store.entries
-        XCTAssertEqual(entries.first?.id, LibraryEntry.demoID)
-        do {
-            try await store.delete(id: LibraryEntry.demoID)
-            XCTFail("the demo must not be deletable")
-        } catch {
-            XCTAssertEqual(error as? LibraryError, .demoCannotBeDeleted)
-        }
-        let demoURL = await store.url(for: LibraryEntry.demoID)
-        XCTAssertNil(demoURL)
     }
 }

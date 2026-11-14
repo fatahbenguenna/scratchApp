@@ -193,6 +193,44 @@ final class ScratchEngineTests: XCTestCase {
         XCTAssertFalse(engine.latestSnapshot()[.a].isHeld)
     }
 
+    /// IC-09, SF-69 : après chaque saut, `discAngle ≡ 2π × position / 1,8` et le repère
+    /// (`stickerAngle = discAngle − 2π × CUE / 1,8`) passe sous la tête quand la tête est au CUE.
+    func testStickerIsUnderThePlayheadAtCueAfterJumps_SF69_IC09() {
+        let twoPi = 2 * Double.pi
+        func wrapped(_ angle: Double) -> Double {
+            let value = angle.truncatingRemainder(dividingBy: twoPi)
+            return value < 0 ? value + twoPi : value
+        }
+        func distanceToNoon(_ angle: Double) -> Double {
+            let value = wrapped(angle)
+            return min(value, twoPi - value)
+        }
+        let engine = ScratchEngine()
+        engine.send(.load(.a, makeClip(seconds: 30)))
+        render(engine)
+        XCTAssertEqual(distanceToNoon(engine.latestSnapshot()[.a].stickerAngle), 0, accuracy: 1e-9,
+                       "after load, the head is at 0 s: sticker at noon")
+
+        engine.send(.seek(.a, seconds: 0.9)) // half a turn
+        render(engine)
+        var deck = engine.latestSnapshot()[.a]
+        XCTAssertEqual(wrapped(deck.discAngle), Double.pi, accuracy: 1e-9)
+        XCTAssertEqual(distanceToNoon(deck.stickerAngle), Double.pi, accuracy: 1e-9, "half a turn away from the CUE")
+
+        engine.send(.setCue(.a))
+        render(engine)
+        deck = engine.latestSnapshot()[.a]
+        XCTAssertEqual(distanceToNoon(deck.stickerAngle), 0, accuracy: 1e-9, "head at the CUE: sticker at noon")
+
+        engine.send(.seek(.a, seconds: 17.3))
+        engine.send(.recallCue(.a))
+        render(engine)
+        deck = engine.latestSnapshot()[.a]
+        XCTAssertEqual(deck.positionSeconds, 0.9, accuracy: 1e-12)
+        XCTAssertEqual(distanceToNoon(deck.stickerAngle), 0, accuracy: 1e-9, "recalled CUE: sticker at noon")
+        XCTAssertEqual(deck.stickerAngle, deck.discAngle - twoPi * 0.9 / 1.8, accuracy: 1e-12)
+    }
+
     func testValuesAreClampedAndNonFiniteValuesIgnored() {
         let engine = ScratchEngine()
         engine.send(.pitch(.a, 0.5))
@@ -221,6 +259,7 @@ final class ScratchEngineTests: XCTestCase {
         engine.send(.lineFader(.a, 0.5))
         engine.send(.momentaryCut(.b, open: true))
         engine.send(.outputSampleRate(44_100))
+        engine.send(.touchMoved(.a, angle: 1, time: 1, predicted: true))
         render(engine)
         let snapshot = engine.latestSnapshot()
         XCTAssertEqual(snapshot.mixer.crossfader, 1)
@@ -284,6 +323,20 @@ final class ScratchEngineTests: XCTestCase {
         deck.isHeld = false
         deck.playbackRate = -0.5
         XCTAssertTrue(deck.isActive)
+    }
+
+    func testMixerIndicatorsAndIdleState() {
+        var snapshot = EngineSnapshot.initial
+        XCTAssertTrue(snapshot.isIdle)
+        XCTAssertFalse(snapshot.mixer.limiterActive)
+        snapshot.mixer.limiterReduction = 1.5
+        snapshot.mixer.outputPeak = 1
+        XCTAssertTrue(snapshot.mixer.limiterActive)
+        XCTAssertTrue(snapshot.mixer.isClipping)
+        XCTAssertFalse(snapshot.isIdle, "a sounding output is not idle")
+        snapshot.mixer = .initial
+        snapshot.decks.b.motorOn = true
+        XCTAssertFalse(snapshot.isIdle)
     }
 
     func testRecordingEngineRecordsCommands() {

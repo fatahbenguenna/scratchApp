@@ -1,5 +1,6 @@
-/// Événement du système audio, traduit des notifications AVAudioSession (iOS) et
-/// AVAudioEngineConfigurationChange (iOS, macOS). Politique : architecture §7.3.
+/// Événement du système audio, traduit des notifications AVAudioSession (iOS),
+/// AVAudioEngineConfigurationChange (iOS, macOS) et NSWorkspace (veille, macOS). Politique :
+/// architecture §7.3 (PRD 2.3, arbitrage IC-04).
 public enum AudioSystemEvent: Equatable, Sendable {
     /// Début d'interruption (appel, Siri, alarme) → `stopAllMotors` (RM-56, SF-18).
     case interruptionBegan
@@ -14,4 +15,8 @@ public enum AudioSystemEvent: Equatable, Sendable {
     case configurationChanged
     /// Services média réinitialisés (iOS) : reconstruction complète, moteurs à STOP.
     case mediaServicesReset
+    /// Mise en veille du Mac → `stopAllMotors` (0.3, PRD 2.3 critère 5).
+    case systemWillSleep
+    /// Sortie de veille : la sortie redémarre, jamais les moteurs (RM-10).
+    case systemDidWake
 }

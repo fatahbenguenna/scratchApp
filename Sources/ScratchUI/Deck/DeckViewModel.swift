@@ -2,7 +2,10 @@ import Observation
 import ScratchCore
 import ScratchLibrary
 
-/// Modèle de présentation d'une platine (architecture §5.4).
+/// Modèle de présentation d'une platine (PRD 4.1 ; architecture §5.2).
+///
+/// **Version de base (story 0.2), complétée par Léa en 4.1 et 4.5** (formats d'affichage, états des
+/// boutons, faux moteur des aperçus).
 ///
 /// Deux cadences :
 /// - `frame` : instantané complet de la platine, remplacé **à chaque image** par `AppModel.tick()`.
@@ -22,7 +25,7 @@ public final class DeckViewModel {
     public private(set) var frame = DeckSnapshot.initial
 
     /// Entrée de bibliothèque chargée (titre affiché), renseignée par l'`AppModel` au chargement.
-    public internal(set) var loadedEntry: LibraryEntry?
+    public var loadedEntry: LibraryEntry?
     public private(set) var isLoaded = false
     public private(set) var motorOn = false
     public private(set) var speed = TurntableSpeed.rpm33
@@ -113,9 +116,9 @@ public final class DeckViewModel {
         engine.send(.touchBegan(deck, angle: angle, time: time))
     }
 
-    /// À appeler pour chaque touche regroupée, dans l'ordre (SF-78).
-    public func touchMoved(angle: Double, time: Double) {
-        engine.send(.touchMoved(deck, angle: angle, time: time))
+    /// À appeler pour chaque touche regroupée, dans l'ordre ; `predicted` pour une touche prédite (SF-78).
+    public func touchMoved(angle: Double, time: Double, predicted: Bool = false) {
+        engine.send(.touchMoved(deck, angle: angle, time: time, predicted: predicted))
     }
 
     /// Relâchement ou annulation par le système (RM-60).

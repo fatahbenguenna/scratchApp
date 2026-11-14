@@ -1,9 +1,10 @@
 import Foundation
 
-/// Bibliothèque locale des sons (SF-02, SF-74, SF-75, RM-47 à RM-49, RM-58 ; architecture §5.2, §8).
+/// Bibliothèque locale des sons (SF-02, SF-74, SF-75, RM-47 à RM-49, RM-58 ; PRD 3.1, 3.2 ;
+/// architecture §5.1, §8).
 ///
-/// Implémentation de référence : `LibraryStore` (acteur). Toutes les opérations sont asynchrones et
-/// sérialisées ; aucune ne doit être appelée depuis le fil audio.
+/// Implémentation : `LibraryStore` (acteur, ScratchLibrary, stories 3.1 et 3.2). Toutes les
+/// opérations sont asynchrones et sérialisées ; aucune n'est appelée depuis le fil audio.
 public protocol LibraryStoring: Sendable {
     /// Entrées : le son de démonstration en tête, puis les imports du plus récent au plus ancien.
     var entries: [LibraryEntry] { get async }
@@ -12,7 +13,7 @@ public protocol LibraryStoring: Sendable {
     ///
     /// Étapes : accès au fichier source sans le modifier, copie dans un fichier temporaire,
     /// empreinte SHA-256, dédoublonnage (SF-75 : renvoie `.existing` et supprime la copie
-    /// temporaire), validation (`AudioFileValidating`, `LibraryError.checkDuration`), déplacement
+    /// temporaire), sonde (`AudioDecoding.probe`, durées SF-80 comprises), déplacement
     /// atomique à la place finale avec suffixe anti-collision (SF-60), puis écriture atomique de
     /// l'index (5.3, RM-48). En cas d'échec, aucune copie incomplète ni entrée n'est conservée.
     func importFile(at url: URL) async throws -> ImportResult
@@ -22,6 +23,8 @@ public protocol LibraryStoring: Sendable {
     /// est inconnue.
     func delete(id: UUID) async throws
 
-    /// URL de la copie locale, ou `nil` pour le son de démonstration et les entrées inconnues.
-    func url(for id: UUID) async -> URL?
+    /// URL de la copie locale, vérifiée avant chaque chargement : une copie absente ou de taille
+    /// différente écarte l'entrée et lève `LibraryError.notFound` (RM-48, IC-10). Lève aussi
+    /// `.notFound` pour le son de démonstration (pas de fichier) et pour une entrée inconnue.
+    func url(for id: UUID) async throws -> URL
 }

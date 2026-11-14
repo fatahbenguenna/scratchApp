@@ -17,7 +17,8 @@ public struct AudioOutputInfo: Equatable, Sendable {
     }
 }
 
-/// État de l'hôte audio, affiché par l'UI (SF-82).
+/// État de l'hôte audio, affiché par l'UI (SF-82). Complète l'instantané du moteur pour la partie
+/// « sortie » de PRD 5.3 point 3 : nom, état, fréquence, tampon effectif.
 public enum AudioOutputStatus: Equatable, Sendable {
     /// Pas encore démarré, ou arrêté (arrière-plan iOS).
     case stopped
@@ -25,8 +26,8 @@ public enum AudioOutputStatus: Equatable, Sendable {
     case starting
     /// Rendu en cours sur la sortie décrite.
     case running(AudioOutputInfo)
-    /// Aucune sortie, ou démarrage impossible : « Sortie audio indisponible ». L'hôte réessaie
-    /// automatiquement ; l'interface reste utilisable (SF-82).
+    /// Aucune sortie, ou démarrage impossible : « Sortie audio indisponible ». L'horloge de secours
+    /// fait tourner le moteur en silence (disques vivants) et l'hôte réessaie automatiquement (SF-82).
     case unavailable(reason: String)
 
     public var isRunning: Bool {

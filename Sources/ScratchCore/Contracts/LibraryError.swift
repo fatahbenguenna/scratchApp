@@ -1,9 +1,8 @@
-import ScratchCore
-
-/// Erreurs typées de l'import, du décodage et de la bibliothèque (architecture §7).
+/// Erreurs typées de l'import, du décodage et de la bibliothèque (PRD 5.3 points 5 et 6 ;
+/// architecture §7.2).
 ///
-/// Levées par `LibraryStoring`, `AudioFileValidating` et `AudioClipDecoding`. `userMessage` donne le
-/// texte français affiché à l'utilisateur (libellés définitifs : spécification UX).
+/// Levées par `LibraryStoring` et `AudioDecoding`. `userMessage` donne le texte français affiché
+/// (libellés de la spécification UX, §8.3).
 public enum LibraryError: Error, Equatable, Sendable {
     /// Stockage libre insuffisant pour la copie (6.1).
     case insufficientStorage
@@ -48,7 +47,7 @@ public enum LibraryError: Error, Equatable, Sendable {
         }
     }
 
-    /// Applique les durées limites de SF-80 : lève `tooShort` ou `tooLong`, sinon ne fait rien.
+    /// Applique les durées limites de SF-80 (appelé par la sonde) : lève `tooShort` ou `tooLong`.
     public static func checkDuration(_ seconds: Double) throws {
         guard seconds.isFinite else { throw LibraryError.corrupted }
         if seconds < TurntableConstants.minimumDurationSeconds { throw LibraryError.tooShort(duration: seconds) }

@@ -1,7 +1,7 @@
 /// Lecture d'un clip le long de la trajectoire calculée par `DeckPhysics` (SF-77, SF-72, RM-55).
 /// Fil audio uniquement, aucune allocation.
 ///
-/// **Squelette (story EP1, James) : produit du silence.** À implémenter :
+/// **Squelette (story 1.3, James) : produit du silence.** À implémenter :
 /// - interpolation Hermite cubique (4 points) entre échantillons, position en secondes ×
 ///   `clip.sampleRate` (le rééchantillonnage vers la sortie est implicite : incrément =
 ///   vitesse × clipRate / outputRate) ;

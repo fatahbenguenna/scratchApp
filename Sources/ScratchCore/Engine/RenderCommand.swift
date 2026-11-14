@@ -11,7 +11,7 @@ enum RenderCommand {
     case pitch(DeckID, Double)
     case resistance(DeckID, Double)
     case touchBegan(DeckID, angle: Double, time: Double)
-    case touchMoved(DeckID, angle: Double, time: Double)
+    case touchMoved(DeckID, angle: Double, time: Double, predicted: Bool)
     case touchEnded(DeckID, time: Double)
     case setCue(DeckID)
     case recallCue(DeckID)
@@ -38,7 +38,8 @@ enum RenderCommand {
         case let .pitch(deck, value): self = .pitch(deck, value)
         case let .resistance(deck, value): self = .resistance(deck, value)
         case let .touchBegan(deck, angle, time): self = .touchBegan(deck, angle: angle, time: time)
-        case let .touchMoved(deck, angle, time): self = .touchMoved(deck, angle: angle, time: time)
+        case let .touchMoved(deck, angle, time, predicted):
+            self = .touchMoved(deck, angle: angle, time: time, predicted: predicted)
         case let .touchEnded(deck, time): self = .touchEnded(deck, time: time)
         case let .setCue(deck): self = .setCue(deck)
         case let .recallCue(deck): self = .recallCue(deck)

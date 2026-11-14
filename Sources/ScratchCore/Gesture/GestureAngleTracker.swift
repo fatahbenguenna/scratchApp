@@ -6,7 +6,10 @@
 /// renvoyer `isFlipped == true`). Dans ce repère, `atan2(dy, dx)` croît dans le sens horaire :
 /// l'angle renvoyé est positif dans le sens horaire, c'est-à-dire le sens de lecture normal.
 ///
-/// **Squelette (story EP4, Léa) : ne saisit rien (`begin` renvoie `false`).** À implémenter :
+/// **Squelette (story 1.2, James ; consommé par la story 4.3, Léa) : ne saisit rien (`begin` renvoie
+/// `false`).** À implémenter, et à étendre en 1.2 (attribution des contacts par identifiant, un seul
+/// contact propriétaire par disque, touches prédites, défilement trackpad avec relâchement à 80 ms
+/// sur horloge injectée, sortie sous forme d'`EngineCommand`) :
 /// - `begin` : saisit seulement si le point est dans le disque (distance ≤ rayon, RM-60) ;
 /// - `move` : angle cumulé sans saut à ±π (dépliement par la plus petite différence d'angle) ;
 ///   gain 1:1 (un tour de doigt = un tour de disque) ;
