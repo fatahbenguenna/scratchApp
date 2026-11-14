@@ -1,0 +1,48 @@
+import ScratchCore
+import SwiftUI
+
+/// Platine en arrangement « colonne » (UX §4.1) : en-tête, forme d'onde et aperçu (4.6),
+/// [plateau P | pitch (4.5)], transport, résistance (4.5). Conteneur d'accessibilité « Platine A ».
+///
+/// Les emplacements des stories suivantes sont réservés dès maintenant : le diamètre du plateau suit
+/// déjà les règles de taille de l'UX (§4.5, §4.6).
+struct DeckView: View {
+    let model: DeckViewModel
+    let intents: any DeckIntents
+    let metrics: MainLayoutMetrics
+
+    var body: some View {
+        let spacings = metrics.rowSpacings
+        VStack(alignment: .leading, spacing: 0) {
+            DeckHeaderView(model: model, intents: intents, width: metrics.columnWidth)
+            reserved(height: metrics.waveformHeight).padding(.top, spacings[0])     // waveform (4.6)
+            reserved(height: metrics.overviewHeight).padding(.top, spacings[1])     // overview (4.6)
+            HStack(spacing: metrics.platterSpacing) {
+                TurntableView(model: model, intents: intents, platter: metrics.platter)
+                reserved(height: metrics.platter).frame(width: metrics.pitchWidth)  // pitch (4.5)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, spacings[2])
+            TransportControls(model: model, metrics: metrics).padding(.top, spacings[3])
+            reserved(height: metrics.resistanceHeight).padding(.top, spacings[4])   // resistance (4.5)
+        }
+        .frame(width: metrics.columnWidth)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Platine \(model.deck.rawValue)")
+    }
+
+    private func reserved(height: CGFloat) -> some View {
+        Color.clear.frame(height: height).accessibilityHidden(true)
+    }
+}
+
+#if DEBUG
+#Preview("Platine A chargée") {
+    let environment = PreviewEnvironment(scenario: .playing)
+    return DeckView(model: environment.model.deckA, intents: environment.intents,
+                    metrics: MainLayoutMetrics(width: 1200, height: 760, idiom: .mac))
+        .padding()
+        .background(Theme.bgSurface)
+        .preferredColorScheme(.dark)
+}
+#endif
