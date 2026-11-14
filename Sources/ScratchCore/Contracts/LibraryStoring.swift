@@ -9,6 +9,11 @@ public protocol LibraryStoring: Sendable {
     /// Entrées : le son de démonstration en tête, puis les imports du plus récent au plus ancien.
     var entries: [LibraryEntry] { get async }
 
+    /// Réconcilie l'index avec les copies de « Banque de sons » (RM-48, D-11) : retire toute entrée dont la
+    /// copie est absente ou de taille différente, réécrit l'index, et renvoie les entrées retirées par cet
+    /// appel (vide si rien n'a changé). Appelée par l'`AppModel` au lancement ; ne lève pas d'erreur.
+    func reconcile() async -> [LibraryEntry]
+
     /// Copie `url` dans `Documents/Banque de sons/` et l'ajoute à l'index (SF-02).
     ///
     /// Étapes : accès au fichier source sans le modifier, copie dans un fichier temporaire,
@@ -24,7 +29,8 @@ public protocol LibraryStoring: Sendable {
     func delete(id: UUID) async throws
 
     /// URL de la copie locale, vérifiée avant chaque chargement : une copie absente ou de taille
-    /// différente écarte l'entrée et lève `LibraryError.notFound` (RM-48, IC-10). Lève aussi
+    /// différente écarte l'entrée et lève `LibraryError.notFound` (RM-48, IC-10, D-11). L'entrée retirée
+    /// n'est pas renvoyée par un `reconcile()` ultérieur : l'appelant la connaît déjà. Lève aussi
     /// `.notFound` pour le son de démonstration (pas de fichier) et pour une entrée inconnue.
     func url(for id: UUID) async throws -> URL
 }
