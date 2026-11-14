@@ -23,3 +23,4 @@ ci-output/
 App/iOS/Info.plist
 App/macOS/Info.plist
 App/macOS/ScratchApp.entitlements
+.build-linux/

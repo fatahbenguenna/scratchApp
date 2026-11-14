@@ -23,6 +23,9 @@ jobs:
     name: Linux — ScratchCore & ScratchLibrary
     runs-on: ubuntu-latest
     container: swift:6.0-jammy
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - name: swift build & test

@@ -9,4 +9,4 @@ fi
 if [ -f /root/.ccr/ca-bundle.crt ]; then
   ARGS+=(-v /root/.ccr/ca-bundle.crt:/ca.crt:ro -e GIT_SSL_CAINFO=/ca.crt -e SSL_CERT_FILE=/ca.crt)
 fi
-exec docker run "${ARGS[@]}" swift:6.0-jammy bash -c "swift test --parallel --scratch-path /tmp/.build-linux $*"
+exec docker run "${ARGS[@]}" swift:6.0-jammy bash -c "swift test --parallel --scratch-path /w/.build-linux $*"
