@@ -104,6 +104,7 @@ struct PressButton<Face: View>: View {
             .accessibilityElement(children: .ignore)
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { if enabled { action() } }
+            .keyboardActivatable(enabled: enabled, action: action)
             .disabled(!enabled)
     }
 }

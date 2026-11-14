@@ -74,6 +74,7 @@ struct WaveformOverviewView: View {
             }
         }
         .accessibilityIdentifier("deck.\(model.deck.rawValue.lowercased()).overview")
+        .keyboardAdjustable(id: "deck.\(model.deck.rawValue.lowercased()).overview") { model.nudgeNeedle(steps: $0) }
     }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

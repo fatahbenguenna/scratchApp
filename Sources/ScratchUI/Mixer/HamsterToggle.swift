@@ -12,7 +12,7 @@ struct HamsterToggle: View {
         .toggleStyle(.switch)
         .frame(minHeight: 44)
         .accessibilityLabel("Hamster, inversion du crossfader")
-        .accessibilityValue(mixer.hamster ? "activé" : "désactivé")
+        .accessibilityValue(AccessibilityText.toggle(mixer.hamster))
         .accessibilityIdentifier("mixer.hamster")
     }
 }

@@ -49,6 +49,31 @@ final class KeyboardControllerTests: XCTestCase {
         XCTAssertFalse(controller.context.isActive, "single-key menu items are disabled")
     }
 
+    // Story 5.3 AC3 — 6.16 « Flèches sur une commande qui a le focus (Mac) » (D-07) : la commande
+    // réglable focalisée reçoit toutes les flèches ; Échap les rend au crossfader.
+    func testArrowsGoToFocusedControlThenCrossfaderAfterEscape_D07() async throws {
+        let model = AppModel(engine: engine, host: nil, library: EmptyLibrary(),
+                             preferences: InMemoryPreferencesStore(), decoder: AudioFileDecoder())
+        let controller = KeyboardController(model: model, names: KeyboardLayoutNames(translate: { _ in nil }))
+        controller.activeOverride = true
+        let focus = AdjustableFocus()
+        controller.adjustableFocus = focus
+        focus.focus(.init(id: "mixer.channelFader.a", adjust: { model.mixer.nudgeLineFader(.a, steps: $0) },
+                          shiftArrow: nil))
+        XCTAssertNil(controller.handle(try XCTUnwrap(event(.keyDown, keyCode: 125))), "↓ consumed")
+        XCTAssertEqual(model.mixer.lineFaders[.a], 0.95, accuracy: 1e-9, "fader A −5 %")
+        XCTAssertEqual(model.mixer.crossfader, 0.5, "the crossfader does not move")
+        XCTAssertNil(controller.handle(try XCTUnwrap(event(.keyDown, keyCode: 126, flags: .shift))))
+        XCTAssertEqual(model.mixer.lineFaders[.a], 1, accuracy: 1e-9, "⇧↑ : ten steps, bounded")
+        XCTAssertNil(controller.handle(try XCTUnwrap(event(.keyDown, keyCode: 12))), "letters stay active")
+        XCTAssertEqual(engine.sentCommands.last, .motor(.a, on: true))
+        XCTAssertNil(controller.handle(try XCTUnwrap(event(.keyDown, keyCode: 53))), "Esc clears the focus")
+        XCTAssertNil(focus.focusedID)
+        XCTAssertNil(controller.handle(try XCTUnwrap(event(.keyDown, keyCode: 124))))
+        XCTAssertEqual(model.mixer.crossfader, 0.55, accuracy: 1e-9, "→ moves the crossfader 5 % right")
+        XCTAssertEqual(model.mixer.lineFaders[.a], 1, accuracy: 1e-9)
+    }
+
     // AC2 — D-06 : F ouvre la voie A tant qu'elle est maintenue ; la perte du focus la referme.
     func testMomentaryCutThroughTheControllerAndFocusLoss_6_14() async throws {
         let controller = makeController()
