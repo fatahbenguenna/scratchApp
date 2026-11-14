@@ -1,0 +1,53 @@
+schema: 1
+story: "4.2"
+story_title: "Table de mixage (vue)"
+pr: 72
+issue: 34
+reviewed_sha: "c17e95b"
+gate: PASS
+status_reason: >-
+  Les 7 critères d'acceptation sont implémentés, testés et visibles sur la capture ci-shots/pr-72.
+  CI Linux et macOS verte ; fusion sans conflit avec main et #71. Les trois points de la dev sont
+  acceptables. Le mini-graphique de la courbe (UX « devrait ») est suivi dans #75, et les libellés du
+  badge sont ajoutés à #58. À fusionner après #70, dont la PR contient le commit.
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues: []
+deviations:
+  - id: "VU-DECK"
+    description: "VU-mètres portés par DeckViewModel.channelMeter plutôt que par MixerViewModel."
+    verdict: PASS
+    rationale: "La crête de voie est dans DeckSnapshot.peakLevel (contrat 0.2) ; cela évite de modifier AppModel.tick() ; D-26 respectée ; aucun redessin en silence."
+  - id: "BADGE-LABELS"
+    description: "Libellés « Démarrage de la sortie audio… » et « Sortie audio arrêtée » absents de l'UX §5.17."
+    verdict: PASS
+    rationale: "AudioOutputStatus a quatre cas, l'UX n'en nomme que deux ; libellés clairs ; ajout à l'UX demandé sur #58."
+  - id: "CURVE-GRAPH"
+    description: "Mini-graphique des gains de la courbe (UX §5.13, « devrait ») non livré."
+    verdict: PASS
+    rationale: "Ce n'est pas un CA ; la vraie fonction CrossfaderCurve.gains arrive avec #64 ; suivi #75."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Sans objet."
+  performance:
+    status: PASS
+    notes: "Saisie native sans attendre l'interface ; balistique en logique pure ; redessin limité aux VU-mètres."
+  reliability:
+    status: PASS
+    notes: "Contact propriétaire unique sur le crossfader ; valeurs commandées tenues (#70) ; SAT maintenu 1 s."
+  maintainability:
+    status: PASS
+    notes: "Composants réutilisables ; logique pure testée ; formule de cut-in dupliquée (relevée dans #75)."
+evidence:
+  linux_tests: "scripts/linux-test.sh sur c17e95b : 152/152 (cœur inchangé)"
+  ci: "Rapport CI 5205f73 (fusion dans c1c5a1b) : Linux ✅, macOS ✅"
+  screenshot: "ci-shots/pr-72 : table complète (badge, SAT, faders, VU-mètres, courbe, hamster, crossfader, repères de cut-in)"
+  merge_check: "git merge-tree avec origin/main et avec story/6.1-app-model-loading : sans conflit"
+recommendations:
+  immediate:
+    - action: "Fusionner #70 avant #72, puis rebaser #72."
+  future:
+    - action: "Léa : mini-graphique des gains de la courbe après #64 (#75)."
+    - action: "Sally : libellés du badge pour .starting et .stopped (#58)."
+    - action: "Recette : simultanéité crossfader et disque sur iPad (SF-19, D-23)."

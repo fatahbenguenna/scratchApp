@@ -69,6 +69,9 @@ struct DeckPhysics {
     private(set) var gripOffset: Double = 0
     /// La tête est bloquée sur une butée par le mouvement du disque (amorce ou sillon fermé).
     private(set) var isPinnedAtBound = false
+    /// Position de la tête avant le premier saut (CUE, needle drop) appliqué depuis le dernier bloc :
+    /// la voix fond l'ancienne position dans la nouvelle (SF-13, SF-71 ; story 1.3).
+    private(set) var pendingJumpOrigin: Double?
 
     private var follower = CriticallyDampedFollower()
     /// Décélération de la roue libre (rad/s²), fixée au relâchement moteur arrêté.
@@ -173,6 +176,7 @@ struct DeckPhysics {
         gripOffset = 0
         follower.reset(angle: 0, velocity: 0)
         isPinnedAtBound = false
+        pendingJumpOrigin = nil
         cueSeconds = nil
         motorOn = false
         finger.cancel()
@@ -181,12 +185,15 @@ struct DeckPhysics {
     // MARK: Geste
 
     mutating func touchBegan(angle: Double, time: Double) {
-        guard !isHeld else { return } // RM-60 : un second doigt est ignoré.
+        // RM-60: a second finger is ignored. A contact that starts while the previous release is
+        // still being replayed resumes the gesture instead of being lost (story 1.2).
+        guard !isHeld || finger.isReleasing else { return }
         finger.begin(angle: angle, time: time)
     }
 
     mutating func touchMoved(angle: Double, time: Double, predicted: Bool) {
-        // Predicted touches are accepted by the contract; their use is calibrated in story 1.2.
+        // D-16, calibrated in story 1.2: predicted touches bring no latency gain without overshoot
+        // at reversals, so the replay ignores them.
         guard !predicted else { return }
         finger.append(angle: angle, time: time)
     }
@@ -211,8 +218,17 @@ struct DeckPhysics {
         jump(to: seconds)
     }
 
+    /// Fil audio uniquement. Rend et efface l'origine du saut en attente (une fois par bloc, avant
+    /// `process`).
+    mutating func takeJumpOrigin() -> Double? {
+        defer { pendingJumpOrigin = nil }
+        return pendingJumpOrigin
+    }
+
     private mutating func jump(to seconds: Double) {
         guard seconds.isFinite else { return }
+        // Several jumps between two blocks: the sound to fade out is the one before the first jump.
+        if pendingJumpOrigin == nil { pendingJumpOrigin = positionSeconds }
         positionSeconds = seconds.clamped(to: -TurntableConstants.leadInSeconds...max(0, durationSeconds), fallback: 0)
         isPinnedAtBound = false
         realignDisc()

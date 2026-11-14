@@ -389,15 +389,43 @@ final class LibraryStoreTests: XCTestCase {
             let store = makeStore()
             let entries = await store.entries
             let removed = await store.reconcile()
-            let partial = await store.indexWasPartiallyReadable
+            let recovery = await store.indexRecovery
             XCTAssertEqual(entries, [demo, valid], "launch \(launch)")
             XCTAssertEqual(removed, [], "launch \(launch)")
-            XCTAssertEqual(partial, launch == 1, "only the first launch reads a partial index")
+            XCTAssertEqual(recovery, launch == 1 ? .partial : .none, "only the first launch reads a partial index")
         }
         let supportFiles = try FileManager.default.contentsOfDirectory(atPath: sandbox.locations.supportDirectory.path)
         XCTAssertEqual(supportFiles.sorted(), ["library.json", "library.json.corrupt"])
         let corrupt = sandbox.locations.supportDirectory.appendingPathComponent("library.json.corrupt")
         XCTAssertEqual(try String(contentsOf: corrupt, encoding: .utf8), original, "the original is kept as it was")
         XCTAssertEqual(try sandbox.indexedIDs(), [valid.id], "library.json holds only the valid entries")
+    }
+
+    /// 6.1 CA 10 — D-49, NFR12 : l'issue de la lecture de l'index est exposée (aucune, réinitialisée,
+    /// partielle), et un document fautif n'est signalé qu'au premier lancement qui le lit (#51).
+    func testIndexRecoveryIsExposed_D49() async throws {
+        let missing = await makeStore().indexRecovery
+        XCTAssertEqual(missing, .none, "no index yet")
+
+        let valid = sandbox.entry(fileName: "a.wav", size: 4)
+        try sandbox.writeIndex([valid])
+        let readable = await makeStore().indexRecovery
+        XCTAssertEqual(readable, .none)
+
+        try sandbox.writeRawIndex("{ pas du JSON")
+        let unreadable = makeStore()
+        let reset = await unreadable.indexRecovery
+        let entriesAfterReset = await unreadable.entries
+        XCTAssertEqual(reset, .reset)
+        XCTAssertEqual(entriesAfterReset, [demo])
+        let afterReset = await makeStore().indexRecovery
+        XCTAssertEqual(afterReset, .none, "the unreadable index was set aside once")
+
+        let validJSON = String(decoding: try LibraryIndex.makeEncoder().encode(valid), as: UTF8.self)
+        try sandbox.writeRawIndex(#"{"version": 1, "entries": [\#(validJSON), 42]}"#)
+        let partial = await makeStore().indexRecovery
+        XCTAssertEqual(partial, .partial)
+        let afterPartial = await makeStore().indexRecovery
+        XCTAssertEqual(afterPartial, .none, "the cleaned index was rewritten (#51)")
     }
 }
