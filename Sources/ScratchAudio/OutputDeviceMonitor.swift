@@ -17,6 +17,11 @@ import ScratchCore
 ///   `systemDidWake`, transmis **de façon synchrone** pendant la notification : STOP précède la mise en
 ///   veille.
 ///
+/// La sortie (`AVAudioEngineOutput`) fait passer `AVAudioEngineConfigurationChange` par le même
+/// regroupement (`deviceConfigurationDidChange()`) : un changement de périphérique, qui produit les deux
+/// sortes de notifications, ne donne qu'un `configurationChanged`. Elle fixe `deviceInUse` à chaque
+/// démarrage.
+///
 /// Le nom, le type de transport et le tampon du périphérique relèvent de `OutputDevice` (story 2.1).
 /// `start()` et `stop()` : fil principal ; `stop()` doit être appelé avant de libérer le moniteur.
 @MainActor
@@ -106,13 +111,11 @@ public final class OutputDeviceMonitor {
 
     // MARK: Core Audio
 
-    /// Périphérique de sortie par défaut du système, ou `nil` s'il n'y en a pas (runner sans audio).
+    /// Périphérique de sortie par défaut du système, ou `nil` s'il n'y en a pas (runner sans audio). Même
+    /// requête que la sortie (`OutputDevice.defaultOutput()`) : l'hôte et le moniteur voient le même
+    /// périphérique.
     public nonisolated static func currentDefaultOutputDevice() -> AudioObjectID? {
-        var address = Self.address(kAudioHardwarePropertyDefaultOutputDevice)
-        var device = AudioObjectID(kAudioObjectUnknown)
-        var size = UInt32(MemoryLayout<AudioObjectID>.size)
-        let status = AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &device)
-        return status == noErr && device != AudioObjectID(kAudioObjectUnknown) ? device : nil
+        OutputDevice.defaultOutput()?.id
     }
 
     /// Périphériques audio connectés.
