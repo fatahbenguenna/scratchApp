@@ -3,35 +3,25 @@ story: "6.2"
 story_title: "Intégration complète"
 pr: 99
 issue: 43
-reviewed_sha: "09f6839"
-gate: FAIL
+reviewed_sha: "b9cc9b4"
+review_history:
+  - sha: "09f6839"
+    gate: FAIL
+    note: "Conflits avec main depuis #89 ; start après les préférences (CA 2) ; enregistrement en arrière-plan (CA 4) ; pump() à la fin de suspend() (D-54)."
+  - sha: "b9cc9b4"
+    gate: PASS
+    note: "Rebase sur caa0046 avec #89 ; ordre de launch() testé ; savePreferencesNow() avant suspend() ; pump() dans suspend() testé sur le vrai hôte ; enregistrement à la fermeture sur Mac (#97, point 3)."
+gate: PASS
 status_reason: >-
-  Seuls les commits propres à la 6.2 ont été relus (4b1e1be et d628bda = #84). L'intégration est
-  solide : hôte démarré à la fin de launch() sans motor ni load ; DisplayWakingEngine branché, boucle
-  réveillée sur host.status ; fenêtre unique (D-38) ; contrôleur clavier unique partagé avec les menus ;
-  fenêtre d'aide ; scenePhase vers suspend() et resume() ; D-37 ; manifeste de confidentialité exact
-  (3B52.1 comprise) ; contrôle « aucun réseau » en CI ; --demo-scene en Debug seulement. FAIL : conflits
-  avec main depuis #89, préférences à intégrer (start après applyPreferences, enregistrement au passage
-  en arrière-plan, CA 2 et CA 4), et engine.pump() à la fin de suspend() (D-54) absent.
+  Seuls les commits propres à la 6.2 ont été relus (copie de la 2.1 identique à #84). Hôte démarré à
+  la fin de launch(), après les préférences et la bibliothèque, sans motor ni load ; DisplayWakingEngine
+  et réveil sur host.status ; fenêtre unique (D-38) ; contrôleur clavier unique et fenêtre d'aide ;
+  Réglages de la 3.4 ; scenePhase vers suspend() et resume(), préférences enregistrées avant suspend() ;
+  STOP publié tout de suite (pump, D-54) ; D-37 ; manifeste de confidentialité exact ; contrôle
+  « aucun réseau » en CI ; --demo-scene en Debug seulement ; enregistrement à la fermeture sur Mac.
 reviewer: Quinn
 updated: "2026-11-14"
 top_issues:
-  - id: "REBASE-89"
-    severity: high
-    finding: "Conflits avec main (caa0046) dans ScratchAppMain.swift, AppModel.swift et AppRootView.swift depuis la fusion de #89."
-    suggested_action: "Rebaser en gardant les deux côtés : scène Settings et une seule KeyboardHelpWindow(names: keyboard.names) ; feuille et openSettings avec scenePhase, verrouillage et MainWindowCloseHost."
-  - id: "LAUNCH-ORDER"
-    severity: medium
-    finding: "CA 2 : host.start() doit suivre l'application des préférences (applyPreferences de #89)."
-    suggested_action: "launch() : applyPreferences, purgeStaging, index, réconciliation, liste, startHost, bandeau, démo ; test de l'ordre."
-  - id: "BACKGROUND-SAVE"
-    severity: medium
-    finding: "CA 4 : les préférences ne sont pas enregistrées au passage en arrière-plan."
-    suggested_action: "savePreferencesNow() dans enterBackground() ; test."
-  - id: "D54-PUMP"
-    severity: medium
-    finding: "D-54 : engine.pump() absent à la fin de AudioEngineHost.suspend() ; en arrière-plan iOS, aucun tick() n'applique stopAllMotors."
-    suggested_action: "pump() après stop() dans suspend() ; test sur le vrai hôte avec le double de sortie, sans tick()."
   - id: "NO-NETWORK-GAPS"
     severity: low
     finding: "check-no-network.sh ne détecte ni Data(contentsOf:) sur une URL distante ni NSURLConnection (mutation QA)."
@@ -61,20 +51,19 @@ nfr_validation:
     status: PASS
     notes: "Boucle d'affichage suspendue au repos et réveillée ; NFR3 à 5,6 % en release."
   reliability:
-    status: FAIL
-    notes: "D-54 absent ; préférences non enregistrées au passage en arrière-plan ; conflits avec main."
+    status: PASS
+    notes: "STOP publié dès suspend() (D-54) ; préférences enregistrées avant suspend() et à la fermeture ; ordre du lancement testé."
   maintainability:
     status: PASS
     notes: "AppModel+Lifecycle isolé et testé avec un hôte simulé ; LaunchOptions pur."
 evidence:
-  ci: "Rapport CI ed28e7e : Linux ✅ (aucune API réseau), macOS ✅ (manifeste, self-test 12/12, lancement avec --demo-scene) ; 8 tests AppLifecycleTests"
-  linux_tests: "scripts/linux-test.sh sur 09f6839 : 234/234"
-  merge_check: "Conflits avec origin/main (caa0046) : ScratchAppMain.swift, AppModel.swift, AppRootView.swift"
+  ci: "Rapport CI 4549db9 (b9cc9b4) : Linux ✅, macOS ✅ ; 10 tests AppLifecycleTests ; ed28e7e (09f6839) : manifeste, self-test 12/12, lancement avec --demo-scene"
+  linux_tests: "scripts/linux-test.sh sur b9cc9b4 : 241/241"
+  merge_check: "b9cc9b4 rebasée sur caa0046 : mergeable_state clean"
   network_probe: "check-no-network.sh par mutation : URLSession, import Network, droit network.client détectés ; Data(contentsOf: URL distante) et NSURLConnection non détectés"
 recommendations:
   immediate:
-    - action: "Rebaser sur main en intégrant #89 ; ordre de launch() ; savePreferencesNow() en arrière-plan ; pump() à la fin de suspend() (D-54) ; puis nouvelle relecture du différentiel."
+    - action: "Fusionner."
   future:
-    - action: "#97, point 3 : sur Mac, enregistrer les préférences à la fermeture (MainWindowCloseHost, willTerminate)."
     - action: "#103 : compléter check-no-network.sh."
     - action: "Bandeaux de sortie après la 2.3 partie 2 ; parcours P0 complet en recette (#44)."
