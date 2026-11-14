@@ -181,14 +181,19 @@ struct DeckPhysics {
     // MARK: Geste
 
     mutating func touchBegan(angle: Double, time: Double) {
-        guard !isHeld else { return } // RM-60 : un second doigt est ignoré.
+        // RM-60: a second finger is ignored. A contact that starts while the previous release is
+        // still being replayed resumes the gesture instead of being lost (story 1.2).
+        guard !isHeld || finger.isReleasing else { return }
         finger.begin(angle: angle, time: time)
     }
 
     mutating func touchMoved(angle: Double, time: Double, predicted: Bool) {
-        // Predicted touches are accepted by the contract; their use is calibrated in story 1.2.
-        guard !predicted else { return }
-        finger.append(angle: angle, time: time)
+        // D-16 (story 1.2): predicted touches only fill the replay's wait between two deliveries.
+        if predicted {
+            finger.appendPredicted(angle: angle, time: time)
+        } else {
+            finger.append(angle: angle, time: time)
+        }
     }
 
     mutating func touchEnded(time: Double) {

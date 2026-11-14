@@ -13,6 +13,8 @@ final class FingerTrajectoryTests: XCTestCase {
     private struct Delivery {
         var arrival: Double
         var events: [(time: Double, angle: Double)]
+        /// Touches prédites livrées après les touches réelles du lot (D-16).
+        var predictions: [(time: Double, angle: Double)] = []
     }
 
     /// Générateur pseudo-aléatoire déterministe (LCG).
@@ -24,21 +26,32 @@ final class FingerTrajectoryTests: XCTestCase {
         }
     }
 
+    /// - Parameter predictionHorizon: si non nul, chaque lot porte une touche prédite à cet horizon
+    ///   après sa dernière touche réelle, extrapolée linéairement des deux dernières touches réelles
+    ///   (modèle pessimiste : il dépasse à chaque inversion).
     private func deliveries(duration: Double, touchRate: Double, displayRate: Double,
-                            pipeline: Double = 0.008, jitter: Double = 0.002,
+                            pipeline: Double = 0.008, jitter: Double = 0.002, predictionHorizon: Double? = nil,
                             finger: (Double) -> Double) -> [Delivery] {
         var generator = LCG()
         var result = [Delivery]()
         var nextTouch = 0.0013
         var frame = 0.0
+        var previous: (time: Double, angle: Double)?
         while frame < duration + 0.1 {
             var events = [(time: Double, angle: Double)]()
             while nextTouch <= frame - pipeline, nextTouch < duration {
+                if let last = events.last { previous = last }
                 events.append((nextTouch, finger(nextTouch)))
                 nextTouch += 1 / touchRate
             }
             if !events.isEmpty {
-                result.append(Delivery(arrival: frame + generator.next() * jitter, events: events))
+                var delivery = Delivery(arrival: frame + generator.next() * jitter, events: events)
+                if let predictionHorizon, let previous, let last = events.last {
+                    let slope = (last.angle - previous.angle) / (last.time - previous.time)
+                    delivery.predictions = [(last.time + predictionHorizon, last.angle + slope * predictionHorizon)]
+                }
+                if let last = events.last { previous = last }
+                result.append(delivery)
             }
             frame += 1 / displayRate
         }
@@ -47,8 +60,9 @@ final class FingerTrajectoryTests: XCTestCase {
 
     /// Rejoue les lots comme le ferait le moteur et renvoie la cible échantillon par échantillon.
     private func playOut(_ deliveries: [Delivery], duration: Double, initialDelay: Double? = nil,
+                         configuration custom: FingerTrajectory.Configuration? = nil,
                          releaseAt releaseTime: Double? = nil) -> (targets: [Double], trajectory: FingerTrajectory) {
-        var configuration = FingerTrajectory.Configuration()
+        var configuration = custom ?? FingerTrajectory.Configuration()
         if let initialDelay { configuration.initialDelay = initialDelay }
         var trajectory = FingerTrajectory(sampleRate: sampleRate, configuration: configuration)
         let total = Int(duration * sampleRate)
@@ -67,6 +81,9 @@ final class FingerTrajectoryTests: XCTestCase {
                         trajectory.begin(angle: event.angle, time: event.time)
                         started = true
                     }
+                }
+                for prediction in deliveries[next].predictions {
+                    trajectory.appendPredicted(angle: prediction.angle, time: prediction.time)
                 }
                 next += 1
             }
@@ -191,5 +208,40 @@ final class FingerTrajectoryTests: XCTestCase {
         var last = 0.0
         for _ in 0..<Int(0.1 * sampleRate) { last = trajectory.nextTarget() }
         XCTAssertEqual(last, 1, accuracy: 1e-12)
+    }
+
+    // CALIBRATION-TEMP
+    func testCalibrationTemp() {
+        let omega = TurntableConstants.referenceAngularVelocity
+        func holes(_ t: [Double], from: Double, to: Double) -> Int {
+            var n = 0; var inHole = false
+            for v in velocities(t, from: from, to: to) { if v < 0.5 * omega { if !inHole { n += 1 }; inHole = true } else { inHole = false } }
+            return n
+        }
+        for touchRate in [120.0, 240.0] { for displayRate in [60.0, 120.0] { for jitter in [0.002, 0.005] {
+            var line = "CAL steady touch \(Int(touchRate)) disp \(Int(displayRate)) jit \(jitter):"
+            for horizon in [nil, 1 / displayRate] as [Double?] {
+                let input = deliveries(duration: 3.0, touchRate: touchRate, displayRate: displayRate, jitter: jitter, predictionHorizon: horizon) { omega * $0 }
+                let (t, tr) = playOut(input, duration: 3.0)
+                line += String(format: " [%@ delay %.2f ms, holes(0-1.5) %d, holes(1.5-2.9) %d, starv %d, fill %d]", horizon == nil ? "plain" : "pred", tr.delay * 1000, holes(t, from: 0.05, to: 1.5), holes(t, from: 1.5, to: 2.9), tr.starvationCount, tr.extrapolationCount)
+            }
+            print(line)
+        }}}
+        let amplitude = Double.pi / 4
+        let sine: (Double) -> Double = { amplitude * sin(2 * Double.pi * 8 * $0) }
+        let triangle: (Double) -> Double = { t in let p = (t * 8).truncatingRemainder(dividingBy: 1); return amplitude * (p < 0.5 ? 4 * p - 1 : 3 - 4 * p) }
+        for (name, f) in [("sine", sine), ("triangle", triangle)] { for displayRate in [60.0, 120.0] {
+            var line = "CAL \(name) disp \(Int(displayRate)):"
+            for (label, horizon, margin) in [("plain", nil, 0.0015), ("pred", 1 / displayRate, 0.0015), ("pred-lowmargin", 1 / displayRate, -0.5 / displayRate)] as [(String, Double?, Double)] {
+                let input = deliveries(duration: 1.0, touchRate: 120, displayRate: displayRate, predictionHorizon: horizon, finger: f)
+                var c = FingerTrajectory.Configuration(); c.targetMargin = margin
+                let (t, tr) = playOut(input, duration: 1.0, configuration: c)
+                let valid = t.filter { $0.isFinite }
+                let real = input.flatMap { $0.events.map(\.angle) }
+                let over = max(valid.max()! - real.max()!, real.min()! - valid.min()!)
+                line += String(format: " [%@ overshoot %.4f rad, delay %.2f ms, fill %d, starv %d]", label, over, tr.delay * 1000, tr.extrapolationCount, tr.starvationCount)
+            }
+            print(line)
+        }}
     }
 }
