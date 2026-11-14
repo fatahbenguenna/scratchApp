@@ -1,0 +1,67 @@
+schema: 1
+story: "4.5"
+story_title: "Pitch, CUE et résistance"
+pr: 87
+issue: 37
+reviewed_sha: "6489117"
+gate: PASS
+status_reason: >-
+  Seul le commit propre à la 4.5 a été relu (4bffbba et 86e72ea = #85). Les six critères sont
+  implémentés : fader de pitch saisi par le bouton (16 points sur la course, pas de 0,1 %, cran de
+  6 pt), valeur signée, remise à zéro par double-toucher ou par « 0 » ; SET CUE et CUE à l'appui,
+  gardés sur une platine vide (toucher, clavier, menu), utilisables disque tenu avec ré-ancrage du
+  geste par le moteur ; résistance ; valeurs commandées maintenues (#57, D-52) ; accessibilité de
+  l'UX. Rebase obligatoire après la fusion par squash de #85 (vérifié sans conflit). Retouches de
+  faible gravité dans #94.
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues:
+  - id: "CUE-MENU-EMPTY"
+    severity: low
+    finding: "Éléments SET CUE et CUE du menu Platine actifs sur une platine vide (aucune commande envoyée)."
+    suggested_action: "Les désactiver avec !deck.isLoaded (#94)."
+  - id: "CUE-ANNOUNCE"
+    severity: low
+    finding: "L'annonce de SET CUE lit la position affichée, pas la position mémorisée par le moteur : écart possible de 0,1 s avec la valeur du bouton CUE."
+    suggested_action: "Annoncer la valeur confirmée par l'instantané (#94)."
+  - id: "CA5-RESISTANCE-TEST"
+    severity: low
+    finding: "La valeur maintenue de la résistance n'est pas testée (le pitch l'est)."
+    suggested_action: "Compléter testSettingsAndMixerHoldCommandedValues (#94)."
+checks:
+  - item: "CA 5 (D-52)"
+    result: "Pitch et résistance par CommandedValue (#57) ; pitch couvert par testSettingsAndMixerHoldCommandedValues ; CUE lu dans l'instantané."
+  - item: "Disque tenu (6.6)"
+    result: "Commandes envoyées disque tenu ; ré-ancrage par realignDisc() (filtre et gripOffset), testRecallCueWhileHeldReanchorsGesture_IC09 ; surface du disque non exclusive sur iOS."
+  - item: "Remise à zéro"
+    result: "TapGesture(count: 2) simultané sur tout le fader, bouton « 0 » ; un double-toucher sur le bouton ne le déplace pas."
+  - item: "Formats"
+    result: "« +5,3 % », « −2,0 % » (U+2212), « 0,0 % » ; temps du CUE au dixième inférieur ; mm:ss,d inchangé."
+  - item: "Platine vide"
+    result: "Garde dans DeckViewModel.setCue() et recallCue(), valable pour le toucher, le clavier (KeyboardDispatcher) et le menu."
+  - item: "Accessibilité (CA 6)"
+    result: "Libellés, valeurs, pas de 0,1 % et de 5 %, action « Remettre à zéro », annonce de SET CUE, Contrôle vocal, identifiants ; focus clavier en 5.3."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Sans objet."
+  performance:
+    status: PASS
+    notes: "Commande envoyée seulement quand la valeur quantifiée change."
+  reliability:
+    status: PASS
+    notes: "Gardes dans le modèle ; ré-ancrage du geste par le moteur, testé."
+  maintainability:
+    status: PASS
+    notes: "FaderDragModel pur et testé ; PressButton partagé ; textes dans DeckFormatting."
+evidence:
+  ci: "Rapport CI b287cb1 (6489117 fusionné dans d51f147) : Linux ✅, macOS ✅ ; 7 tests PitchCueResistanceTests"
+  linux_tests: "scripts/linux-test.sh sur 6489117 rebasé sur main (f2a9e25) : 234/234"
+  merge_check: "Conflit avec main après le squash de #85 ; git rebase --onto origin/main 86e72ea sans conflit ; sans conflit avec #88 et #89"
+recommendations:
+  immediate:
+    - action: "git rebase --onto origin/main 86e72ea, puis fusionner."
+  future:
+    - action: "#94 : menu CUE à vide, annonce de SET CUE, test de la résistance."
+    - action: "4.6 : éclat de 150 ms du marqueur CUE sur les formes d'onde, piloté par setCueCount."
+    - action: "Recette (#44) : CUE d'un autre doigt disque tenu, résistance pendant un scratch, double-toucher du pitch, VoiceOver."
