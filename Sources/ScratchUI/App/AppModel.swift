@@ -25,8 +25,11 @@ import ScratchLibrary
 /// platine intacte (RM-48). Au lancement, `launch()` réconcilie la bibliothèque et affiche un bandeau
 /// (D-11, D-49).
 ///
-/// Fil principal uniquement. `tick()` est appelé une fois par image d'affichage. Le cycle de vie
-/// (préférences, arrière-plan, hôte audio) relève de 3.4 et de 6.2.
+/// **Cycle de vie** (story 6.2, `AppModel+Lifecycle.swift`) : l'hôte audio démarre à la fin de
+/// `launch()`, sans aucune lecture ; l'arrière-plan iOS le suspend et le premier plan le relance ;
+/// l'état de la sortie et le verrouillage de l'écran suivent l'instantané et l'hôte.
+///
+/// Fil principal uniquement. `tick()` est appelé une fois par image d'affichage.
 @MainActor
 @Observable
 public final class AppModel {
@@ -35,7 +38,12 @@ public final class AppModel {
     public let mixer: MixerViewModel
 
     /// État de la sortie audio (SF-16, SF-82 : nom, état, fréquence, tampon effectif).
-    public private(set) var outputStatus: AudioOutputStatus = .stopped
+    public internal(set) var outputStatus: AudioOutputStatus = .stopped
+    /// iPhone et iPad : l'écran ne se verrouille pas automatiquement tant qu'un moteur tourne ou qu'un
+    /// disque est tenu (D-37). Changé seulement quand la règle change ; appliqué par `AppRootView`.
+    public internal(set) var keepsScreenAwake = false
+    /// Arguments de lancement (`--demo-scene`, CI seulement).
+    public let launchOptions: LaunchOptions
 
     public let engine: any EngineControlling
     public let host: (any AudioOutputHosting)?
@@ -65,6 +73,8 @@ public final class AppModel {
 
     private let indexRecovery: @Sendable () async -> LibraryIndexRecovery
     @ObservationIgnored private var hasLaunched = false
+    /// iOS : app passée en arrière-plan, hôte suspendu (6.2).
+    @ObservationIgnored var isInBackground = false
     @ObservationIgnored private var demoClipTask: Task<AudioClip, Never>?
 
     /// Durées du moteur et rattrapage de la feutrine affichés par l'écran Réglages (3.4) : valeur
@@ -85,6 +95,7 @@ public final class AppModel {
     ///   - indexRecovery: issue de la lecture de l'index au lancement (D-49). `ScratchAppMain` la lit
     ///     sur `LibraryStore` ; les doubles de test la fournissent directement.
     ///   - libraryFolder: dossier des copies, ouvert dans le Finder (3.5, Mac).
+    ///   - launchOptions: arguments de lancement (6.2) ; sans eux, rien n'est chargé ni joué.
     public init(
         engine: any EngineControlling,
         host: (any AudioOutputHosting)?,
@@ -92,9 +103,11 @@ public final class AppModel {
         preferences: any PreferencesStoring,
         decoder: any AudioDecoding,
         indexRecovery: @escaping @Sendable () async -> LibraryIndexRecovery = { .none },
-        libraryFolder: URL? = nil
+        libraryFolder: URL? = nil,
+        launchOptions: LaunchOptions = LaunchOptions()
     ) {
         self.libraryFolder = libraryFolder
+        self.launchOptions = launchOptions
         self.engine = engine
         self.host = host
         self.library = library
@@ -120,8 +133,8 @@ public final class AppModel {
     public var confirmation: ReplacementConfirmation? { confirmations.first }
 
     /// Une image d'affichage : applique les commandes si aucun fil ne rend (pas d'hôte, hôte arrêté
-    /// ou suspendu), lit l'instantané, met à jour les modèles de présentation et libère les clips
-    /// rendus par le moteur.
+    /// ou suspendu), lit l'instantané, met à jour les modèles de présentation, libère les clips
+    /// rendus par le moteur, puis suit l'état de la sortie et le verrouillage de l'écran.
     public func tick() {
         if host?.isRenderingAudio != true { engine.pump() }
         let snapshot = engine.latestSnapshot()
@@ -133,14 +146,17 @@ public final class AppModel {
         trackPreferences(in: snapshot)
         engine.drainReleasedClips()
         if let host, outputStatus != host.status { outputStatus = host.status }
+        let awake = !isInBackground && Self.keepsScreenAwake(snapshot)
+        if keepsScreenAwake != awake { keepsScreenAwake = awake }
     }
 
     // MARK: - Lancement (CA 5, CA 10)
 
     /// Au premier appel : préférences appliquées au moteur, sans lecture (3.4, RM-10), purge des
-    /// copies de dépôts interrompus (5.2), lecture de l'index, réconciliation (D-11), liste à jour et
-    /// bandeau unique. Un index illisible ou partiellement illisible prime sur les entrées retirées
-    /// (D-49).
+    /// copies de dépôts interrompus (5.2), lecture de l'index, réconciliation (D-11), liste à jour,
+    /// démarrage de l'hôte audio (6.2), puis bandeau unique. Un index illisible ou partiellement
+    /// illisible prime sur les entrées retirées (D-49). Aucune commande `motor` ni `load` n'est
+    /// envoyée (SF-01, RM-10), sauf avec l'argument de la CI `--demo-scene`.
     public func launch() async {
         guard !hasLaunched else { return }
         hasLaunched = true
@@ -149,7 +165,9 @@ public final class AppModel {
         let recovery = await indexRecovery()
         let removed = await library.reconcile()
         await refreshLibrary()
+        startHost()
         if let text = BannerText.launch(recovery: recovery, removed: removed) { toasts.show(text) }
+        if launchOptions.demoScene { await playDemoScene() }
     }
 
     /// Relit la liste de la bibliothèque.
