@@ -3,8 +3,10 @@ import ScratchCore
 /// Préférences conservées entre les lancements (SF-17, SF-24 ; architecture §8).
 ///
 /// Persistées en un seul document JSON (`PreferencesStoring`). Le décodage est **tolérant** : une
-/// clé absente prend la valeur par défaut, pour que l'ajout d'un réglage ne fasse pas perdre les
-/// autres. Les sons chargés et l'état START/STOP ne sont jamais conservés (SF-17, RM-10).
+/// clé absente ou une valeur illisible prend la valeur par défaut, pour que l'ajout d'un réglage ne
+/// fasse pas perdre les autres. Les paires A/B se décodent moitié par moitié : une moitié illisible
+/// n'efface pas l'autre (#97). Les sons chargés et l'état START/STOP ne sont jamais conservés
+/// (SF-17, RM-10).
 public struct AppPreferences: Codable, Equatable, Sendable {
     /// Réglages propres à une platine.
     public struct Deck: Codable, Equatable, Sendable {
@@ -53,7 +55,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
             crossfader = (try? container.decodeIfPresent(Double.self, forKey: .crossfader)) ?? defaults.crossfader
             crossfaderCurve = (try? container.decodeIfPresent(Double.self, forKey: .crossfaderCurve)) ?? defaults.crossfaderCurve
             hamster = (try? container.decodeIfPresent(Bool.self, forKey: .hamster)) ?? defaults.hamster
-            lineFaders = (try? container.decodeIfPresent(DeckPair<Double>.self, forKey: .lineFaders)) ?? defaults.lineFaders
+            lineFaders = container.decodeTolerantPair(Double.self, forKey: .lineFaders, defaults: defaults.lineFaders)
         }
     }
 
@@ -80,7 +82,7 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let defaults = AppPreferences.defaults
         version = (try? container.decodeIfPresent(Int.self, forKey: .version)) ?? Self.currentVersion
-        decks = (try? container.decodeIfPresent(DeckPair<Deck>.self, forKey: .decks)) ?? defaults.decks
+        decks = container.decodeTolerantPair(Deck.self, forKey: .decks, defaults: defaults.decks)
         mixer = (try? container.decodeIfPresent(Mixer.self, forKey: .mixer)) ?? defaults.mixer
         motor = (try? container.decodeIfPresent(MotorTimings.self, forKey: .motor)) ?? defaults.motor
     }
@@ -95,12 +97,14 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         )
     }
 
-    /// Copie bornée aux plages de la spec ; une valeur non finie reprend la valeur par défaut.
+    /// Copie bornée aux plages de la spec ; une valeur non finie reprend la valeur par défaut. Le
+    /// pitch est ramené au pas de 0,1 % (SF-11), comme sur l'interface : le moteur joue la valeur
+    /// affichée (#97).
     public func sanitized() -> AppPreferences {
         var copy = self
         copy.decks = decks.map { deck in
             Deck(speed: deck.speed,
-                 pitch: deck.pitch.clamped(to: TurntableConstants.pitchRange, fallback: 0),
+                 pitch: Self.quantizedPitch(deck.pitch),
                  resistance: deck.resistance.clamped(to: 0...1, fallback: TurntableConstants.defaultResistance))
         }
         copy.mixer.crossfader = mixer.crossfader.clamped(to: 0...1, fallback: TurntableConstants.defaultCrossfader)
@@ -108,6 +112,14 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         copy.mixer.lineFaders = mixer.lineFaders.map { $0.clamped(to: 0...1, fallback: TurntableConstants.defaultLineFader) }
         copy.motor = motor.clamped()
         return copy
+    }
+
+    /// Pitch au pas de `TurntableConstants.pitchStep`, borné à ±8 % ; non fini : 0. Même calcul que
+    /// `DeckViewModel.quantizedPitch` (4.5).
+    static func quantizedPitch(_ value: Double) -> Double {
+        guard value.isFinite else { return 0 }
+        let steps = (value / TurntableConstants.pitchStep).rounded()
+        return (steps * TurntableConstants.pitchStep).clamped(to: TurntableConstants.pitchRange, fallback: 0)
     }
 
     /// Commandes qui appliquent ces préférences au moteur au lancement. Ne contient jamais de
@@ -128,5 +140,21 @@ public struct AppPreferences: Codable, Equatable, Sendable {
         commands.append(.brakeDuration(values.motor.brakeDuration))
         commands.append(.slipmatCatchUp(values.motor.slipmatCatchUp))
         return commands
+    }
+}
+
+/// Clés d'une paire A/B (`DeckPair` encodé par le `Codable` synthétisé).
+private enum PairKey: String, CodingKey {
+    case a, b
+}
+
+private extension KeyedDecodingContainer {
+    /// Paire décodée moitié par moitié (#97) : une moitié absente ou illisible prend sa valeur par
+    /// défaut sans effacer l'autre. Le contrat `DeckPair` garde son `Codable` synthétisé.
+    func decodeTolerantPair<Value: Decodable>(_ type: Value.Type, forKey key: Key,
+                                              defaults: DeckPair<Value>) -> DeckPair<Value> {
+        guard let pair = try? nestedContainer(keyedBy: PairKey.self, forKey: key) else { return defaults }
+        return DeckPair(a: (try? pair.decodeIfPresent(Value.self, forKey: .a)) ?? defaults.a,
+                        b: (try? pair.decodeIfPresent(Value.self, forKey: .b)) ?? defaults.b)
     }
 }
