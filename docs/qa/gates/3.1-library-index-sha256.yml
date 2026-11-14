@@ -1,0 +1,76 @@
+schema: 1
+story: "3.1"
+story_title: "Index de bibliothèque et empreinte SHA-256"
+pr: 46
+issue: 28
+reviewed_sha: "121bc5f"
+gate: CONCERNS
+status_reason: >-
+  Les 9 critères d'acceptation sont implémentés et testés. scripts/linux-test.sh passe (89/89) et la
+  CI Linux et macOS est verte. Le changement de contrat reconcile() est conforme à D-11 et à
+  l'architecture §8. Réserve mineure de fiabilité : un index partiellement illisible est recopié de
+  côté à chaque lancement (#51). Écart de traçabilité, antérieur à la PR et confié au PO : message
+  pour un index illisible (#52).
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues:
+  - id: "LIB-001"
+    severity: medium
+    finding: >-
+      Index lisible dont une entrée est ignorée : LibraryIndex.load() copie le document vers
+      library.json.corrupt_N sans réécrire l'index nettoyé. Une copie de plus à chaque lancement,
+      sans limite (reproduit par une sonde : 3 instances donnent 3 copies).
+    refs:
+      - "Sources/ScratchLibrary/LibraryIndex.swift:49-50"
+      - "Sources/ScratchLibrary/LibraryStore.swift:92-98"
+    suggested_owner: dev
+    follow_up: "#51"
+  - id: "TRACE-001"
+    severity: low
+    finding: >-
+      Le PRD 3.1 CA2 et l'architecture §8 demandent un message pour un index illisible. La story 3.1
+      le reporte et la story 6.1 ne le reprend pas : aucune story ne porte cette exigence.
+    refs:
+      - "docs/bmad/prd.md (story 3.1, CA2)"
+      - "docs/bmad/architecture.md §8, règle 3"
+    suggested_owner: po
+    follow_up: "#52"
+  - id: "INFO-001"
+    severity: low
+    finding: >-
+      La relecture du changement de contrat par Winston (story, T3) n'apparaît pas sur la PR. La QA a
+      vérifié la conformité à D-11 et à l'architecture.
+    suggested_owner: orchestrator
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      Chemins forgés (../, chemin absolu, nom caché, nom vide, NUL) testés ; lien symbolique et
+      dossier homonyme sondés par la QA ; aucun fichier hors de Banque de sons n'est touché.
+  performance:
+    status: PASS
+    notes: >-
+      Lecture en flux par blocs de 1 Mio, mémoire bornée. En débogage : vecteurs officiels en 0,07 s,
+      3 fichiers de 1 Mio en 0,25 s.
+  reliability:
+    status: CONCERNS
+    notes: >-
+      Écriture atomique, mise de côté sans écrasement, réconciliation testée. Réserve LIB-001 (#51).
+  maintainability:
+    status: PASS
+    notes: >-
+      Code documenté en français (D-42), tests nommés d'après les CA et les exigences, bac à sable
+      partagé (LibrarySandbox).
+evidence:
+  linux_tests: "scripts/linux-test.sh sur 121bc5f : 89/89 ; fusion simulée avec #48 : 100/100"
+  ci: "Rapport CI 6fcc88a : Linux ✅, macOS ✅"
+  independent_checks: "Empreintes SHA-256 hors NIST recalculées avec Python hashlib : identiques"
+  contract_change: "reconcile() async -> [LibraryEntry] conforme à D-11, R4 et à l'architecture §8 ; pas d'implémentation par défaut ; EmptyLibrary à jour"
+recommendations:
+  immediate: []
+  future:
+    - action: "Après une lecture partielle, réécrire l'index nettoyé pour ne mettre le document de côté qu'une fois (#51)."
+      refs: ["Sources/ScratchLibrary/LibraryStore.swift:92-98"]
+    - action: "3.2 : assainir les noms de copie (ni '.' en tête, ni '..') et tronquer importedAt à la seconde avant l'écriture."
+      refs: ["Sources/ScratchLibrary/LibraryStore.swift:119-122"]
+    - action: "PO et Winston : trancher le message pour un index illisible, par le contrat et 6.1, ou par un amendement du PRD (#52)."
