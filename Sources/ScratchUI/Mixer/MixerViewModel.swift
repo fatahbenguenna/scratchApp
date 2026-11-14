@@ -5,7 +5,9 @@ import ScratchCore
 /// Modèle de présentation de la table de mixage (PRD 4.2 ; architecture §5.2). Mêmes cadences que
 /// `DeckViewModel` : `frame` à chaque image (VU-mètres, saturation), le reste sur changement.
 ///
-/// **Version de base (story 0.2), complétée par Léa en 4.2 et 5.1.**
+/// **Version de base (story 0.2), complétée en 4.2** (SAT, libellés, lettres, repères de cut-in,
+/// valeurs VoiceOver) **et en 5.1.** Les VU-mètres de voie sont portés par `DeckViewModel.channelMeter`
+/// (crête de la voie dans l'instantané de la platine).
 @MainActor
 @Observable
 public final class MixerViewModel {
@@ -19,6 +21,8 @@ public final class MixerViewModel {
     public private(set) var hamster = false
     public private(set) var lineFaders = DeckPair(repeating: TurntableConstants.defaultLineFader)
     public private(set) var momentaryCuts = DeckPair(repeating: false)
+    /// Indicateur SAT, maintenu 1 s (D-13).
+    public private(set) var saturation = SaturationState()
 
     // Commanded values shown until a snapshot confirms them (#57).
     @ObservationIgnored private var commandedCrossfader = CommandedValue<Double>()
@@ -38,6 +42,9 @@ public final class MixerViewModel {
     func apply(_ snapshot: MixerSnapshot) {
         if frame != snapshot { frame = snapshot }
         let now = clock()
+        var nextSaturation = saturation
+        nextSaturation.update(snapshot, at: now)
+        if saturation != nextSaturation { saturation = nextSaturation }
         let shownCrossfader = commandedCrossfader.resolve(snapshot.crossfader, at: now)
         if crossfader != shownCrossfader { crossfader = shownCrossfader }
         let shownCurve = commandedCurve.resolve(snapshot.crossfaderCurve, at: now)
@@ -49,6 +56,41 @@ public final class MixerViewModel {
         let shownCuts = commandedCuts.resolve(snapshot.momentaryCuts, at: now)
         if momentaryCuts != shownCuts { momentaryCuts = shownCuts }
     }
+
+    // MARK: Textes et repères (story 4.2)
+
+    /// Platine à chaque extrémité du crossfader : la butée gauche est la voie A, ou B avec le
+    /// hamster (SF-67, 6.10) ; le bouton ne bouge pas.
+    public var leftDeck: DeckID { hamster ? .b : .a }
+    public var rightDeck: DeckID { hamster ? .a : .b }
+
+    /// Valeur de la courbe : « Coupure franche » (1), « Douce » (0), sinon « 60 % » (UX §5.13).
+    public var curveText: String {
+        if crossfaderCurve >= 1 { return "Coupure franche" }
+        if crossfaderCurve <= 0 { return "Douce" }
+        return Self.percent(crossfaderCurve)
+    }
+
+    /// Largeur de cut-in `w = lerp(1 ; 0,03 ; courbe)` ; repères affichés quand `w ≤ 0,2`, à `w`
+    /// (plein niveau de la voie de droite) et `1 − w` (voie de gauche) (UX §5.12).
+    public var cutInWidth: Double? {
+        let width = 1 + (TurntableConstants.crossfaderCutInWidth - 1) * crossfaderCurve
+        return width <= 0.2 ? width : nil
+    }
+
+    /// Valeur VoiceOver du crossfader : « 50 %, centre », « butée gauche, voie A » (UX §5.12, §11.2).
+    public var crossfaderAccessibilityValue: String {
+        if crossfader <= 0 { return "butée gauche, voie \(leftDeck.rawValue)" }
+        if crossfader >= 1 { return "butée droite, voie \(rightDeck.rawValue)" }
+        let text = Self.percent(crossfader)
+        return abs(crossfader - 0.5) < 0.005 ? text + ", centre" : text
+    }
+
+    /// Valeur d'un fader de voie : « 100 % ».
+    public func lineFaderText(_ deck: DeckID) -> String { Self.percent(lineFaders[deck]) }
+
+    /// Pourcentage entier avec espace insécable (UX §8.1).
+    static func percent(_ value: Double) -> String { "\(Int((value * 100).rounded()))\u{00A0}%" }
 
     /// Position 0 (butée A) … 1 (butée B) (SF-12).
     public func setCrossfader(_ value: Double) {
