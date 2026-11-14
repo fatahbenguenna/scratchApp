@@ -1,0 +1,68 @@
+schema: 1
+story: "2.2"
+story_title: "Décodeur AVFoundation"
+pr: 55
+issue: 25
+reviewed_sha: "e372d85"
+gate: CONCERNS
+status_reason: >-
+  Les 8 critères d'acceptation sont implémentés ; tous sont testés, sauf l'objectif de temps du MP3
+  de 10 min. CI Linux et macOS verte ; fusion sans conflit avec le main actuel. Fixture MP3 vérifiée :
+  reproduite à l'octet près par la commande documentée, contenu synthétique, CC0. Réserve : la mesure
+  de performance porte sur un WAV et ne renseigne pas l'objectif MP3 du CA7 (#61).
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues:
+  - id: "PERF-001"
+    severity: low
+    finding: >-
+      testTenMinuteDecodeTime mesure un WAV de 10 min, qui ne passe par aucun décodeur avec pertes ;
+      le chiffre n'est visible que dans un journal CI inaccessible. Objectif du CA7 (MP3 de 10 min en
+      3 s au plus) non renseigné.
+    refs: ["Tests/ScratchAudioTests/AudioFileDecoderTests.swift (testTenMinuteDecodeTime)"]
+    suggested_owner: dev
+    follow_up: "#61"
+deviations:
+  - id: "DEV-1"
+    description: "Durée à ± 75 ms pour AAC et MP3 (± 1 trame pour WAV, AIFF et ALAC)."
+    verdict: PASS
+    rationale: "Bornes du délai et du remplissage des codecs (MP3 ≈ 51 ms, AAC ≈ 71 ms à 44,1 kHz) ; seule la durée de la sonde est relâchée ; effet négligeable sur SF-80."
+  - id: "DEV-2"
+    description: "Mesure de performance sur un WAV de 10 min plutôt qu'un MP3."
+    verdict: CONCERNS
+    rationale: "Ne mesure pas le décodage avec pertes ; MP3 de 599,8 s constructible dans le test à partir de la fixture (574 répétitions des trames audio) ; #61."
+  - id: "DEV-3"
+    description: "Pic mémoire ≤ 1,5 × le clip garanti par conception, sans mesure."
+    verdict: PASS
+    rationale: "Relecture : le clip, un tampon de bloc et deux tampons de conversion (rapport ≈ 1,01) ; mesure prévue en recette par D-21."
+fixture_check:
+  file: "Tests/ScratchAudioTests/Support/MP3Fixture.swift"
+  size_bytes: 4362
+  sha256: "bb487a35e53dd9d2555cb55f97391b09f094f6d9b7d3068aeae0355dfffc04fa"
+  reproduced: "identique octet pour octet avec la commande documentée (ffmpeg 6.1.1, libmp3lame)"
+  content: "sinusoïde aevalsrc de 1 kHz, 1 s, mono, 44,1 kHz ; ni ID3v1 ni ID3v2 ; 44 100 trames décodées, crête 0,48"
+  license: "CC0, contenu généré pour ScratchApp, sans source tierce"
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Lecture des en-têtes RIFF et AIFF bornée ; erreurs typées, sans plantage."
+  performance:
+    status: CONCERNS
+    notes: "Objectif MP3 de 10 min non mesuré (#61) ; mémoire bornée par construction."
+  reliability:
+    status: PASS
+    notes: "Troncature WAV et AIFF détectée par l'en-tête ; fin de fichier tolérée de 0,1 s ; annulation propagée."
+  maintainability:
+    status: PASS
+    notes: "Sonde, session de décodage et ChannelMixdown séparées ; fixture reproductible ; D-42."
+evidence:
+  linux_tests: "scripts/linux-test.sh sur e372d85 : 74/74"
+  ci: "Rapport CI 788442e : Linux ✅, macOS ✅"
+  merge_check: "git merge-tree avec origin/main (après #46, #50 et #56) : sans conflit"
+recommendations:
+  immediate: []
+  future:
+    - action: "Hugo : mesurer un MP3 de 10 min construit à partir de la fixture et rendre le chiffre lisible (#61)."
+    - action: "Journaliser l'écart de durée mesuré en AAC et MP3 pour resserrer la tolérance de ± 75 ms."
+    - action: "PO : ajuster les Examples du Gherkin « Format compatible » (tolérance par famille de codecs)."
+    - action: "Recette 6.3 : temps de décodage d'un MP3 de 10 min en release et empreinte mémoire (D-21)."

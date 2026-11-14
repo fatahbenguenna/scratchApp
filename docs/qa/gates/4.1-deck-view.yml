@@ -1,0 +1,81 @@
+schema: 1
+story: "4.1"
+story_title: "Platine : modèle de présentation, faux moteur et disque animé"
+pr: 49
+issue: 33
+reviewed_sha: "77f3245"
+gate: CONCERNS
+status_reason: >-
+  Les 10 critères d'acceptation sont implémentés et vérifiés. CI Linux et macOS verte (17 nouveaux
+  tests ScratchUITests) ; capture conforme ; contrats intacts. Réserve : un défaut latent apparaîtra
+  avec l'hôte audio réel, quand les commandes sont appliquées en différé. START/STOP clignote, et la
+  boucle d'affichage peut se suspendre sur un instantané qui précède la commande (#57, P0, avant 6.2).
+  Les écarts de l'UX sont suivis dans #58.
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues:
+  - id: "UI-001"
+    severity: high
+    finding: >-
+      Avec un hôte qui rend le son, tick() ne pompe pas : l'image qui suit send() lit un instantané
+      antérieur. apply() écrase motorOn (clignotement de START/STOP), et DisplayLinkDriver.step() se
+      suspend dès la première image au repos après wake() : le disque peut rester figé pendant la
+      lecture si DisplayWakingEngine est branché. Latent : invisible avec le faux moteur de 4.1.
+    refs:
+      - "Sources/ScratchUI/Deck/DeckViewModel.swift:119 (apply)"
+      - "Sources/ScratchUI/Preview/DisplayLinkDriver.swift (step)"
+      - "Sources/ScratchUI/App/AppModel.swift:60"
+    suggested_owner: dev
+    follow_up: "#57"
+  - id: "UX-001"
+    severity: low
+    finding: >-
+      UX à aligner : deck.x.position est absorbé par l'en-tête combiné (§5.10) ; deck.x.emptyImport
+      manque à §11.6 ; la marge interne 12 de §9.5 est incompatible avec P = C − 52.
+    suggested_owner: ux
+    follow_up: "#58"
+deviations:
+  - id: "DEV-1"
+    description: "Taille : environ 1 530 lignes de code et 420 de tests, pour 850 visées ; Preview/ non découpé."
+    verdict: PASS
+    rationale: "La consigne de découpage contredit les CA1, CA8 et CA10 (RootView sur le faux moteur, capture). Le découpage ne ramenait pas la PR sous 900 lignes."
+  - id: "DEV-2"
+    description: "deck.a.position absorbé par l'élément VoiceOver combiné de l'en-tête."
+    verdict: PASS
+    rationale: "Conséquence de l'UX §5.10 ; aucun test d'interface en V1 ; à trancher en 5.3 (#58)."
+  - id: "DEV-3"
+    description: "Identifiant ajouté : deck.a.emptyImport."
+    verdict: PASS
+    rationale: "Deux boutons Importer sont visibles à vide ; il faut un identifiant unique ; à ajouter à l'UX §11.6 (#58)."
+  - id: "DEV-4"
+    description: "Marge de l'UX §9.5 : le fond déborde de 6 pt dans les gouttières."
+    verdict: PASS
+    rationale: "La formule testée (CA8) prime ; séparation nette sur la capture ; UX à corriger (#58)."
+  - id: "DEV-5"
+    description: "Clignotement possible de START/STOP pendant une image en 6.2."
+    verdict: CONCERNS
+    rationale: "Confirmé ; même cause que la suspension prématurée de la boucle d'affichage ; #57, à corriger avant 6.2."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Sans objet."
+  performance:
+    status: PASS
+    notes: "Redessin limité aux couches tournantes ; textes mis à jour au dixième ; boucle suspendable au repos."
+  reliability:
+    status: CONCERNS
+    notes: "UI-001 (#57) : commandes appliquées en différé par le vrai moteur."
+  maintainability:
+    status: PASS
+    notes: "Découpage Deck/, Layout/, Preview/ ; métriques testables ; documentation en français (D-42)."
+evidence:
+  linux_tests: "scripts/linux-test.sh sur 77f3245 : 63/63 (cœur inchangé)"
+  ci: "Rapport CI d57560e : Linux ✅, macOS ✅ (88 tests)"
+  screenshot: "ci-shots/pr-49 : deux platines vides conformes à l'UX"
+recommendations:
+  immediate: []
+  future:
+    - action: "Léa : valeur commandée tenue jusqu'à confirmation par l'instantané ; boucle suspendue seulement après plusieurs images au repos ; test avec un moteur à instantané retardé (#57)."
+    - action: "Hugo (6.1) : ne pas brancher DisplayWakingEngine sur un moteur rendu par un hôte avant #57 ; poser loadedClip et loadedEntry ensemble (note sur #42)."
+    - action: "Sally : aligner l'UX §5.10, §9.5 et §11.6 (#58)."
+    - action: "Bob : réévaluer la taille visée des stories d'interface."
