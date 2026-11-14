@@ -6,7 +6,8 @@ import SwiftUI
 /// Seules les couches tournantes lisent `frame` et sont réévaluées à chaque image ; elles tournent par
 /// `rotationEffect` sans animation, sur des dessins qui ne changent qu'avec la taille ou le son
 /// (UX §10.2). Angles du contrat : radians, sens horaire positif, 0 = midi ; le repère est dessiné à
-/// midi puis tourné de `stickerAngle` (D-10). Aucune saisie ici (story 4.3).
+/// midi puis tourné de `stickerAngle` (D-10). La saisie passe par `DiscInputSurface` (story 4.3) ;
+/// l'état vide reste au-dessus d'elle, et un disque vide n'est pas saisissable.
 struct TurntableView: View {
     let model: DeckViewModel
     let intents: any DeckIntents
@@ -47,6 +48,8 @@ struct TurntableView: View {
                 .animation(model.isHeld ? nil : .easeOut(duration: 0.08), value: model.isHeld)
         }
         .frame(width: platter, height: platter)
+        // Native input surface (4.3): each event goes to the engine in the cycle that receives it.
+        .overlay { DiscInputSurface(coordinator: model.discInput) }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Disque, \(model.deckName)")
         .accessibilityValue(model.discAccessibilityValue)
