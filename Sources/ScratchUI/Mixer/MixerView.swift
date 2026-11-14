@@ -12,17 +12,19 @@ struct MixerView: View {
     let outputStatus: AudioOutputStatus
     let metrics: MainLayoutMetrics
 
+    /// iPhone paysage : courbe et hamster dans le panneau « Table » (D-30, UX §4.3).
+    private var isPhone: Bool { metrics.idiom == .phoneLandscape }
+
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: isPhone ? 8 : 12) {
             #if os(iOS)
             HStack {
-                Button { intents.openLibrary() } label: { Label("Bibliothèque", systemImage: "music.note.list") }
-                    .accessibilityIdentifier("library.open")
+                LibraryButton(intents: intents)
                 Spacer(minLength: 8)
-                Button { intents.openSettings() } label: { Label("Réglages", systemImage: "gearshape") }
-                    .accessibilityIdentifier("settings.open")
+                if isPhone { MixerSettingsPopover(mixer: mixer).labelStyle(.iconOnly) }
+                Spacer(minLength: 8)
+                SettingsButton(intents: intents)
             }
-            .buttonStyle(RaisedButtonStyle())
             .labelStyle(.iconOnly)
             #endif
             HStack(spacing: 8) {
@@ -36,14 +38,38 @@ struct MixerView: View {
                 ChannelFader(mixer: mixer, deck: deckB)
             }
             .frame(maxHeight: .infinity)
-            CrossfaderCurveControl(mixer: mixer)
-            HamsterToggle(mixer: mixer)
+            if !isPhone {
+                CrossfaderCurveControl(mixer: mixer)
+                HamsterToggle(mixer: mixer)
+            }
             CrossfaderView(mixer: mixer, height: metrics.crossfaderHeight)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Table de mixage")
+    }
+}
+
+/// Bouton « Bibliothèque » (`library.open`) : intention de la 3.5 (Hugo).
+struct LibraryButton: View {
+    let intents: any DeckIntents
+
+    var body: some View {
+        Button { intents.openLibrary() } label: { Label("Bibliothèque", systemImage: "music.note.list") }
+            .buttonStyle(RaisedButtonStyle())
+            .accessibilityIdentifier("library.open")
+    }
+}
+
+/// Bouton « Réglages » (`settings.open`).
+struct SettingsButton: View {
+    let intents: any DeckIntents
+
+    var body: some View {
+        Button { intents.openSettings() } label: { Label("Réglages", systemImage: "gearshape") }
+            .buttonStyle(RaisedButtonStyle())
+            .accessibilityIdentifier("settings.open")
     }
 }
 

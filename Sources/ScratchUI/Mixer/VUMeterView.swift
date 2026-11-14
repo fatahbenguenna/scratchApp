@@ -4,18 +4,21 @@ import SwiftUI
 /// table, avec SAT, qui suit chaque image (ADR-12).
 struct VUMeterView: View {
     let deck: DeckViewModel
+    /// Horizontal (iPad portrait, iPhone portrait) : segments de gauche à droite.
+    var horizontal = false
 
     var body: some View {
         let meter = deck.channelMeter
         let lit = meter.litSegments
         let peak = meter.peakSegment
-        VStack(spacing: 2) {
-            ForEach((0..<12).reversed(), id: \.self) { index in
+        let layout = horizontal ? AnyLayout(HStackLayout(spacing: 2)) : AnyLayout(VStackLayout(spacing: 2))
+        layout {
+            ForEach(horizontal ? Array(0..<12) : Array((0..<12).reversed()), id: \.self) { index in
                 RoundedRectangle(cornerRadius: 1)
                     .fill(index < lit || index == peak ? Self.color(of: index) : Theme.vuOff)
             }
         }
-        .frame(width: 8)
+        .frame(width: horizontal ? nil : 8, height: horizontal ? 8 : nil)
         .accessibilityElement()
         .accessibilityLabel("Niveau de la voie \(deck.deck.rawValue)")
         .accessibilityValue(meter.accessibilityValue)

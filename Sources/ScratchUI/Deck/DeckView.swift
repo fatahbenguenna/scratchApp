@@ -14,7 +14,7 @@ struct DeckView: View {
     var body: some View {
         let spacings = metrics.rowSpacings
         VStack(alignment: .leading, spacing: 0) {
-            DeckHeaderView(model: model, intents: intents, width: metrics.columnWidth)
+            DeckHeaderView(model: model, intents: intents, width: metrics.columnWidth, height: metrics.headerHeight)
             reserved(height: metrics.waveformHeight).padding(.top, spacings[0])     // waveform (4.6)
             reserved(height: metrics.overviewHeight).padding(.top, spacings[1])     // overview (4.6)
             HStack(spacing: metrics.platterSpacing) {
