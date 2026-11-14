@@ -24,6 +24,10 @@ struct WaveformOverviewView: View {
     /// le précédent n'a pas reçu de fin (geste interrompu par le système).
     @State private var dragStart: CGPoint?
     @State private var hoverX: CGFloat?
+    /// Vrai pendant le glisser ; remis à faux par SwiftUI à la fin **et** à l'annulation par le système
+    /// (rotation, changement de disposition, appel, geste prioritaire), qui n'appelle pas `onEnded`
+    /// (#102).
+    @GestureState private var isDragging = false
 
     private var overflow: CGFloat { max(0, Self.touchHeight - height) }
 
@@ -56,6 +60,13 @@ struct WaveformOverviewView: View {
         .padding(.top, overflow)
         .contentShape(Rectangle())
         .gesture(needleDrop(geometry: geometry), including: enabled ? .all : .subviews)
+        .onChange(of: isDragging) {
+            // Ended normally: `onEnded` has already reset the state. Cancelled: hide the ghost.
+            if !isDragging, gesture.isActive {
+                gesture.reset()
+                dragStart = nil
+            }
+        }
         .onContinuousHover { phase in
             switch phase {
             case let .active(location): hoverX = enabled ? location.x : nil
@@ -113,6 +124,7 @@ struct WaveformOverviewView: View {
 
     private func needleDrop(geometry: OverviewGeometry) -> some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .local)
+            .updating($isDragging) { _, state, _ in state = true }
             .onChanged { value in
                 // Local space includes the upward overflow: the touch zone is [0, max(44, height)].
                 let zone = Double(max(Self.touchHeight, height))
