@@ -1,0 +1,53 @@
+schema: 1
+story: "5.2"
+story_title: "Glisser-déposer sur une platine"
+pr: 74
+issue: 40
+reviewed_sha: "7fd02c9"
+gate: PASS
+status_reason: >-
+  Les 6 critères d'acceptation sont implémentés ; les critères 1 à 5 sont testés (8 tests macOS), le
+  dépôt réel reste à vérifier en recette. CI Linux et macOS verte ; aucun conflit avec main ni avec
+  les PR en cours de fusion. La ligne transverse de DeckView (Léa) est correcte. Le refus des fichiers
+  non audio du Finder intervient quelques millisecondes après le début du survol, et un dépôt pendant
+  ce délai retombe sur l'erreur de la 6.1. D-27 appliquée dès le survol. La copie temporaire de
+  Fichiers est supprimée ; un fichier du Finder n'est jamais touché (RM-47). À fusionner après #71 et
+  le rebase.
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues: []
+checks:
+  - item: "Ligne transverse dans DeckView (Léa)"
+    result: "deckDropZone après frame(width:) : colonne entière, en-tête compris ; voile sans interception ni accessibilité ; sans conflit avec #70 et #72."
+  - item: "Finder, fichier non audio"
+    result: "Survol accepté le temps de lire l'URL (quelques ms, contenu jamais lu), puis refus selon l'extension ; jeton de session ; course résiduelle couverte par la sonde de la 3.2 et l'alerte de la 6.1."
+  - item: "D-27"
+    result: "Refus au survol si plusieurs éléments ; seconde vérification dans performDrop."
+  - item: "RM-47"
+    result: "Copie dans tmp/ScratchApp-Drops/<UUID>/, supprimée après l'import (préfixe sur chemins standardisés) ; fichier du Finder conservé (test avec un vrai LibraryStore)."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Aucun contenu lu au survol ; suppression limitée au dossier temporaire ; fichiers de l'utilisateur intacts."
+  performance:
+    status: PASS
+    notes: "Résolution de l'URL et copie hors du fil principal."
+  reliability:
+    status: PASS
+    notes: "Refus au survol, avec seconde vérification au dépôt ; parcours d'erreur de la 6.1."
+  maintainability:
+    status: PASS
+    notes: "Filtre en logique pure ; types communs avec le sélecteur ; couleur danger à remplacer par Theme.danger après le rebase sur la 4.2."
+evidence:
+  linux_tests: "scripts/linux-test.sh : 195/195 (cœur inchangé)"
+  ci: "Rapport CI 32562ec (fusion dans c1c5a1b) : Linux ✅, macOS ✅"
+  merge_check: "git merge-tree avec main, fix/57-commanded-values, story/4.2-mixer-view et story/1.4-mixer-core : sans conflit"
+recommendations:
+  immediate:
+    - action: "Rebaser après la fusion de #71, laisser la CI repasser au vert sur la combinaison, puis fusionner."
+  future:
+    - action: "Après le rebase sur la 4.2 : réutiliser Theme.danger au lieu de la couleur locale."
+    - action: "Purger tmp/ScratchApp-Drops au lancement (copies laissées par un arrêt pendant un import)."
+    - action: "Ajouter un test : isStaged est faux pour un chemin qui contient .. et pour un dossier voisin."
+    - action: "#73 : décider aussi du cas « fichier déposé que le système ne peut pas fournir »."
+    - action: "Recette : dépôt depuis le Finder (Mac) et depuis Fichiers (iPad, D-23)."

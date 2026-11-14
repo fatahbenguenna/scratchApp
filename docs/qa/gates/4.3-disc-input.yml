@@ -1,0 +1,53 @@
+schema: 1
+story: "4.3"
+story_title: "Saisie du disque : tactile, souris et trackpad"
+pr: 77
+issue: 35
+reviewed_sha: "50466da"
+gate: PASS
+status_reason: >-
+  Seul le commit propre à la 4.3 a été relu ; ceux de #70 et #72 sont identiques (git range-diff).
+  Critères implémentés et logique testée (8 tests DiscInputTests) ; CI Linux et macOS verte ; aucun
+  conflit avec main ni avec #74. Sens du défilement cohérent pour les deux réglages du défilement
+  naturel, à confirmer sur appareil (D-24). Latence instrumentée reportée, conformément au CA6
+  conditionnel (sonde de la 2.1). RM-60 et RM-61 de bout en bout ; aucun saut au redimensionnement ;
+  disque vide non saisissable. Vérifications sur appareil ajoutées à la recette (#44).
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues: []
+checks:
+  - item: "D-24, défilement naturel"
+    result: "fingerDelta : deltas tels quels avec le défilement naturel, inversés sinon ; trackpad : la surface suit les doigts ; molette vers le bas = sens horaire quel que soit le réglage ; à confirmer sur appareil."
+  - item: "Latence (CA6)"
+    result: "Envoi synchrone dans le cycle d'événements, horodatages système ; mesure instrumentée en recette avec la sonde de la 2.1 (D-15)."
+  - item: "Recette sur appareil (D-23, D-05)"
+    result: "Surfaces multitouch non exclusives, une par disque, plus le crossfader de la 4.2 ; trois contacts possibles par construction ; vérification réelle sur #44."
+  - item: "RM-60, RM-61"
+    result: "Saisie au départ dans min(R + 6, P/2), contact propriétaire, annulation = relâchement, zone centrale ; défilement commencé hors du disque ignoré ; contact et défilement exclusifs."
+  - item: "6.14"
+    result: "Géométrie relue à chaque événement ; recalage sans saut (1.2)."
+  - item: "Disque vide"
+    result: "Aucune saisie au doigt ni au défilement ; curseur et indication seulement si un son est chargé ; état vide au-dessus de la surface."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Sans objet."
+  performance:
+    status: PASS
+    notes: "Envoi dans le cycle d'événements, touches regroupées ; mesure de latence en recette."
+  reliability:
+    status: PASS
+    notes: "Relâchement garanti (annulation par le système, annulation programmée, minuterie à 80 ms)."
+  maintainability:
+    status: PASS
+    notes: "Coordinateur commun ; surfaces minces ; logique testée avec ordonnanceur injectable."
+evidence:
+  ci: "Rapport CI 8bf13ec (fusion dans c1c5a1b) : Linux ✅, macOS ✅"
+  linux_tests: "scripts/linux-test.sh : 194/194 (cœur inchangé)"
+  merge_check: "git merge-tree avec origin/main (après #64 et #71) et avec story/5.2-drag-and-drop : sans conflit"
+  range_diff: "a768380, fc5fbb9, 759324d identiques à c4627d1, fe710a6, c17e95b"
+recommendations:
+  immediate:
+    - action: "Fusionner #70 puis #72, rebaser #77 et laisser la CI repasser au vert."
+  future:
+    - action: "Recette (#44) : latence avec la sonde de la 2.1, trois contacts (D-05), sens du défilement avec et sans défilement naturel, redimensionnement pendant un scratch."
