@@ -69,6 +69,40 @@ final class AudioEngineHostSystemEventTests: XCTestCase {
         XCTAssertFalse(output.isMonitoring)
     }
 
+    /// CA 1 — gate de la partie 2 (Quinn, D-55) : iOS ne garantit pas la fin d'une interruption. Une
+    /// réinitialisation des services média la clôt (session et graphe reconstruits, sortie relancée,
+    /// moteurs à STOP), et le retour au premier plan aussi.
+    func testInterruptionEndsOnMediaServicesResetOrForeground() {
+        let engine = ScratchEngine()
+        let (host, output) = FakeOutput.makeHost(engine: engine, failing: false, platform: .iOS, retryInterval: 0.05)
+        host.start()
+        runMotorA(engine)
+
+        output.onSystemEvent?(.interruptionBegan)
+        XCTAssertTrue(host.isFallbackRunning)
+        output.onSystemEvent?(.mediaServicesReset)
+        XCTAssertEqual(output.resetSessionCount, 1)
+        XCTAssertEqual(output.startCount, 2)
+        XCTAssertEqual(output.fallbackRunningAtStart, [false, false], "the clock stops before the output starts")
+        XCTAssertFalse(host.isFallbackRunning)
+        XCTAssertEqual(host.status, .running(output.info))
+        output.onSystemEvent?(.configurationChanged)
+        XCTAssertEqual(output.startCount, 3, "no longer interrupted: a configuration change restarts the output")
+        engine.pump()
+        XCTAssertFalse(engine.latestSnapshot()[.a].motorOn)
+
+        // An interruption whose end never comes, then background and foreground.
+        output.onSystemEvent?(.interruptionBegan)
+        XCTAssertTrue(host.isFallbackRunning)
+        host.suspend()
+        host.resume()
+        XCTAssertEqual(host.status, .running(output.info))
+        XCTAssertFalse(host.isFallbackRunning)
+        output.onSystemEvent?(.configurationChanged)
+        XCTAssertEqual(output.startCount, 5, "the foreground closes the interruption")
+        host.stop()
+    }
+
     // MARK: - CA 2, 3 (D-04, RM-56)
 
     /// CA 2 — 6.5 « Débrancher le casque » : STOP est appliqué avant que la sortie ne reparte sur le
@@ -209,7 +243,7 @@ final class AudioEngineHostSystemEventTests: XCTestCase {
         let (host, output) = FakeOutput.makeHost(engine: engine, failing: true, retryInterval: 0.05)
         host.start()
         XCTAssertTrue(host.isRetrying)
-        XCTAssertEqual(host.notice, AudioEngineHost.PostedNotice(id: 1, notice: .outputUnavailable))
+        XCTAssertEqual(host.notice, PostedAudioNotice(id: 1, notice: .outputUnavailable))
         XCTAssertEqual(host.notice?.notice.message, "Sortie audio indisponible. ScratchApp réessaiera automatiquement.")
 
         try await waitUntil { output.startCount >= 4 }

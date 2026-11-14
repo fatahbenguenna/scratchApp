@@ -31,18 +31,11 @@ import ScratchCore
 /// audio).
 @MainActor
 @Observable
-public final class AudioEngineHost: AudioOutputHosting {
-    /// Avis publié pour l'interface (story 2.3 CA 8). `id` croît à chaque avis : deux avis identiques
-    /// successifs restent distincts.
-    public struct PostedNotice: Equatable, Sendable, Identifiable {
-        public let id: Int
-        public let notice: AudioHostNotice
-    }
-
+public final class AudioEngineHost: AudioOutputHosting, AudioNoticePosting {
     public private(set) var status: AudioOutputStatus = .stopped
     public private(set) var isRenderingAudio = false
     /// Dernier avis pour le bandeau (UX §8.5), lu par l'`AppModel` (story 6.2).
-    public private(set) var notice: PostedNotice?
+    public private(set) var notice: PostedAudioNotice?
 
     /// Moteur rendu par l'hôte. Les commandes passent par `engine.send` depuis le fil principal.
     public let engine: ScratchEngine
@@ -144,7 +137,8 @@ public final class AudioEngineHost: AudioOutputHosting {
         let actions = AudioSystemPolicy.actions(for: event, context: context)
         switch event {
         case .interruptionBegan: isInterrupted = true
-        case .interruptionEnded: isInterrupted = false
+        // iOS does not guarantee the end of an interruption: a media services reset also closes it.
+        case .interruptionEnded, .mediaServicesReset: isInterrupted = false
         default: break
         }
         perform(actions)
@@ -181,7 +175,7 @@ public final class AudioEngineHost: AudioOutputHosting {
                 if status.isRunning, let info = output.currentInfo() { status = .running(info) }
             case let .notify(value):
                 noticeCount += 1
-                notice = PostedNotice(id: noticeCount, notice: value)
+                notice = PostedAudioNotice(id: noticeCount, notice: value)
             }
         }
         isRenderingAudio = isOutputRunning || fallbackClock.isRunning

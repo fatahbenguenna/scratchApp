@@ -75,6 +75,8 @@ public final class AppModel {
     @ObservationIgnored private var hasLaunched = false
     /// iOS : app passée en arrière-plan, hôte suspendu (6.2).
     @ObservationIgnored var isInBackground = false
+    /// Dernier avis de l'hôte audio affiché en bandeau (2.3 CA 8).
+    @ObservationIgnored var shownHostNoticeID: Int?
     @ObservationIgnored private var demoClipTask: Task<AudioClip, Never>?
 
     /// Durées du moteur et rattrapage de la feutrine affichés par l'écran Réglages (3.4) : valeur
