@@ -1177,6 +1177,8 @@ Dans la confirmation de remplacement, « nouveau » est le nom de l'entrée de b
 | Sortie indisponible | SF-82 | Sortie audio indisponible. ScratchApp réessaiera automatiquement. |
 | Sortie retrouvée | SF-82 | Sortie audio disponible : Haut-parleur. |
 | Copies disparues au lancement | RM-48, D-11 | « boucle.wav » a été retiré de la bibliothèque : sa copie a été supprimée ou modifiée en dehors de ScratchApp. (Pour plusieurs sons : « 3 sons ont été retirés de la bibliothèque : leurs copies ont été supprimées ou modifiées en dehors de ScratchApp. ») |
+| Index illisible, au lancement | NFR12, D-49 | La bibliothèque était illisible : elle a été réinitialisée. Importez de nouveau vos sons. |
+| Index partiellement illisible, au lancement | NFR12, D-49 | Une partie de la bibliothèque était illisible : les sons concernés en ont été retirés. Importez-les de nouveau si besoin. |
 
 ### 8.6 Annonces VoiceOver
 
