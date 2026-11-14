@@ -14,6 +14,7 @@ final class FakeEngineTests: XCTestCase {
 
     private struct EmptyLibrary: LibraryStoring {
         var entries: [LibraryEntry] { get async { [] } }
+        func reconcile() async -> [LibraryEntry] { [] }
         func importFile(at url: URL) async throws -> ImportResult { throw LibraryError.unsupportedFormat }
         func delete(id: UUID) async throws { throw LibraryError.notFound }
         func url(for id: UUID) async throws -> URL { throw LibraryError.notFound }
