@@ -4,6 +4,8 @@ story_title: "Forme d'onde et needle drop"
 pr: 95
 issue: 38
 reviewed_sha: "833fa3c"
+rebased_sha: "5c2344e"
+rebase_check: "git range-diff : 833fa3c, fdf6361, 1eac185 = 2ff1405, 256d451, bca3a74 ; CI ✅ ; 241/241 sur la fusion avec main (5e54089)"
 addendum:
   - sha: "1eac185"
     gate: PASS
@@ -60,7 +62,7 @@ evidence:
   analysis_probe: "WaveformAnalyzer en repli scalaire, release, Linux : 10 min à 48 kHz en 0,063 s, 1 439 992 octets"
 recommendations:
   immediate:
-    - action: "Après la fusion de #87 : git rebase --onto origin/main d65a56f, puis fusionner."
+    - action: "Rebase fait (5c2344e, identique) : fusionner."
   future:
     - action: "#102 : réinitialiser le geste à l'annulation système ; mesurer NFR4 dans l'étape release."
     - action: "Recette (#44) : 120 i/s sans image perdue pendant un scratch, needle drop au doigt, VoiceOver sur l'aperçu."
