@@ -10,13 +10,16 @@ struct CrossfaderCurveControl: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 8) {
+            // Tight row: « Coupure franche » must stay on one line in the 240-pt Mac mixer.
+            HStack(spacing: 6) {
                 Text(verbatim: "Courbe").font(Theme.sectionLabel).foregroundStyle(Theme.textSecondary)
                 if showsGraph {
                     CurveGraph(curve: mixer.crossfaderCurve, hamster: mixer.hamster).equatable()
                 }
-                Spacer(minLength: 4)
+                Spacer(minLength: 0)
                 Text(verbatim: mixer.curveText).font(Theme.valueReadout).foregroundStyle(Theme.textPrimary)
+                    .lineLimit(1)
+                    .fixedSize()
             }
             HStack(spacing: 6) {
                 Text(verbatim: "Douce").font(Theme.caption).foregroundStyle(Theme.textSecondary)
