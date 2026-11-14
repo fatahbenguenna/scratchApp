@@ -1,7 +1,7 @@
 import Atomics
 
 /// File sans verrou à **un seul producteur et un seul consommateur** (SPSC), de capacité fixe
-/// (architecture §4, ADR-03).
+/// (architecture §3, ADR-03).
 ///
 /// - Capacité arrondie à la puissance de 2 supérieure (minimum 2). La mémoire est allouée à la
 ///   création : `push` et `pop` n'allouent jamais et ne prennent aucun verrou.

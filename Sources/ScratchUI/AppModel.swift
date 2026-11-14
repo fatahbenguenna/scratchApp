@@ -32,7 +32,7 @@ public struct DeletionRequest: Equatable, Identifiable, Sendable {
 }
 
 /// Modèle racine de l'application : compose le moteur, l'hôte audio, la bibliothèque et les
-/// préférences, et expose les modèles de présentation (architecture §3, §5.4).
+/// préférences, et expose les modèles de présentation (architecture §2.3, §5.4).
 ///
 /// Fil principal uniquement. `tick()` est appelé une fois par image d'affichage.
 ///

@@ -1,5 +1,5 @@
 /// Physique d'une platine : moteur, plateau, feutrine, disque tenu, tête de lecture, CUE et repère
-/// (spec 5.1 ; architecture §5.1 et §6). Fil audio uniquement, aucune allocation.
+/// (spec 5.1 ; architecture §6.3). Fil audio uniquement, aucune allocation.
 ///
 /// **Squelette (story EP1, James).** Les réglages et les états discrets sont tenus et bornés, mais
 /// rien ne bouge : `process` renvoie une position constante et une vitesse nulle. À implémenter :

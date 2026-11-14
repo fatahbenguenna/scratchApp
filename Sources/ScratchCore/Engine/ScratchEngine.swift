@@ -1,4 +1,4 @@
-/// Moteur audio de ScratchApp : deux platines et une table de mixage (architecture §4 et §5.1).
+/// Moteur audio de ScratchApp : deux platines et une table de mixage (architecture §3, §5.1 et §6.2).
 ///
 /// Fils d'exécution :
 /// - **fil de contrôle** (fil principal dans l'app) : `send`, `latestSnapshot`, `drainReleasedClips`,
@@ -12,7 +12,7 @@
 /// Version minimale (story 0.2) : les commandes sont appliquées et reflétées dans l'instantané,
 /// le rendu produit du silence. La physique et le DSP arrivent avec les stories de l'épopée EP1.
 public final class ScratchEngine: EngineControlling, @unchecked Sendable {
-    /// Capacité de la file de commandes (≥ 4 s de touches regroupées à 240 Hz sur deux disques).
+    /// Capacité de la file de commandes (plus de 2 s de touches regroupées à 240 Hz sur deux disques).
     public static let commandCapacity = 1024
     /// Capacité de la file de retour des clips.
     public static let releaseCapacity = 64
@@ -97,7 +97,8 @@ public final class ScratchEngine: EngineControlling, @unchecked Sendable {
 
     // MARK: Fil audio
 
-    /// Rend `frameCount` trames stéréo désentrelacées dans `left` et `right` (écrasement).
+    /// Fil audio uniquement. Rend `frameCount` trames stéréo désentrelacées dans `left` et `right`
+    /// (écrasement).
     ///
     /// Ordre : commandes en attente, puis blocs de `maximumBlockFrames` au plus (physique →
     /// lecture → mixage), puis publication d'un instantané. Temps réel : aucune allocation, aucun

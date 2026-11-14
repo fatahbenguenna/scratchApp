@@ -3,7 +3,7 @@ import Observation
 import ScratchCore
 
 /// Hôte AVAudioEngine du moteur de ScratchApp (SF-16, SF-18, SF-78, SF-81, SF-82 ; architecture
-/// §4, §5.3, §7.3).
+/// §3, §5.3, §7.3).
 ///
 /// **Squelette (story EP2, James) : ne démarre aucune sortie (état `.unavailable`).** À implémenter :
 /// - `AVAudioEngine` + `AVAudioSourceNode` au format Float32 stéréo désentrelacé à la fréquence

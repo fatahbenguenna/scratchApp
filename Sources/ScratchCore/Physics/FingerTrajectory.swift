@@ -20,7 +20,7 @@
 ///   mouvement, avec le même retard.
 ///
 /// Latence ajoutée = `delay` : ≈ 13 ms avec un affichage à 120 Hz, ≈ 21 ms à 60 Hz
-/// (architecture §6.4). Aucune allocation ; à n'utiliser que sur le fil audio.
+/// (architecture §6.4). Fil audio uniquement, aucune allocation.
 struct FingerTrajectory {
     struct Configuration: Equatable, Sendable {
         /// Retard du tout premier geste, avant apprentissage.

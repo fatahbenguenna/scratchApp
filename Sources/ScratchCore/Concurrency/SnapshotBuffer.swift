@@ -1,7 +1,7 @@
 import Atomics
 
 /// Triple tampon sans verrou pour publier un état d'**un** fil écrivain vers **un** fil lecteur
-/// (architecture §4, ADR-04).
+/// (architecture §3, ADR-04).
 ///
 /// L'écrivain (fil audio) publie une valeur complète par `write` ; le lecteur (fil principal)
 /// obtient par `read` la dernière valeur publiée, jamais une valeur à moitié écrite. Chaque

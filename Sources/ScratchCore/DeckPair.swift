@@ -1,7 +1,7 @@
 /// Une valeur par platine (A et B), sans allocation.
 ///
 /// Type valeur de taille fixe : utilisable dans l'instantané du moteur (`EngineSnapshot`), qui
-/// ne doit contenir aucun tableau dynamique (règle temps réel, architecture §6).
+/// ne doit contenir aucun tableau dynamique (règle temps réel, architecture §6.1).
 public struct DeckPair<Value> {
     public var a: Value
     public var b: Value
