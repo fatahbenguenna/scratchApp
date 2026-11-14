@@ -1,0 +1,58 @@
+schema: 1
+story: "5.1"
+story_title: "Clavier et menus Mac"
+pr: 80
+issue: 39
+reviewed_sha: "47c9ed5"
+gate: PASS
+status_reason: >-
+  Seul le commit propre à la 5.1 a été relu ; celui de la 4.3 est identique (range-diff). Critères
+  implémentés, logique testée (11 tests) ; CI Linux et macOS verte ; aucun conflit avec main, #77, #78
+  ni #79. D-08 (codes physiques vérifiés, caractère réel affiché), D-09, D-25, D-34 et D-07 (Échap)
+  respectées ; coupures refermées à la perte du focus ; raccourcis inactifs pendant une saisie ; pas
+  de double déclenchement par construction (moniteur local avant les menus), à vérifier en 6.2, qui
+  doit partager le contrôleur (note sur #43).
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues: []
+checks:
+  - item: "D-08"
+    result: "Carte unique par code de touche kVK_ANSI (vérifiés) ; caractère réel de la disposition active (UCKeyTranslate) dans l'aide et les menus."
+  - item: "D-09"
+    result: "⇧←, ⇧↓ et ⇧→ → positions physiques 0, 0,5 et 1 ; le hamster est appliqué par le moteur."
+  - item: "D-25"
+    result: "Répétition pour le pitch et ←/→ ; consommée sans effet ailleurs."
+  - item: "D-34"
+    result: "ScratchCommands (Fichier, Platine, Table, Aide) ; Nouvelle fenêtre retirée ; F et J seulement dans l'aide ; éléments à touche simple désactivés hors contexte ; à attacher en 6.2."
+  - item: "D-07"
+    result: "Échap retire le focus ; flèches vers la commande qui a le focus reportées en 5.3 (CA4)."
+  - item: "Coupures F et J"
+    result: "Ouvertes à l'appui, refermées au relâchement et à la perte du focus (didResignKey, willBeginSheet, didResignActive) ; jamais rouvertes par répétition."
+  - item: "Saisie de texte"
+    result: "Contexte inactif si le premier répondeur est un NSText, ou en présence d'une feuille ou d'une fenêtre modale, ou si la fenêtre principale n'est pas clé ; frappe non consommée."
+  - item: "Double déclenchement"
+    result: "Le moniteur local consomme la frappe avant les équivalents de menu ; vérification de bout en bout en 6.2."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Sans objet."
+  performance:
+    status: PASS
+    notes: "Traitement constant par frappe."
+  reliability:
+    status: PASS
+    notes: "Coupures toujours refermées ; raccourcis neutralisés pendant une saisie et dans les dialogues."
+  maintainability:
+    status: PASS
+    notes: "Carte unique ; répartiteur pur ; routage unique."
+evidence:
+  ci: "Rapport CI 4cbefdc (fusion dans 1b27355) : Linux ✅, macOS ✅"
+  linux_tests: "scripts/linux-test.sh : 212/212 (cœur inchangé)"
+  merge_check: "git merge-tree avec main, story/4.3-disc-input, story/3.5-library-screen, story/1.5-scratch-engine : sans conflit"
+recommendations:
+  immediate:
+    - action: "Fusionner après #77, puis rebaser."
+  future:
+    - action: "6.2 : un seul KeyboardController partagé par RootView et ScratchCommands ; scène KeyboardHelpWindow ; vérifier l'absence de double déclenchement (note sur #43)."
+    - action: "5.3 : flèches vers la commande réglable qui a le focus (D-07)."
+    - action: "Recette : clavier AZERTY réel ; F et J pendant un scratch à la souris."

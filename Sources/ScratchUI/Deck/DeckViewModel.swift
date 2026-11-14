@@ -72,9 +72,15 @@ public final class DeckViewModel {
     /// Horloge monotone des confirmations (injectée par les tests).
     @ObservationIgnored var clock: () -> Double = { ProcessInfo.processInfo.systemUptime }
 
+    /// Saisie du disque (doigt, souris, trackpad) partagée par les surfaces de la story 4.3 ;
+    /// `cancelAll` relâche le disque (rotation, changement de disposition, sélecteur de platine).
+    public let discInput: DiscInputCoordinator
+
     public init(deck: DeckID, engine: any EngineControlling) {
         self.deck = deck
         self.engine = engine
+        discInput = DiscInputCoordinator(deck: deck)
+        discInput.model = self
     }
 
     // MARK: Textes et états affichés (story 4.1)

@@ -45,9 +45,11 @@ struct ScratchAppMain: App {
         let engine = ScratchEngine()
         let host = AudioEngineHost(engine: engine)
         let decoder = AudioFileDecoder()
-        let library = LibraryStore(locations: libraryLocations(), decoder: decoder)
+        let locations = libraryLocations()
+        let library = LibraryStore(locations: locations, decoder: decoder)
         return AppModel(engine: engine, host: host, library: library, preferences: UserDefaultsPreferencesStore(),
-                        decoder: decoder, indexRecovery: { await library.indexRecovery })
+                        decoder: decoder, indexRecovery: { await library.indexRecovery },
+                        libraryFolder: locations.soundBankDirectory)
     }
 
     /// Emplacements standard ; en cas d'échec du système, un dossier temporaire garde l'app utilisable

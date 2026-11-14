@@ -61,6 +61,9 @@ struct DeckRenderer {
     /// Un fondu enchaîné est en cours (diagnostic, tests).
     var isCrossfading: Bool { crossfadeRemaining > 0 }
 
+    /// La voix produit du son (gain de mouvement non nul ou fondu de saut en cours).
+    var isAudible: Bool { motionGain > 0 || crossfadeRemaining > 0 }
+
     mutating func setOutputSampleRate(_ rate: Double) {
         guard rate.isFinite, rate > 0 else { return }
         outputSampleRate = rate
@@ -85,8 +88,24 @@ struct DeckRenderer {
 
     /// Fil audio uniquement. Écrit `frameCount` trames stéréo dans `left`/`right` (écrasement, pas
     /// d'accumulation) à partir des positions (s) et des vitesses de lecture signées de `DeckPhysics`.
+    ///
+    /// Variante de commodité (tests, outils) : le moteur passe une `ClipView`, sans toucher à l'objet.
     mutating func render(
         clip: AudioClip?,
+        positions: UnsafePointer<Double>,
+        rates: UnsafePointer<Double>,
+        frameCount: Int,
+        left: UnsafeMutablePointer<Float>,
+        right: UnsafeMutablePointer<Float>
+    ) {
+        render(clip: clip.map(ClipView.init), positions: positions, rates: rates, frameCount: frameCount,
+               left: left, right: right)
+    }
+
+    /// Fil audio uniquement. Comme ci-dessus, à partir d'une vue du clip (aucun comptage de
+    /// références sur le fil audio).
+    mutating func render(
+        clip: ClipView?,
         positions: UnsafePointer<Double>,
         rates: UnsafePointer<Double>,
         frameCount: Int,
@@ -137,7 +156,7 @@ struct DeckRenderer {
 
     /// Lecture à la position `position` (s) : interpolation ou filtre selon `ratio`, fondus de bord.
     @inline(__always)
-    private func read(_ clip: AudioClip, at position: Double, ratio: Double,
+    private func read(_ clip: ClipView, at position: Double, ratio: Double,
                       duration: Double) -> (left: Float, right: Float) {
         guard position.isFinite, position > 0, position < duration else { return (0, 0) }
         let edge = Self.raisedCosine(position / Self.startFadeSeconds)

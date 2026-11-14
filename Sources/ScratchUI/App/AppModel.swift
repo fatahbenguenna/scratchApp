@@ -1,5 +1,8 @@
 import Foundation
 import Observation
+#if os(macOS)
+import AppKit
+#endif
 import ScratchAudio
 import ScratchCore
 import ScratchLibrary
@@ -53,21 +56,31 @@ public final class AppModel {
     public private(set) var alerts: [AppAlert] = []
     /// Confirmations de remplacement en attente ; la première est affichée (`confirmation`).
     public private(set) var confirmations: [ReplacementConfirmation] = []
+    /// Feuille Bibliothèque présentée (3.5 ; ⌘L, bouton « Bibliothèque »).
+    public var isLibraryPresented = false
+    /// Confirmation de suppression affichée (3.5, UX §8.4).
+    public private(set) var deletionConfirmation: DeletionConfirmation?
+    /// Dossier `Documents/Banque de sons`, ouvert par « Afficher la bibliothèque dans le Finder ».
+    public let libraryFolder: URL?
 
     private let indexRecovery: @Sendable () async -> LibraryIndexRecovery
     @ObservationIgnored private var hasLaunched = false
     @ObservationIgnored private var demoClipTask: Task<AudioClip, Never>?
 
-    /// - Parameter indexRecovery: issue de la lecture de l'index au lancement (D-49).
-    ///   `ScratchAppMain` la lit sur `LibraryStore` ; les doubles de test la fournissent directement.
+    /// - Parameters:
+    ///   - indexRecovery: issue de la lecture de l'index au lancement (D-49). `ScratchAppMain` la lit
+    ///     sur `LibraryStore` ; les doubles de test la fournissent directement.
+    ///   - libraryFolder: dossier des copies, ouvert dans le Finder (3.5, Mac).
     public init(
         engine: any EngineControlling,
         host: (any AudioOutputHosting)?,
         library: any LibraryStoring,
         preferences: any PreferencesStoring,
         decoder: any AudioDecoding,
-        indexRecovery: @escaping @Sendable () async -> LibraryIndexRecovery = { .none }
+        indexRecovery: @escaping @Sendable () async -> LibraryIndexRecovery = { .none },
+        libraryFolder: URL? = nil
     ) {
+        self.libraryFolder = libraryFolder
         self.engine = engine
         self.host = host
         self.library = library
@@ -191,6 +204,14 @@ public final class AppModel {
         await requestLoad(entry, on: deck, reason: entry.origin == .demo ? .demo : .library)
     }
 
+    /// « Charger sur A » ou « Charger sur B » depuis l'écran Bibliothèque (3.5) : mêmes règles que
+    /// `load(_:on:)`. La feuille se ferme une fois le son chargé ; elle reste ouverte après un refus
+    /// de remplacement ou une erreur.
+    public func loadFromLibrary(_ entry: LibraryEntry, on deck: DeckID) async {
+        guard self.deck(deck).activity == .idle else { return }
+        await requestLoad(entry, on: deck, reason: entry.origin == .demo ? .demo : .library, closesLibrary: true)
+    }
+
     /// « Charger la démo » (SF-76) : son de démonstration chargé sans lecture, selon les mêmes règles.
     public func loadDemoAndWait(on deck: DeckID) async {
         await load(LibraryEntry.demo(title: DemoSound.title, duration: DemoSound.duration), on: deck)
@@ -216,7 +237,10 @@ public final class AppModel {
         guard let confirmation = confirmations.first else { return nil }
         confirmations.removeFirst()
         if replace {
-            return Task { await self.performLoad(confirmation.entry, on: confirmation.deck, reason: confirmation.reason) }
+            return Task {
+                await self.performLoad(confirmation.entry, on: confirmation.deck, reason: confirmation.reason,
+                                       closesLibrary: confirmation.closesLibrary)
+            }
         }
         if confirmation.reason == .imported {
             toasts.show(BannerText.addedWithoutReplacing(confirmation.entry.title))
@@ -233,17 +257,19 @@ public final class AppModel {
     /// active (moteur en marche, disque en mouvement ou tenu) demande une confirmation. Une platine
     /// chargée à l'arrêt, ou vide même si son plateau tourne, est remplacée directement (D-40) ; le
     /// chargement arrête alors le moteur (SF-03).
-    private func requestLoad(_ entry: LibraryEntry, on deck: DeckID, reason: LoadReason) async {
+    private func requestLoad(_ entry: LibraryEntry, on deck: DeckID, reason: LoadReason,
+                             closesLibrary: Bool = false) async {
         let snapshot = engine.latestSnapshot()[deck]
         if snapshot.isLoaded, snapshot.isActive {
             confirmations.append(ReplacementConfirmation(deck: deck, currentTitle: self.deck(deck).title,
-                                                         entry: entry, reason: reason))
+                                                         entry: entry, reason: reason, closesLibrary: closesLibrary))
             return
         }
-        await performLoad(entry, on: deck, reason: reason)
+        await performLoad(entry, on: deck, reason: reason, closesLibrary: closesLibrary)
     }
 
-    private func performLoad(_ entry: LibraryEntry, on deck: DeckID, reason: LoadReason) async {
+    private func performLoad(_ entry: LibraryEntry, on deck: DeckID, reason: LoadReason,
+                             closesLibrary: Bool = false) async {
         let model = self.deck(deck)
         model.activity = .loading
         let clip: AudioClip
@@ -266,6 +292,48 @@ public final class AppModel {
         model.loadedClip = clip
         model.loadedEntry = entry
         if reason == .duplicate { toasts.show(BannerText.duplicate(entry.title)) }
+        if closesLibrary { isLibraryPresented = false }
+    }
+
+    // MARK: - Bibliothèque (3.5)
+
+    /// Ferme la feuille Bibliothèque (« OK », Échap).
+    public func closeLibrary() {
+        isLibraryPresented = false
+    }
+
+    /// Demande la suppression de `entry`. La confirmation nomme les platines qui portent le son ;
+    /// la démo n'est jamais supprimable (SF-74).
+    public func requestDelete(_ entry: LibraryEntry) {
+        guard entry.isDeletable else { return }
+        deletionConfirmation = DeletionConfirmation(entry: entry, decks: decks(carrying: entry.id))
+    }
+
+    /// Réponse à la confirmation de suppression (RM-49). Les platines qui portent le son sont
+    /// arrêtées et vidées, puis la copie est supprimée ; l'original n'est jamais touché. La
+    /// suppression est rendue sous forme de tâche (attendue par les tests).
+    @discardableResult
+    public func resolveDeletion(confirm: Bool) -> Task<Void, Never>? {
+        guard let confirmation = deletionConfirmation else { return nil }
+        deletionConfirmation = nil
+        guard confirm else { return nil }
+        let entry = confirmation.entry
+        for deck in decks(carrying: entry.id) {
+            engine.send(.motor(deck, on: false))
+            unload(deck)
+        }
+        return Task { await self.deleteCopy(of: entry) }
+    }
+
+    private func deleteCopy(of entry: LibraryEntry) async {
+        do {
+            try await library.delete(id: entry.id)
+        } catch LibraryError.notFound {
+            // Already gone (reconciled elsewhere): nothing left to delete.
+        } catch {
+            alerts.append(.deletionFailed(name: entry.title))
+        }
+        await refreshLibrary()
     }
 
     /// Copie vérifiée (`url(for:)`), puis décodage hors du fil principal.
@@ -326,12 +394,21 @@ extension AppModel: DeckIntents {
         Task { await self.importDroppedFileAndWait(url, on: deck) }
     }
 
-    /// Écran Bibliothèque : story 3.5.
-    public func openLibrary() {}
+    /// Ouvre la feuille Bibliothèque, liste à jour (3.5 ; ⌘L, bouton « Bibliothèque »).
+    public func openLibrary() {
+        isLibraryPresented = true
+        Task { await self.refreshLibrary() }
+    }
 
     /// Réglages : story 3.4.
     public func openSettings() {}
 
-    /// Dossier de la bibliothèque dans le Finder : story 3.5.
-    public func revealLibraryInFinder() {}
+    /// Mac : ouvre `Documents/Banque de sons` dans le Finder (menu Fichier ; 3.5). Sans effet sur iOS.
+    public func revealLibraryInFinder() {
+        #if os(macOS)
+        guard let libraryFolder else { return }
+        try? FileManager.default.createDirectory(at: libraryFolder, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(libraryFolder)
+        #endif
+    }
 }

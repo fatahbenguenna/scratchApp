@@ -192,4 +192,74 @@ final class FingerTrajectoryTests: XCTestCase {
         for _ in 0..<Int(0.1 * sampleRate) { last = trajectory.nextTarget() }
         XCTAssertEqual(last, 1, accuracy: 1e-12)
     }
+
+    // MARK: Reprise pendant le rejeu du relâchement (story 1.2, relue en 1.5)
+
+    /// Rejoue `trajectory` échantillon par échantillon pendant `seconds` ; renvoie les cibles.
+    private func step(_ trajectory: inout FingerTrajectory, seconds: Double) -> [Double] {
+        trajectory.prepareBlock()
+        return (0..<Int(seconds * sampleRate)).map { _ in trajectory.nextTarget() }
+    }
+
+    /// Reprise avant la fin du rejeu du relâchement : le geste continue depuis le point de
+    /// relâchement, sans saut (la plus grande marche est celle du geste), le disque reste tenu et la
+    /// cible finale est exacte (point de relâchement + déplacement du nouveau doigt).
+    func testResumeDuringReleaseContinuesFromReleasePoint() {
+        var trajectory = FingerTrajectory(sampleRate: sampleRate)
+        let speed = 2.0 // rad/s
+        trajectory.begin(angle: 1, time: 10)
+        for k in 1...12 { trajectory.append(angle: 1 + speed * Double(k) / 120, time: 10 + Double(k) / 120) }
+        trajectory.end(time: 10.1)
+        var targets = step(&trajectory, seconds: 0.05) // the release (at 10.1 + delay) is still pending
+        XCTAssertTrue(trajectory.isReleasing)
+        // A new finger lands elsewhere (angle 7) 5 ms after the release and moves on.
+        trajectory.begin(angle: 7, time: 10.105)
+        XCTAssertFalse(trajectory.isReleasing, "the gesture is resumed")
+        for k in 1...12 { trajectory.append(angle: 7 + speed * Double(k) / 120, time: 10.105 + Double(k) / 120) }
+        targets += step(&trajectory, seconds: 0.3)
+        XCTAssertTrue(trajectory.isActive, "held between the two contacts")
+        let releasePoint = 1 + speed * 0.1
+        XCTAssertEqual(targets.last ?? 0, releasePoint + speed * 0.1, accuracy: 1e-9, "continues from the release point")
+        let steps = zip(targets.dropFirst(), targets).map { abs($0 - $1) }
+        XCTAssertLessThanOrEqual(steps.max() ?? 1, speed / sampleRate * 1.000_001, "no jump at the resume")
+    }
+
+    /// Reprises enchaînées : trois contacts successifs, chacun repris pendant le relâchement du
+    /// précédent ; les déplacements s'additionnent exactement.
+    func testChainedResumesAccumulateExactly() {
+        var trajectory = FingerTrajectory(sampleRate: sampleRate)
+        var time = 20.0
+        var expected = 0.0
+        trajectory.begin(angle: 0, time: time)
+        for contact in 0..<3 {
+            let origin = Double(contact * 10) // each finger lands at an unrelated angle
+            if contact > 0 { trajectory.begin(angle: origin, time: time) }
+            for k in 1...6 { trajectory.append(angle: origin + 0.05 * Double(k), time: time + Double(k) / 120) }
+            expected += 0.3
+            time += 0.05
+            trajectory.end(time: time)
+            _ = step(&trajectory, seconds: 0.03) // shorter than the replay delay: still releasing
+            XCTAssertTrue(trajectory.isActive)
+            time += 0.003
+        }
+        let targets = step(&trajectory, seconds: 0.3)
+        XCTAssertFalse(trajectory.isActive, "the last release is played out")
+        XCTAssertEqual(targets.last ?? 0, expected, accuracy: 1e-9)
+    }
+
+    /// Reprise datée avant le dernier point connu (horloges de contact décalées) : aucun point n'est
+    /// ajouté dans le passé, le décalage relie quand même le nouveau doigt au point de relâchement.
+    func testResumeDatedBeforeTheLastPoint() {
+        var trajectory = FingerTrajectory(sampleRate: sampleRate)
+        trajectory.begin(angle: 0, time: 30)
+        for k in 1...6 { trajectory.append(angle: 0.1 * Double(k), time: 30 + Double(k) / 120) }
+        trajectory.end(time: 30.05)
+        _ = step(&trajectory, seconds: 0.01)
+        trajectory.begin(angle: 4, time: 30.02) // earlier than the release point (30.05)
+        trajectory.append(angle: 4.2, time: 30.04) // still before: ignored
+        trajectory.append(angle: 4.3, time: 30.1)
+        let targets = step(&trajectory, seconds: 0.3)
+        XCTAssertEqual(targets.last ?? 0, 0.6 + 0.3, accuracy: 1e-9)
+        XCTAssertTrue(zip(targets.dropFirst(), targets).allSatisfy { $0 >= $1 - 1e-12 }, "no backward jump")
+    }
 }
