@@ -12,7 +12,7 @@ import XCTest
 final class HostNoticeBannerTests: XCTestCase {
     @MainActor
     @Observable
-    private final class NoticeHost: AudioOutputHosting, AudioNoticePosting {
+    final class NoticeHost: AudioOutputHosting, AudioNoticePosting {
         private(set) var status: AudioOutputStatus = .stopped
         private(set) var isRenderingAudio = false
         private(set) var notice: PostedAudioNotice?
