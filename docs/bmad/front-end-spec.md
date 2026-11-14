@@ -3,11 +3,11 @@
 | | |
 |---|---|
 | **Document** | `docs/bmad/front-end-spec.md` (« UI/UX Specification » BMAD) |
-| **Version** | 1.0 |
+| **Version** | 1.1 |
 | **Date** | 14 novembre 2026 |
 | **Auteur** | 🎨 Sally, UX Expert BMAD |
-| **Statut** | Proposition, à valider par 📝 Sarah (PO) |
-| **Référence** | [`scratchapp_specifications_v2_0.md`](../specs/scratchapp_specifications_v2_0.md), section 3 (fait foi) et [`REVUE_v1.9_vers_v2.0.md`](../specs/REVUE_v1.9_vers_v2.0.md) ; artefacts fusionnés : [brief](project-brief.md) (IC-05, IC-07, IC-08, IC-09) et [PRD](prd.md) (point A10, stories EP4 et EP5) |
+| **Statut** | Validée par 📝 Sarah (PO) le 14 novembre 2026 : questions de la section 14 tranchées dans [`po-validation.md`](po-validation.md) |
+| **Référence** | [`scratchapp_specifications_v2_1.md`](../specs/scratchapp_specifications_v2_1.md), section 3 (fait foi ; la v2.0 est archivée) et [`REVUE_v1.9_vers_v2.0.md`](../specs/REVUE_v1.9_vers_v2.0.md) ; artefacts fusionnés : [brief](project-brief.md) (IC-05, IC-07, IC-08, IC-09) et [PRD](prd.md) (point A10, stories EP4 et EP5) |
 | **Destinataires** | 💻 Léa (EP4 Interface, EP5 Commandes Mac et accessibilité), 🏗️ Winston (instantané moteur), 💻 Hugo (import, bibliothèque), 🧪 Quinn (recette), 🏃 Bob (stories) |
 
 ## Journal des modifications
@@ -15,6 +15,7 @@
 | Date | Version | Description | Auteur |
 |---|---|---|---|
 | 2026-11-14 | 1.0 | Première version : principes, architecture de l'information, parcours, dispositions iPhone/iPad/Mac, composants, gestes, états, textes, style, animation, accessibilité, questions pour le PO ; réponses aux points délégués par le brief (IC-05, IC-07, IC-08, IC-09) et le PRD (A10). | Sally |
+| 2026-11-14 | 1.1 | Validation PO : propositions de la section 14 retenues ; corrections ciblées de 5.10 (titre, D-12), 5.19 (durée de la démo, D-20), 7.3 (sortie indisponible, D-35 ; changement de périphérique, D-04), 8.3 et 8.5 (réconciliation de la bibliothèque, D-11) ; références vers la spec v2.1. | Sarah (PO) |
 
 ## Sommaire
 
@@ -35,12 +36,12 @@
 
 ### Conventions de lecture
 
-- **Cadre.** Ce document précise la section 3 de la spec v2.0 (PO-10 délégué à la spécification UX). Il n'ajoute **aucune fonctionnalité**. Les choix qui interprètent la spec sont marqués **[Choix UX]** et repris, avec ceux qui demandent un arbitrage, en [section 14](#14-questions-pour-le-po).
+- **Cadre.** Ce document précise la section 3 de la spec v2.1 (PO-10 délégué à la spécification UX). Il n'ajoute **aucune fonctionnalité**. Les choix qui interprètent la spec sont marqués **[Choix UX]** et repris, avec ceux qui demandent un arbitrage, en [section 14](#14-questions-pour-le-po).
 - **Unités.** Toutes les dimensions sont en **points** (pt). « ≥ 44 » désigne la zone tactile minimale, qui peut déborder du visuel.
 - **Notations du disque.** **P** = diamètre du plateau (cadre carré du composant disque) ; **D** = diamètre du vinyle = 0,92 × P ; **R** = D / 2 (rayon du disque au sens de RM-61).
 - **Exigences.** « doit » = obligatoire pour la recette ; « devrait » = recommandé, écart possible avec justification dans la PR.
-- **Renvois.** « spec 3.5 » ou « spec 6.14 » désigne une section ou un scénario Gherkin de la spec v2.0 ; un numéro seul (« 5.12 », « 6.4 ») désigne une section de ce document ; « Qn » renvoie à la [section 14](#14-questions-pour-le-po).
-- **Identifiants.** Les identifiants SF, RM, PO et E sont ceux de la spec v2.0. Les noms de composants Swift sont en anglais, les libellés en français.
+- **Renvois.** « spec 3.5 » ou « spec 6.14 » désigne une section ou un scénario Gherkin de la spec v2.1 ; un numéro seul (« 5.12 », « 6.4 ») désigne une section de ce document ; « Qn » renvoie à la [section 14](#14-questions-pour-le-po).
+- **Identifiants.** Les identifiants SF, RM, PO et E sont ceux de la spec (inchangés en v2.1). Les noms de composants Swift sont en anglais, les libellés en français.
 - **Hors V1.** Aucune commande P2 (REVERSE, crépitement, REC, banque de sons complète, pointeurs, retour haptique, MIDI) n'apparaît dans l'interface V1, même désactivée.
 
 ---
@@ -817,7 +818,7 @@ Split View, Slide Over et Stage Manager suivent la règle de 4.1 : en dessous de
 - **Rôle.** Identifier la platine et le son ; titre, durée, position mm:ss,d (spec 3.1, SF-03).
 - **Anatomie.** Ligne 1 : pastille de lettre 24 × 24 (fond couleur de la platine, lettre `text.onAccent` 15 gras) ; titre (`deck.title`, une ligne, troncature au milieu pour garder l'extension) ; bouton « Importer » (icône `square.and.arrow.down`, texte affiché si la largeur de colonne ≥ 320). Ligne 2 : position (`time.position`, ex. « 00:12,3 »), « / » et durée (`time.duration`, ex. « 03:45,0 ») ; pastilles d'état.
 - **Hauteurs.** 44 (iPhone portrait), 28 sur une ligne (iPhone paysage, sans durée), 52 (iPad, Mac).
-- **Titre.** Nom de l'entrée de bibliothèque, c'est-à-dire le nom de fichier d'origine, extension comprise (SF-60) ; pour la démo, « Son de démonstration » [Choix UX, Q25].
+- **Titre.** Nom de l'entrée de bibliothèque, c'est-à-dire le nom de sa copie locale : nom de fichier d'origine, extension comprise, avec le suffixe `_2`, `_3`… en cas de collision (SF-02, SF-60, D-12) ; pour la démo, « Son de démonstration » [Choix UX, Q25].
 - **Position.** Intervalle [−2 s ; durée] : « −00:01,2 » dans l'amorce (signe moins U+2212), « 03:45,0 » en fin de son. Mise à jour à chaque image, le texte ne change que lorsque le dixième change.
 - **Pastilles d'état.** `Fin du son` (sillon fermé, `text.secondary` sur `bg.raised`) ; `Import de « nom »…` avec indicateur d'activité ; `Chargement…`.
 - **Vide.** Titre « Aucun son » (`text.secondary`), position « --:--,- ».
@@ -908,7 +909,7 @@ Split View, Slide Over et Stage Manager suivent la règle de 4.1 : en dessous de
 - **Ligne** (hauteur ≥ 60, s'agrandit avec la taille du texte) :
   - icône 28 (`waveform`, ou `sparkles` pour la démo) ;
   - nom (`body`, deux lignes au plus, troncature au milieu) ;
-  - sous-titre (`footnote`, `text.secondary`) : « 3:45 · 14 nov. 2026 · Import » ; pour la démo « 0:30 · Intégré » ;
+  - sous-titre (`footnote`, `text.secondary`) : « 3:45 · 14 nov. 2026 · Import » ; pour la démo « 8,0 s · Intégré » (D-20) ;
   - pastilles « Sur A » / « Sur B » (couleurs des platines) si le son est chargé ;
   - boutons **« A »** et **« B »** (44 × 44, contour couleur de la platine) sur iPhone ; **« Charger sur A »** et **« Charger sur B »** sur iPad et Mac.
 - **Supprimer.** Balayage vers la gauche « Supprimer » (rouge), mode « Modifier », menu contextuel (appui long ou clic secondaire : « Charger sur A », « Charger sur B », « Supprimer… ») ; Mac : touche ⌫ sur la ligne sélectionnée. Jamais pour la démo. Confirmation obligatoire (8.4).
@@ -1097,10 +1098,10 @@ stateDiagram-v2
 
 | État | Déclencheur | Rendu | Retour à la normale |
 |---|---|---|---|
-| **Sortie audio indisponible** (SF-82) | Aucune sortie, ou moteur audio impossible à démarrer | Badge à l'état indisponible (fond `danger.deep`) « Sortie audio indisponible » ; bandeau « Sortie audio indisponible. ScratchApp réessaiera automatiquement. » Import, bibliothèque, réglages et commandes restent utilisables ; les disques peuvent rester immobiles tant que le moteur audio ne tourne pas (Q14) | Dès qu'une sortie apparaît : badge normal, bandeau « Sortie audio disponible : <nom>. » ; aucun moteur ne redémarre seul |
+| **Sortie audio indisponible** (SF-82) | Aucune sortie, ou moteur audio impossible à démarrer | Badge à l'état indisponible (fond `danger.deep`) « Sortie audio indisponible » ; bandeau « Sortie audio indisponible. ScratchApp réessaiera automatiquement. » Import, bibliothèque, réglages et commandes restent utilisables ; l'horloge de secours fait vivre disques, plateaux et VU-mètres, en silence (Q14, D-35) | Dès qu'une sortie apparaît : badge normal, bandeau « Sortie audio disponible : <nom>. » ; aucun moteur ne redémarre seul |
 | **Interruption système** (iOS, SF-18) | Appel, Siri, alarme | Moteurs à STOP sans rampe, témoins éteints ; bandeau « Lecture interrompue par le système. Appuyez sur START pour reprendre. » | START, manuellement (RM-10) |
 | **Sortie retirée** (casque, USB) | Perte de la route | Moteurs à STOP ; badge mis à jour ; bandeau « Sortie audio déconnectée : les platines sont arrêtées. » | START, manuellement |
-| **Changement de périphérique (Mac)** | Choix d'une autre sortie dans Réglages Système | Badge mis à jour ; position conservée (spec 6.5) | — |
+| **Changement de périphérique (Mac)** | Choix d'une autre sortie dans Réglages Système | Badge mis à jour ; position conservée ; moteurs inchangés si l'ancien périphérique reste connecté, à STOP s'il a disparu (spec 6.5, SF-16, D-04) | — |
 | **Arrière-plan (iOS)** | Retour à l'écran d'accueil | Au retour : moteurs à STOP, sons et positions conservés, aucun bandeau | START |
 | **Fenêtre inactive (Mac)** | Autre app au premier plan | La lecture et l'animation continuent ; raccourcis inactifs | — |
 
@@ -1149,7 +1150,7 @@ Toutes les erreurs sont des alertes à un bouton « OK ». Après une erreur, la
 | Corrompu ou vide | spec 6.1 | **Fichier illisible** | « nom » est vide ou endommagé. Aucun son n'a été ajouté à la bibliothèque. |
 | Source illisible (non téléchargé, accès refusé) | SF-02 | **Fichier inaccessible** | « nom » n'a pas pu être lu. S'il est stocké sur iCloud Drive, vérifiez qu'il est téléchargé sur cet appareil, puis réessayez. |
 | Autre échec de copie | SF-02, RM-48 | **Échec de l'import** | « nom » n'a pas pu être copié dans ScratchApp. Réessayez. |
-| Copie locale absente ou endommagée au chargement | RM-48 | **Son introuvable** | La copie de « nom » dans ScratchApp est introuvable ou endommagée. Supprimez ce son de la bibliothèque, puis importez-le de nouveau. |
+| Copie locale absente ou endommagée au chargement | RM-48, D-11 | **Son introuvable** | La copie de « nom » a été supprimée ou modifiée en dehors de ScratchApp. Ce son a été retiré de la bibliothèque ; importez-le de nouveau. |
 | Échec de suppression | RM-48 | **Suppression impossible** | « nom » n'a pas pu être supprimé. Réessayez. |
 
 Le titre « Espace de stockage insuffisant » est le texte exact du scénario spec 6.1 « Échec de copie faute d'espace ». Dans les messages, « cet iPhone » devient « cet iPad » ou « ce Mac » selon l'appareil.
@@ -1175,6 +1176,7 @@ Dans la confirmation de remplacement, « nouveau » est le nom de l'entrée de b
 | Sortie retirée | spec 6.5 | Sortie audio déconnectée : les platines sont arrêtées. |
 | Sortie indisponible | SF-82 | Sortie audio indisponible. ScratchApp réessaiera automatiquement. |
 | Sortie retrouvée | SF-82 | Sortie audio disponible : Haut-parleur. |
+| Copies disparues au lancement | RM-48, D-11 | « boucle.wav » a été retiré de la bibliothèque : sa copie a été supprimée ou modifiée en dehors de ScratchApp. (Pour plusieurs sons : « 3 sons ont été retirés de la bibliothèque : leurs copies ont été supprimées ou modifiées en dehors de ScratchApp. ») |
 
 ### 8.6 Annonces VoiceOver
 
@@ -1433,7 +1435,7 @@ Le trait d'interaction directe permet de scratcher au doigt sans désactiver Voi
 - [x] Textes d'interface exacts, y compris erreurs et confirmations (8)
 - [x] Jetons de couleur, typographie et iconographie (9)
 - [x] Exigences de performance et d'animation (10)
-- [ ] Questions de la section 14 tranchées par le PO
+- [x] Questions de la section 14 tranchées par le PO ([`po-validation.md`](po-validation.md))
 - [ ] Champs de l'instantané validés par l'architecte
 
 ---
@@ -1441,6 +1443,8 @@ Le trait d'interaction directe permet de scratcher au doigt sans désactiver Voi
 ## 14. Questions pour le PO
 
 Chaque question porte une **proposition** appliquée dans ce document en attendant l'arbitrage.
+
+> **Arbitrage du PO** ([`po-validation.md`](po-validation.md), intégré à la spec v2.1) : toutes les propositions sont retenues, y compris les trois écarts avec le PRD (format `mm:ss,d`, butées physiques, refus du dépôt multiple), sauf celle de Q14 : l'horloge de secours, alternative citée par la question, est retenue, et les disques restent vivants (D-35). Précisions : Q19 est sans objet, la démo générée n'ayant pas de licence (D-20) ; Q25 affiche le nom de la copie, suffixe compris (D-12). Correspondance : Q1, Q2 → D-29 · Q3 → D-30 · Q4 → D-05 · Q5 → D-09 · Q6 → D-08 · Q7 → D-07 · Q8 → D-24 · Q9 → D-31 · Q10 → D-32 · Q11 → D-33 · Q12 → D-34 · Q13 → D-10 · Q14 → D-35 · Q15 → D-26 · Q16 → D-28 · Q17 → D-27 · Q18 → D-36 · Q19 → D-20 · Q20 → D-37 · Q21 → D-15 · Q22 → D-38 · Q23 → D-39 · Q24 → D-40 · Q25 → D-12.
 
 ### Réponses aux points délégués à l'UX
 

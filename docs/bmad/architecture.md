@@ -1,10 +1,10 @@
 # ScratchApp — Architecture technique
 
 - **Artefact BMAD :** Architecture (🏗️ Winston, Architect)
-- **Version :** 1.1 — 14 novembre 2026
-- **Statut :** proposé pour validation PO (Sarah), base des stories 1.1 à 6.3
-- **Références :** [spécifications v2.0](../specs/scratchapp_specifications_v2_0.md) (font foi), [brief](project-brief.md) et [traçabilité](traceability.md) (Mary), [PRD](prd.md) (John), [spécification UX](front-end-spec.md) (Sally), [équipe BMAD](TEAM.md), [`CONTRIBUTING.md`](../../CONTRIBUTING.md)
-- **Arbitrages intégrés :** IC-03 (rattrapage de la feutrine), IC-04 (changements de sortie), IC-06 (coupure momentanée), IC-09 et Q13 (repère), Q14 (horloge de secours), à consigner dans la spec v2.1 par le PO ; points du PRD A1, A2, A3 et A8.
+- **Version :** 1.2 — 14 novembre 2026 (1.1 : version proposée ; 1.2 : corrections de la validation PO)
+- **Statut :** validé par le PO (Sarah, [`po-validation.md`](po-validation.md)), base des stories 1.1 à 6.3
+- **Références :** [spécifications v2.1](../specs/scratchapp_specifications_v2_1.md) (font foi ; la v2.0 est archivée), [brief](project-brief.md) et [traçabilité](traceability.md) (Mary), [PRD](prd.md) (John), [spécification UX](front-end-spec.md) (Sally), [équipe BMAD](TEAM.md), [`CONTRIBUTING.md`](../../CONTRIBUTING.md)
+- **Arbitrages intégrés :** IC-03 (rattrapage de la feutrine), IC-04 (changements de sortie), IC-06 (coupure momentanée), IC-09 et Q13 (repère), Q14 (horloge de secours), consignés dans la spec v2.1 (décisions D-03, D-04, D-06, D-10 et D-35 de [`po-validation.md`](po-validation.md)) ; points du PRD A1, A2, A3 et A8.
 - **Code associé :** contrats et squelettes de la story 0.2 (issue #6), compilables et testés. Les signatures de la section 5 sont celles du code.
 
 ## Sommaire
@@ -719,7 +719,7 @@ Alternatives écartées (prototype numérique dans les mêmes conditions pour le
 | 120 Hz (ProMotion, Mac 120 Hz) | 12,7 à 13,6 ms | 0 |
 | 60 Hz | 20,6 à 20,9 ms | 0 (2 à 3 pendant l'adaptation du premier geste) |
 
-Ce retard s'ajoute au tampon de sortie (5,3 ms) et à la latence tactile du système. La latence geste → son de 20 ms (SF-78, NFR1) est donc hors d'atteinte sur un affichage à 60 Hz et serrée à 120 Hz : voir §14 et le risque R-03. Leviers de calibrage (PO-07) : `targetMargin`, touches prédites (ci-dessus), tampon de sortie de 128 trames si le matériel le permet.
+Ce retard s'ajoute au tampon de sortie (5,3 ms) et à la latence tactile du système. La latence geste → son de 20 ms (SF-78, NFR1) est donc hors d'atteinte sur un affichage à 60 Hz et serrée à 120 Hz : voir §14 et le risque R-03. Le PO a reformulé l'objectif par cadence d'affichage (D-15) : ≤ 20 ms sur écran 120 Hz, ≤ 30 ms sur écran 60 Hz, mesurés de l'horodatage de l'événement à la sortie du son. Leviers de calibrage (PO-07) : `targetMargin`, touches prédites (ci-dessus), tampon de sortie de 128 trames si le matériel le permet.
 
 **Tests** (`Tests/ScratchCoreTests/FingerTrajectoryTests.swift`) : vitesse constante à 120 Hz (±5 %, aucune marche > 1 % de la vitesse par échantillon, retard ≤ 20 ms) ; adaptation à 60 Hz ; huit profils d'appareils sans famine après convergence ; doigt immobilisé → angle final exact et vitesse nulle (RM-12) ; baby scratch à 8 Hz → retour au départ à ±10 ms de son près (6.3) ; relâchement rejoué ; événements non croissants ou non finis ignorés. Le critère spectral de la story 1.3 (énergie > 8 kHz ≤ −50 dBFS sur une sinusoïde scratchée) le complète en bout de chaîne.
 
@@ -727,7 +727,7 @@ Ce retard s'ajoute au tampon de sortie (5,3 ms) et à la latence tactile du syst
 
 - **Voix** : position (s) × `clip.sampleRate` → indice fractionnaire ; interpolation **Hermite cubique** 4 points (SF-77). Le rééchantillonnage vers la sortie est implicite : l'incrément vaut `vitesse × clipRate / outputRate`, d'où l'absence de redécodage au changement de sortie (point A8 du PRD, 6.5, 6.15).
 - **Amorce et sillon fermé** : position < 0 ou ≥ durée → silence, sans lecture hors bornes, y compris pour les points d'interpolation voisins des bornes (RM-09) ; fondu de quelques millisecondes à l'entrée en butée (6.12, aucun clic).
-- **Anti-repliement** : au-delà d'un rapport de décimation effectif `|vitesse| × clipRate / outputRate > 2`, filtrage passe-bas à coupure adaptée et coût borné (SF-77). Seuils de test du PRD (1.3 critères 3 à 5) retenus pour IC-11.
+- **Anti-repliement** : au-delà d'un rapport de décimation effectif `|vitesse| × clipRate / outputRate > 2`, filtrage passe-bas à coupure adaptée et coût borné (SF-77). Seuil de SF-77 (IC-11, D-13) : une sinusoïde de 12 kHz lue à 3× (sortie à 48 kHz) ne produit que des composantes repliées inférieures d'au moins 40 dB au niveau du signal ; seuils d'interpolation et de lissage du PRD (1.3 critères 3 et 5) inchangés.
 - **Sauts** (CUE, needle drop) : fondu enchaîné de 5 ms entre l'ancienne et la nouvelle position (SF-71, 6.6).
 - **Mixage** (IC-06) : `gain voie = fader de voie × (coupure momentanée ouverte ? 1 : gain crossfader de la voie)`, `x` inversé si hamster ; gains lissés à la fréquence audio (≤ 5 ms, RM-52), montée ≤ 1 ms en coupure franche et pour les coupures momentanées, bascule hamster sans clic (SF-67).
 - **Sortie** : somme avec marge, limiteur doux (crête ≤ −0,1 dBFS, 6.8), `limiterReduction` en dB ; gains effectifs ; crêtes de voie (après fader de voie, avant crossfader) et de sortie pour les VU-mètres et l'indicateur SAT.
@@ -800,7 +800,7 @@ L'`AppModel` (6.1) expose une erreur courante, affichée dans une alerte non blo
 
 | Contenu | Emplacement | Format | Écriture | Propriétaire |
 |---|---|---|---|---|
-| Copies des sons | `Documents/Banque de sons/<nom d'origine>` (suffixe `-2`, `-3`… avant l'extension en cas de collision, PRD A3) | octets du fichier source, inchangés | fichier temporaire du même volume → sonde → `moveItem` (atomique) | Hugo |
+| Copies des sons | `Documents/Banque de sons/<nom d'origine>` (suffixe `_2`, `_3`… avant l'extension en cas de collision, PRD A3, D-12) | octets du fichier source, inchangés | fichier temporaire du même volume → sonde → `moveItem` (atomique) | Hugo |
 | Fichiers temporaires d'import | `Application Support/ScratchApp/Imports/<UUID>.<ext>` | idem | supprimés en fin d'import, purgés au lancement | Hugo |
 | Index de bibliothèque | `Application Support/ScratchApp/library.json` | `{"version": 1, "entries": [LibraryEntry]}`, dates ISO 8601 | `Data.write(options: .atomic)` après le déplacement de la copie (RM-48) | Hugo |
 | Préférences | `UserDefaults`, clé `app.scratchapp.preferences.v1` | JSON d'`AppPreferences` (un seul document), décodage tolérant | regroupée (0,5 s après un changement) et au passage en arrière-plan | Hugo |
@@ -811,7 +811,7 @@ Règles :
 
 1. **Import** (SF-02, RM-47, PRD 6.1 critère 2) : accès au fichier source par URL à portée de sécurité (`startAccessingSecurityScopedResource`) le temps de la copie seulement, lecture coordonnée (`NSFileCoordinator`) pour iCloud Drive ; la source n'est jamais modifiée et aucun signet n'est conservé.
 2. **Empreinte et dédoublonnage** (SF-75, RM-58) : SHA-256 portable calculé en flux pendant la copie ; si l'empreinte existe déjà → `.existing(entry)`, copie temporaire supprimée.
-3. **Réconciliation** (RM-48, IC-10) : au chargement de l'index et à chaque `url(for:)`, une entrée dont la copie est absente ou de taille différente de `fileSize` est écartée et signalée (`notFound`) ; un index illisible est mis de côté (`library.json.corrupt`) et la bibliothèque repart vide avec un message ; les fichiers de « Banque de sons » absents de l'index sont ignorés en V1.
+3. **Réconciliation** (RM-48, IC-10, D-11) : au lancement et avant chaque chargement (`url(for:)`), toute entrée dont la copie est absente ou de taille différente de `fileSize` est retirée de l'index ; l'entrée demandée lève `notFound` et les entrées retirées sont rendues à l'`AppModel`, qui en informe l'utilisateur (opération à ajouter à `LibraryStoring` en story 3.1, par exemple `reconcile() async -> [LibraryEntry]`) ; un index illisible est mis de côté (`library.json.corrupt`) et la bibliothèque repart vide avec un message ; les fichiers de « Banque de sons » absents de l'index sont ignorés en V1.
 4. **Suppression** (RM-49) : copie locale puis index ; jamais le fichier d'origine. Un son chargé peut être supprimé après confirmation : `unload` sur les platines concernées, puis suppression (3.5).
 5. **Aucun état sonore persisté** : ni sons chargés (PO-12), ni START/STOP, ni positions (SF-17, RM-10).
 6. **Évolution des formats** : champ `version` dans les deux documents ; décodage tolérant (clé absente → valeur par défaut) ; toute rupture fait l'objet d'une migration testée.
@@ -905,7 +905,7 @@ docs/bmad/architecture.md                             🏗️ Winston
 
 ## 11. Standards de code
 
-1. **Langue** : identifiants et commentaires techniques en ligne (`//`) en anglais ; documentation des API (`///`) et libellés d'interface en français, comme le code du sprint 0 (à confirmer, §14.2 C6). Messages de commit en français, au format `type(scope): résumé`.
+1. **Langue** : identifiants et commentaires techniques en ligne (`//`) en anglais ; documentation des API (`///`) et libellés d'interface en français, comme le code du sprint 0 (confirmé par le PO, D-42 ; `CONTRIBUTING.md`). Messages de commit en français, au format `type(scope): résumé`.
 2. **Swift** : Swift 5.10, mode 5, code compatible avec une future migration en mode 6 (`Sendable` déclaré, isolation `@MainActor` explicite, pas d'état global mutable).
 3. **Un type principal par fichier**, nommé comme le fichier. Contrôle d'accès minimal : `public` pour les seuls contrats entre modules, `internal` par défaut, `@testable import` dans les tests.
 4. **Aucun `fatalError`, `try!` ni déballage forcé** dans le code de production, hors constantes vérifiées (UUID littéral) ; `precondition` réservé aux erreurs de programmation détectées à la construction.
@@ -956,7 +956,7 @@ Format court : contexte → décision → conséquences. Une décision remplacé
 |---|---|---|---|---|---|
 | R-01 | Allocation ou verrou caché dans le code Swift du fil audio (métadonnées génériques, existentiels, ARC, exclusivité dynamique) | Craquements sous charge | Moyenne | Règles §6.1, types triviaux vérifiés, `Unmanaged`, échauffement, test de comptage d'allocations (1.5), revue QA, Instruments ; repli : noyau DSP en C si une mesure le justifie | James, Quinn |
 | R-02 | Budget CPU : Hermite + anti-repliement à 16× sur deux platines | Décrochages | Faible | Coût borné par échantillon, mesure NFR3 | James |
-| R-03 | Latence geste → son au-delà de 20 ms (SF-78) : rejeu du doigt (13 à 21 ms) + tampon (5,3 ms) + latence tactile du système | Sensation de retard | **Élevée** à 60 Hz | Mesure sur appareil (PO-07) ; leviers §6.4 (touches prédites, marge, tampon de 128 trames) ; objectif à préciser par cadence d'affichage (§14.2) | PO, James |
+| R-03 | Latence geste → son au-delà de 20 ms (SF-78) : rejeu du doigt (13 à 21 ms) + tampon (5,3 ms) + latence tactile du système | Sensation de retard | **Élevée** à 60 Hz | Mesure sur appareil (PO-07) ; leviers §6.4 (touches prédites, marge, tampon de 128 trames) ; objectif reformulé par cadence d'affichage (D-15 : ≤ 20 ms à 120 Hz, ≤ 30 ms à 60 Hz) | PO, James |
 | R-04 | Mémoire : deux sons de 10 min (≈ 460 Mo) + décodage + forme d'onde, appareils de 3 Go | Arrêt par le système | Moyenne | ADR-05 (48 kHz max), décodage direct dans le clip, pic ≤ 1,5 × (NFR4), PO-16 | James, PO |
 | R-05 | Bluetooth et AirPlay : latence de sortie de 150 à 250 ms | Scratch injouable | Élevée si BT | Latence annoncée publiée (`AudioOutputInfo.outputLatency`) ; avertissement envisagé en V1.1 (UX Q21) | Sally, James |
 | R-06 | Tampon de 256 trames non accordé, fréquence matérielle imposée (44,1 ou 96 kHz) | Latence plus forte | Moyenne | Rééchantillonnage à la volée ; tampon obtenu publié et consigné (SF-78) | James |
@@ -971,6 +971,8 @@ Format court : contexte → décision → conséquences. Une décision remplacé
 | R-15 | Migration Swift 6 (concurrence stricte) | Refactorisation | Moyenne | Annotations `Sendable` et `@MainActor` dès la V1 | Tous |
 
 ## 14. Écarts, contradictions et points à valider
+
+> **Décisions du PO** ([`po-validation.md`](po-validation.md)) : E1 (ADR-05) et E8 (ADR-09) acceptés (D-21, D-22, D-43) ; E14 confirmé (D-10) ; C1 → D-16 ; C2 → D-15 ; C3 → D-40 ; C4 → D-41 ; C5 → D-36 ; C6 → D-42 ; PO-14 clos (D-20 : 8 s). Les autres écarts de 14.1 sont acceptés.
 
 ### 14.1 Écarts par rapport aux recommandations de l'orchestrateur et au PRD
 
@@ -989,7 +991,7 @@ Format court : contexte → décision → conséquences. Une décision remplacé
 | E11 | Dépliage d'angle « côté UI » | `GestureAngleTracker` dans `ScratchCore/Gesture/` (James, 1.2), consommé par Léa (4.3) | PRD 5.4, 1.2 |
 | E12 | `AppModel` avec intentions | Composition et `tick()` seulement | Le protocole d'intentions est défini par Léa en 4.1 (PRD 5.4) |
 | E13 | `suspendForBackground` | `suspend()` / `resume()` | PRD 2.1 critère 8 |
-| E14 | Formule de Q13 : `stickerAngle = discAngle − 2π·(position − cue)/1,8` | `stickerAngle = discAngle − 2π·cue/1,8`, avec `discAngle` recalé sur `2π·position/1,8` (UX §5.1) | Avec la position dans la formule, le repère serait immobile en lecture normale (les deux termes avancent ensemble). La forme retenue donne le comportement demandé par Q13 : repère sous la tête au CUE, cohérent après le sillon fermé, le CUE et le needle drop. **À confirmer.** |
+| E14 | Formule de Q13 : `stickerAngle = discAngle − 2π·(position − cue)/1,8` | `stickerAngle = discAngle − 2π·cue/1,8`, avec `discAngle` recalé sur `2π·position/1,8` (UX §5.1) | Avec la position dans la formule, le repère serait immobile en lecture normale (les deux termes avancent ensemble). La forme retenue donne le comportement demandé par Q13 : repère sous la tête au CUE, cohérent après le sillon fermé, le CUE et le needle drop. **Confirmé par le PO (D-10).** |
 | E15 | — | Cible de test `ScratchUITests` ajoutée à `Package.swift` | Tests des modèles de présentation dès cette PR |
 
 ### 14.2 Contradictions ou imprécisions de la spec à arbitrer
@@ -1006,6 +1008,6 @@ Format court : contexte → décision → conséquences. Une décision remplacé
 ### 14.3 Points ouverts techniques
 
 - PO-07 : calibrage de `FingerTrajectory` (marge visée, touches prédites) et mesure de latence sur appareil.
-- PO-14 : contenu du son de démonstration (contrat : déterministe, 8 s, 48 kHz, titre « Son de démonstration » ; 3.3 propose 6 à 10 s).
+- PO-14 : clos (D-20) : son généré, déterministe, 8 s, stéréo, 48 kHz, titre « Son de démonstration ».
 - PO-15 : constantes de résistance 2 à 35 ms (`TurntableConstants`).
 - PO-16 : durée maximale au regard de la mémoire (ADR-05 réduit le risque).

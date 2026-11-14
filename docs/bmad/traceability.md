@@ -2,7 +2,8 @@
 
 - **Auteur :** 📊 Mary, Analyst BMAD
 - **Date :** 14 novembre 2026
-- **Source :** `docs/specs/scratchapp_specifications_v2_0.md` (fait foi). Aucune exigence nouvelle n'est introduite.
+- **Source :** spécifications v2.0, désormais archivées ([`archive/scratchapp_specifications_v2_0.md`](../specs/archive/scratchapp_specifications_v2_0.md)). Aucune exigence nouvelle n'est introduite. La spec qui fait foi est la [v2.1](../specs/scratchapp_specifications_v2_1.md) : mêmes identifiants, décisions du PO intégrées.
+- **Validation PO ([`po-validation.md`](po-validation.md)) :** les priorités marquées ⚠ sont tranchées (D-01, D-02) : SF-20, SF-76, SF-80 et RM-58 restent P0 ; SF-74, SF-75, SF-67 et SF-78 sont P1. Trois scénarios de features [P0] portent le tag `@P1` (6.1 « Recharger un son déjà importé sans accéder à Drive », « Importer un contenu déjà présent dans la bibliothèque » ; 6.2 « Régler les durées de démarrage et de freinage »). La v2.1 ajoute 11 scénarios (6.5, 6.8, 6.10, 6.11, 6.13, 6.14, 6.16), à rattacher par Quinn dans la recette (6.3).
 - **Artefact compagnon :** [`project-brief.md`](project-brief.md) (personas, risques, incohérences IC-01 à IC-12).
 - **Périmètre :** les 72 exigences V1 : SF-01 à SF-24, SF-64 à SF-83 (44 SF), RM-01 à RM-13 et RM-47 à RM-61 (28 RM).
 

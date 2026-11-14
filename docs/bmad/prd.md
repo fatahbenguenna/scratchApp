@@ -1,13 +1,13 @@
 # ScratchApp — PRD (Product Requirements Document)
 
-- **Version :** 1.0
+- **Version :** 1.1
 - **Date :** 14 novembre 2026
 - **Auteur :** 📋 John, Product Manager BMAD
-- **Statut :** proposition, à valider par 📝 Sarah (PO)
-- **Références :** [spécifications v2.0](../specs/scratchapp_specifications_v2_0.md) (font foi), [revue v1.9 → v2.0](../specs/REVUE_v1.9_vers_v2.0.md), [charte d'équipe](TEAM.md), [`CONTRIBUTING.md`](../../CONTRIBUTING.md).
+- **Statut :** validé par 📝 Sarah (PO) le 14 novembre 2026, avec réserves : [`po-validation.md`](po-validation.md) (registre D-01 à D-47)
+- **Références :** [spécifications v2.1](../specs/scratchapp_specifications_v2_1.md) (font foi ; la v2.0 est archivée), [revue v1.9 → v2.0](../specs/REVUE_v1.9_vers_v2.0.md), [charte d'équipe](TEAM.md), [`CONTRIBUTING.md`](../../CONTRIBUTING.md).
 - **Artefacts liés :** [brief produit](project-brief.md) et [matrice de traçabilité](traceability.md) (Mary, fusionnés) ; spécification UX (Sally, `front-end-spec.md`) et architecture et contrats de code (Winston, `architecture.md`, story 0.2), rédigées en parallèle. Les incohérences IC-01 à IC-12 et les questions Q-01 à Q-03 renvoient au brief.
 
-> Ce PRD ne réécrit pas la spécification : chaque exigence renvoie aux identifiants SF, RM, PO et E de la v2.0 et aux scénarios Gherkin de la section 6. En cas d'écart, la spécification v2.0 prime.
+> Ce PRD ne réécrit pas la spécification : chaque exigence renvoie aux identifiants SF, RM, PO et E de la spécification (inchangés en v2.1) et aux scénarios Gherkin de sa section 6. En cas d'écart, la spécification v2.1 prime.
 
 ## 1. Objectifs et contexte
 
@@ -32,7 +32,7 @@ Le développement suit BMAD (charte `TEAM.md`) : trois développeurs travaillent
 | Indicateur | Cible |
 |---|---|
 | Critères de recette P0 et P1 (spec, section 7) | 100 % vérifiés et consignés dans la recette (story 6.3) |
-| Latence geste→son mesurée | ≤ 20 ms sur Mac et appareils récents ; tampon ≤ 256 trames à 48 kHz (SF-78) |
+| Latence geste→son mesurée | ≤ 20 ms sur écran 120 Hz, ≤ 30 ms sur écran 60 Hz, appareils de référence ; tampon ≤ 256 trames à 48 kHz (SF-78, D-15) |
 | Self-test de scratch en CI | ✅ sur chaque PR de code et sur `main` |
 | Plantages pendant la recette | 0 |
 | Exigences V1 (SF, RM) rattachées à au moins une story | 100 % (section 9) |
@@ -58,6 +58,7 @@ Le développement suit BMAD (charte `TEAM.md`) : trois développeurs travaillent
 | Version | Date | Auteur | Modification |
 |---|---|---|---|
 | 1.0 | 2026-11-14 | John (PM) | Création : objectifs, FR1 à FR32, NFR1 à NFR14, hypothèses techniques, épopées EP1 à EP6, 26 stories, plan en cinq vagues, points à arbitrer A1 à A14 (dont IC-01, IC-02, Q-01 et Q-02 du brief). |
+| 1.1 | 2026-11-14 | Sarah (PO) | Validation PO : critères des stories 1.1 à 1.4, 2.1, 2.3, 3.1 à 3.3, 4.1 à 4.3, 4.6, 5.1 à 5.3 et 6.1 à 6.3 alignés sur les décisions D-01 à D-47 (`po-validation.md`, section 5) ; NFR1 et NFR14 précisés ; références vers la spec v2.1. |
 
 ## 2. Exigences fonctionnelles
 
@@ -102,7 +103,7 @@ Chaque FR regroupe des exigences de la spec sans les reformuler : le texte de r�
 
 | NFR | Objet | Exigence | Vérification | Stories |
 |---|---|---|---|---|
-| NFR1 | Latence et tampon | SF-78 : tampon de 256 trames à 48 kHz (≈ 5,3 ms) au plus quand le matériel le permet ; latence geste→son ≤ 20 ms sur les appareils de référence (point A13, Q-01), hors sorties Bluetooth dont la latence propre dépasse l'objectif (point A14, Q-02). Toutes les touches disponibles sont exploitées (regroupées et prédites). Les événements de geste et de crossfader partent vers le moteur dans le cycle d'événements qui les reçoit, sans attendre un rafraîchissement de l'interface. | Tampon effectif et latence de sortie publiés (2.1) ; mesure consignée en recette (6.3, PO-07) | 1.2, 2.1, 4.2, 4.3, 6.3 |
+| NFR1 | Latence et tampon | SF-78 : tampon de 256 trames à 48 kHz (≈ 5,3 ms) au plus quand le matériel le permet ; latence geste→son ≤ 20 ms sur écran 120 Hz et ≤ 30 ms sur écran 60 Hz, sur les appareils de référence (iPhone 13 ou plus récent, iPad à puce M1 ou plus récente, Mac Apple Silicon ; D-14), mesurée de l'horodatage système de l'événement à la sortie du son, latence de sortie annoncée incluse, hors sorties Bluetooth et AirPlay (D-15). Toutes les touches regroupées sont exploitées ; les touches prédites ne comblent que l'attente du rejeu (D-16). Les événements de geste et de crossfader partent vers le moteur dans le cycle d'événements qui les reçoit, sans attendre un rafraîchissement de l'interface. | Tampon effectif et latence de sortie publiés (2.1) ; mesure consignée en recette (6.3, PO-07) | 1.2, 2.1, 4.2, 4.3, 6.3 |
 | NFR2 | Temps réel | Dans le fil de rendu : aucune allocation, aucun verrou bloquant, aucun appel Objective-C ou Swift susceptible d'allouer (journalisation, tableaux dynamiques, chaînes, closures créées à la volée), aucune entrée-sortie. Interface → audio : file SPSC sans verrou, bornée, qui ne bloque jamais quand elle est pleine. Audio → interface : instantané d'état lu sans verrou. Un clip remplacé n'est jamais libéré dans le fil de rendu. | Test de comptage d'allocations (1.5) ; revue QA de chaque PR (case du modèle de PR) | 1.1 à 1.5, 2.1 |
 | NFR3 | Charge CPU | Rendu de 256 trames, deux platines à ±16× avec anti-repliement : 30 % au plus de la durée du tampon sur Mac Apple Silicon. | Mesure de performance (1.5), indicative en CI | 1.3, 1.5 |
 | NFR4 | Mémoire | Deux sons distincts de 10 min (SF-80) chargés sur les deux platines sans plantage ni alerte mémoire (PCM Float32 stéréo à 48 kHz : ≈ 230 Mo par son). Un même son chargé sur A et B n'est pas dupliqué. Un son remplacé est libéré : empreinte stable après 20 remplacements. Pic de décodage ≤ 1,5 × la taille du clip. Forme d'onde ≤ 2 Mo par son. Empreinte totale cible ≤ 650 Mo. | Mesure en recette (6.3) ; alimente PO-16 | 1.5, 2.2, 4.6, 6.1, 6.3 |
@@ -115,7 +116,7 @@ Chaque FR regroupe des exigences de la spec sans les reformuler : le texte de r�
 | NFR11 | Testabilité et traçabilité | Chaque exigence testable a un test XCTest qui cite son identifiant SF ou RM. Le cœur est déterministe : un même flux de commandes horodatées à l'échantillon produit la même sortie. | Revue QA ; tests de rendu hors ligne (1.5, 2.4) | toutes |
 | NFR12 | Robustesse | Aucune erreur de fichier, de stockage ou de sortie audio ne provoque de plantage (SF-82, RM-48). Écritures atomiques ; index illisible récupéré. | Tests d'erreur (2.2, 3.1, 3.2) ; recette | EP2, EP3, EP6 |
 | NFR13 | Fluidité d'affichage | Disque, repère et forme d'onde à 60 i/s au moins (120 i/s sur écran ProMotion) ; lecture de l'instantané sans attente (SF-70). | Recette ; Instruments | 4.1, 4.6 |
-| NFR14 | Langue | Interface et documentation en français ; code, identifiants et commentaires techniques en anglais (`CONTRIBUTING.md`). | Revue | toutes |
+| NFR14 | Langue | Interface et documentation en français ; identifiants et noms de types en anglais ; commentaires de documentation (`///`) en français, commentaires techniques en ligne (`//`) en anglais (`CONTRIBUTING.md`, D-42). | Revue | toutes |
 
 ## 4. Objectifs de design de l'interface
 
@@ -238,8 +239,8 @@ Toutes les stories de l'épopée sont du Swift pur, testées sous Linux, et ne f
   3. Les vitesses cibles du tableau de 6.6 « Modifier le pitch » sont obtenues à 0,01 RPM près à 33⅓ et à 45 RPM ; le pitch est borné à ±8 % et quantifié au pas de 0,1 % (SF-11, RM-50). Un changement de RPM ou de pitch en rotation rejoint la nouvelle cible par une rampe, sans discontinuité de ωp (6.2 « Sélectionner 45 tours », « Modifier la vitesse pendant la lecture » ; 6.6 « Remettre le pitch à zéro »).
   4. START pendant le freinage réaccélère depuis la vitesse courante, sans discontinuité (6.2 « Appuyer sur START pendant le freinage ») ; START sans son fait tourner le plateau (6.2 « Démarrer sans fichier »).
   5. Feutrine : moteur actif, ωp et l'état START/STOP ne dépendent jamais de la tenue du disque (RM-53 ; 6.9 « Le plateau tourne sous le disque retenu »). STOP pendant la tenue : le plateau s'arrête sous le disque, qui reste tenu ; au relâchement, aucune reprise motorisée (RM-07 ; 6.2 « Appuyer sur STOP pendant que je retiens le disque »).
-  6. Disque relâché moteur actif : ωd rejoint ωp selon le temps de rattrapage réglable de 0 à 300 ms (60 ms par défaut). Critère provisoire (point A1) : |ωd − ωp| ≤ 5 % de ωp au terme du temps de rattrapage ; à 0 ms, la vitesse du plateau est rejointe dès le tampon suivant, sans discontinuité de position (SF-10, SF-68 ; 6.3 « Relâcher le disque moteur actif », « Lancer le son depuis le repère (release) » ; 6.9 « Rattrapage réglable », « Rattrapage plus lent »).
-  7. Disque relâché moteur arrêté : un disque lancé s'arrête par friction en 150 ms au plus et aucune lecture motorisée ne démarre (SF-10 ; 6.3 « Relâcher le disque moteur arrêté »).
+  6. Disque relâché moteur actif : ωd rejoint ωp selon le temps de rattrapage T réglable de 0 à 300 ms (60 ms par défaut), par une réponse du premier ordre de constante τ = T/3. Critère (D-03) : au terme de T, l'écart |ωd − ωp| est réduit à 5 % au plus de sa valeur au relâchement (95 % de ωp pour un disque relâché immobile) ; à 0 ms, la vitesse du plateau est rejointe dès le tampon suivant, sans discontinuité de position (SF-10, SF-68 ; 6.3 « Relâcher le disque moteur actif », « Lancer le son depuis le repère (release) » ; 6.9 « Rattrapage réglable », « Rattrapage plus lent »).
+  7. Disque relâché moteur arrêté : un disque lancé ralentit par friction constante (décroissance linéaire de ωd, D-03) et s'arrête 150 ms au plus après le relâchement ; aucune lecture motorisée ne démarre (SF-10 ; 6.3 « Relâcher le disque moteur arrêté »).
   8. Disque tenu : θd suit θf par un filtre du second ordre à amortissement critique, de constante de temps 2 ms (résistance 0 %) à 35 ms (100 %) (5.1 §3, SF-06). Doigt fixe : ωd s'annule (à 10⁻³ de la vitesse nominale près) après cinq constantes de temps, y compris à 100 % (RM-12 ; 6.3 « Poser le doigt sur le disque », « Maintenir un disque immobile » ; 6.7 « Conserver la possibilité d'arrêter le disque »). La saisie d'un disque en rotation initialise le filtre sur l'angle et la vitesse courants, sans saut (6.3 « Saisir le disque en rotation »).
   9. Résistance (critères P1 portés par cette story, point A5) : à geste identique, la crête d'accélération de ωd est plus faible à 90 % qu'à 10 % (SF-22 ; 6.7 « Réduire la résistance », « Augmenter la résistance ») ; un geste arrière soutenu à 90 % donne ωd < 0 sans inversion parasite (RM-12 ; 6.7 « Scratcher en sens inverse avec une résistance élevée ») ; une variation de résistance pendant la tenue ne crée aucune discontinuité de θd ni de ωd (SF-23, RM-13 ; 6.7 « Modifier la résistance pendant le scratch ») ; la résistance ne modifie ni ωp, ni les durées moteur, ni le rattrapage (RM-11, RM-54 ; 6.7 « Ne pas modifier la vitesse nominale », « La résistance ne ralentit pas le rattrapage »).
   10. Le modèle avance à la fréquence audio (par échantillon ou par sous-bloc borné), sans allocation ; les tests XCTest s'exécutent sous Linux et citent leurs identifiants.
@@ -255,8 +256,8 @@ Toutes les stories de l'épopée sont du Swift pur, testées sous Linux, et ne f
   3. Un seul contact propriétaire par disque ; tout autre contact sur ce disque est ignoré jusqu'au relâchement (RM-60 ; 6.3 « Deuxième doigt sur le même disque »). Deux disques sont suivis indépendamment (SF-19 ; 6.8 « Scratcher les deux disques en même temps sur iPad »).
   4. Une annulation par le système vaut relâchement ; aucun état « tenu » ne subsiste (RM-60 ; 6.3 « Toucher annulé par le système »).
   5. Zone centrale (rayon < 12 % du rayon du disque) : le contact retient le disque sans le faire tourner ; en sortie de zone, le suivi reprend depuis l'angle courant, sans saut (RM-61 ; 6.3 « Doigt posé au centre du disque »).
-  6. Les échantillons de contact sont horodatés et acceptés par lots (touches regroupées) ; un échantillon prédit est remplacé par l'échantillon réel correspondant, sans erreur cumulée (SF-78).
-  7. Défilement à deux doigts : les deltas sont convertis en rotation selon le gain fixé par la spec UX (point A10) ; la session est relâchée 80 ms après le dernier événement, mesurés sur une horloge injectée (SF-79 ; 6.14 « Scratcher au trackpad »).
+  6. Les échantillons de contact sont horodatés et acceptés par lots (touches regroupées) ; un échantillon prédit est remplacé par l'échantillon réel correspondant, sans erreur cumulée (SF-78). Les touches prédites ne servent qu'à combler l'attente du rejeu entre deux lots, sans dépassement dans le mauvais sens aux inversions ; leur emploi est décidé et calibré dans cette story (D-16, PO-07).
+  7. Défilement à deux doigts : les deltas sont convertis en rotation selon la formule de la spec UX (§6.3 : la surface du disque sous le pointeur suit les doigts) ; l'inertie du défilement est ignorée ; un cran de molette classique vaut 15° ; un défilement commencé hors du disque ne le saisit pas (D-24) ; la session est relâchée 80 ms après le dernier événement, mesurés sur une horloge injectée (SF-79 ; 6.14 « Scratcher au trackpad »).
   8. Un changement de géométrie du disque (centre, rayon) pendant un geste ne produit aucun saut d'angle (6.14 « Redimensionner la fenêtre pendant un scratch »).
   9. La sortie est la suite d'événements de geste du contrat 0.2 (saisie, angle cible horodaté, relâchement) pour une platine donnée ; aucune dépendance à UIKit ou AppKit ; tests Linux.
 
@@ -269,7 +270,7 @@ Toutes les stories de l'épopée sont du Swift pur, testées sous Linux, et ne f
   1. La tête est intégrée à la fréquence audio : p += ωd / (2π) × 1,8 s × dt (5.1 §4) ; un tour de disque déplace la tête de 1,8 s à un échantillon près (RM-04, RM-50).
   2. Lecture avant et arrière réelle du son chargé, sans son préenregistré (RM-05 ; SF-07, SF-08 ; 6.3 « Pousser le disque vers l'avant », « Faire reculer le disque », « Faire un scratch avant-arrière », « Varier la vitesse du scratch »).
   3. Interpolation au moins cubique (SF-77) : une sinusoïde de 1 kHz lue entre 0,25× et 2× s'écarte du signal analytique de −60 dB au plus (tolérance de test).
-  4. Anti-repliement au-delà de 2× (SF-77) : lue à 8×, une sinusoïde de 4 kHz à −6 dBFS, qui dépasserait la fréquence de Nyquist, ressort à −36 dBFS au plus (tolérance de test).
+  4. Anti-repliement au-delà de 2× (SF-77, D-13) : lue à 3× avec une sortie à 48 kHz, une sinusoïde de 12 kHz, qui dépasserait la fréquence de Nyquist, ne produit que des composantes repliées inférieures d'au moins 40 dB au niveau de la sinusoïde.
   5. Vitesse de lecture bornée à ±16× ; paramètres lissés à la fréquence audio, de sorte que des angles de doigt reçus à 60–120 Hz ne produisent aucune marche de vitesse (SF-77, 5.1 §4). Test : sinusoïde de 200 Hz scratchée, énergie au-delà de 8 kHz ≤ −50 dBFS (tolérance de test).
   6. Inversions sans discontinuité : un baby scratch de huit inversions par seconde sur un quart de tour respecte le critère précédent et revient au point de départ à ±10 ms (6.3 « Enchaîner des inversions rapides (baby scratch) »).
   7. À vitesse nulle, aucun nouvel échantillon n'est parcouru et la sortie est silencieuse (6.3 « Maintenir un disque immobile »).
@@ -286,13 +287,13 @@ Toutes les stories de l'épopée sont du Swift pur, testées sous Linux, et ne f
 - **Récit :** En tant que DJ scratch, je veux une table de mixage dont le crossfader coupe net et ne touche jamais à la lecture, afin de rythmer mes scratchs entre A et B.
 - **Critères d'acceptation :**
   1. Gain d'une voie = fader de voie × gain du crossfader pour cette voie (SF-65, RM-52). Valeurs initiales : faders à 100 %, crossfader au centre, courbe « coupure franche », hamster désactivé (3.2, SF-66).
-  2. Courbe conforme à 5.2 : le tableau de 6.10 « Gain des voies selon la courbe » est respecté à ±0,05 ; en courbe douce, chaque voie est à −3 dB ± 0,5 dB au centre (6.4 « Crossfader en position intermédiaire avec courbe douce ») ; en coupure franche, la voie est à plein niveau en 3 % de course au plus depuis la butée opposée (SF-66 ; 6.4 « Ouvrir la voie avec un déplacement minimal (cut-in) ») ; les valeurs intermédiaires de la courbe varient de façon monotone (5.2). Courbe intermédiaire et hamster sont livrés dès le P0 (point A12).
+  2. Courbe conforme à 5.2 : le tableau de 6.10 « Gain des voies selon la courbe » est respecté à ±0,05 ; en courbe douce, chaque voie est à −3 dB ± 0,5 dB au centre (6.4 « Crossfader en position intermédiaire avec courbe douce ») ; en coupure franche, la voie est à plein niveau en 3 % de course au plus depuis la butée opposée (SF-66 ; 6.4 « Ouvrir la voie avec un déplacement minimal (cut-in) ») ; les valeurs intermédiaires de la courbe varient de façon monotone (5.2). La courbe intermédiaire est livrée dès le P0 (D-02).
   3. Lissage à la fréquence audio : faders et crossfader en 5 ms au plus ; temps de montée de 1 ms au plus en coupure franche (RM-52, RM-08).
-  4. Hamster : le sens du crossfader est inversé ; la bascule est lissée en 5 ms au plus, sans clic (SF-67 ; 6.10 « Activer le hamster »).
-  5. Coupure momentanée par platine (« transformer », 3.5) : tant qu'elle est active, le gain de crossfader de la voie vaut 1, avec la même montée qu'en coupure franche ; le fader de voie continue de s'appliquer et une voie déjà ouverte n'est pas modifiée (IC-06 ; 6.14 « Couper le son au clavier pendant un scratch à la souris »).
+  4. Hamster (critère P1 porté par cette story, D-02, D-19) : le sens du crossfader est inversé ; la bascule est lissée en 5 ms au plus, sans clic (SF-67 ; 6.10 « Activer le hamster »).
+  5. Coupure momentanée par platine (« transformer », 3.5) : gain de la voie = fader de voie × (coupure ouverte ? 1 : gain du crossfader) (RM-52, D-06), avec la même montée qu'en coupure franche ; un fader de voie à 0 garde la voie muette ; une voie dont le gain de crossfader vaut déjà 1 n'est pas modifiée ; `F` et `J` visent les voies A et B quel que soit le hamster (IC-06 ; 6.14 « Couper le son au clavier pendant un scratch à la souris »).
   6. Les gains n'agissent que sur le niveau : position et vitesse de chaque platine sont identiques, à l'échantillon près, avec ou sans mouvement du mixeur (SF-12, RM-06 ; 6.4 « Fermer complètement la voie A au crossfader », « Ouvrir la voie A au crossfader », « Fader de voie »).
   7. Sortie sans écrêtage numérique (marge et limiteur doux) : deux sinusoïdes à 0 dBFS, crossfader au centre en coupure franche, donnent une crête de sortie ≤ −0,1 dBFS et lèvent l'indicateur de limitation (SF-65 ; 6.8 « Pas de saturation à la somme des deux voies »).
-  8. Un VU-mètre par voie et un indicateur de saturation de sortie sont publiés dans l'instantané (3.2, SF-65). Proposition : niveau de voie après fader, avant crossfader (point A10).
+  8. Un VU-mètre par voie et un indicateur de saturation de sortie sont publiés dans l'instantané (3.2, SF-65). Niveau de voie après le fader de voie, avant le crossfader (D-26) ; « limiteur actif » dès 1 dB de réduction (D-13).
   9. Sans allocation ; tests Linux.
 
 #### Story 1.5 — ScratchEngine : deux platines, commandes et instantané
@@ -326,7 +327,7 @@ Toutes les stories de l'épopée sont du Swift pur, testées sous Linux, et ne f
   3. iOS et iPadOS : session de catégorie « lecture », non mixable (PO-09), activée au démarrage du moteur audio.
   4. macOS : sortie sur le périphérique par défaut du système, y compris une interface USB compatible (SF-16 ; 6.5 « Brancher une interface audio USB »).
   5. Le démarrage ne lance aucune lecture (SF-01, RM-10).
-  6. Si le moteur audio ne peut pas démarrer, l'état « Sortie audio indisponible » est publié, sans exception non gérée, et l'interface reste utilisable (SF-82, version minimale ; la relance automatique relève de 2.3).
+  6. Si le moteur audio ne peut pas démarrer, l'état « Sortie audio indisponible » est publié, sans exception non gérée, et l'interface reste utilisable ; l'horloge de secours fait tourner le moteur en silence, disques et plateaux vivants (SF-82, D-35 ; la relance automatique relève de 2.3).
   7. Le nom de la sortie active est publié (« Haut-parleur », « Casque », nom du périphérique USB) (3.2).
   8. API de suspension : `suspend()` met immédiatement les deux moteurs à STOP sans rampe et coupe la sortie (RM-56) ; `resume()` relance la sortie sans aucune lecture (RM-10). Elle est appelée par 6.2 pour l'arrière-plan iOS (SF-81).
   9. Test macOS : le même graphe, rendu en mode manuel hors ligne, reproduit le scénario de 1.5 à l'échantillon près (base de 2.4).
@@ -354,9 +355,9 @@ Toutes les stories de l'épopée sont du Swift pur, testées sous Linux, et ne f
 - **Critères d'acceptation :**
   1. iOS et iPadOS, interruption de session : les deux moteurs passent immédiatement à STOP, positions conservées ; à la fin de l'interruption, rien ne reprend et START est nécessaire (SF-18, RM-10, RM-56 ; 6.5 « Recevoir une interruption système (iPhone/iPad) »).
   2. iOS et iPadOS, casque filaire ou Bluetooth déconnecté : STOP avant toute sortie sur le haut-parleur (6.5 « Débrancher le casque (iPhone/iPad) »).
-  3. Interface USB retirée : aucun plantage, la nouvelle route du système est suivie, les moteurs passent à STOP, la reprise est manuelle (6.5 « Perdre le périphérique audio »).
-  4. macOS, choix d'un autre périphérique de sortie par défaut, éventuellement à une autre fréquence : le moteur audio redémarre sur la nouvelle sortie ; hauteur et vitesse nominale inchangées ; positions conservées ; les moteurs gardent leur état (point A2, IC-04) (6.5 « Changer de périphérique de sortie sur Mac »).
-  5. macOS, mise en veille : moteurs à STOP (0.3).
+  3. Périphérique utilisé disparu (interface USB retirée ; sur iOS, raison « ancien périphérique indisponible ») : aucun plantage, la nouvelle route du système est suivie, les moteurs passent à STOP, la reprise est manuelle (RM-56, D-04 ; 6.5 « Perdre le périphérique audio »).
+  4. macOS, choix d'un autre périphérique de sortie par défaut, éventuellement à une autre fréquence, l'ancien restant connecté : le moteur audio redémarre sur la nouvelle sortie ; hauteur et vitesse nominale inchangées ; positions conservées ; les moteurs gardent leur état (SF-16, D-04). Sur iOS, un changement de route autre qu'une disparition ne change pas l'état des moteurs (6.5 « Changer de périphérique de sortie sur Mac »).
+  5. macOS, mise en veille : moteurs à STOP, aucune reprise au réveil (0.3, RM-56 ; 6.5 « Mettre le Mac en veille »).
   6. Aucune sortie disponible : état « Sortie audio indisponible », interface utilisable, nouvel essai automatique dès qu'une sortie apparaît, sans redémarrer l'app (SF-82 ; 6.5 « Aucune sortie audio disponible »).
   7. Le nom de la sortie publié est mis à jour à chaque changement (6.5 « Brancher une interface audio USB »).
   8. La logique « événement système → action » est isolée et testée sur macOS avec des événements simulés ; le comportement sur matériel est vérifié en recette (6.3, PO-08).
@@ -381,9 +382,9 @@ Toutes les stories de l'épopée sont du Swift pur, testées sous Linux, et ne f
 - **Dépendances :** 0.2
 - **Récit :** En tant qu'utilisateur, je veux que les sons copiés dans l'app soient indexés de façon durable, afin de les retrouver intacts à chaque lancement, sans connexion.
 - **Critères d'acceptation :**
-  1. Implémente la partie index du protocole de bibliothèque (0.2) : chaque entrée porte un UUID stable, une empreinte SHA-256, le nom, la durée, la date d'import, l'origine (« Import » ou « Démo ») et le nom de sa copie locale (RM-58, SF-74).
+  1. Implémente la partie index du protocole de bibliothèque (0.2) : chaque entrée porte un UUID stable, une empreinte SHA-256, le nom, la durée, la date d'import, l'origine (`.imported` ou `.demo`, affichées « Import » et « Intégré », D-36), le nom et la taille de sa copie locale (RM-58, SF-74).
   2. L'index `Application Support/ScratchApp/library.json` est écrit de façon atomique (fichier temporaire puis remplacement) (5.3). Un index illisible est mis de côté et la bibliothèque repart vide avec un message, sans plantage (NFR12).
-  3. Au chargement de l'index et avant chaque chargement d'un son, toute entrée dont la copie est absente ou de taille différente (copie supprimée depuis Fichiers ou le Finder) est écartée et signalée (RM-48, IC-10).
+  3. Au lancement et avant chaque chargement d'un son, l'index est réconcilié : toute entrée dont la copie est absente ou de taille différente (copie supprimée ou modifiée depuis Fichiers ou le Finder) est retirée de l'index, et la liste des entrées retirées est rendue à l'appelant pour informer l'utilisateur (RM-48, D-11 ; 6.13 « Copie supprimée en dehors de l'application », « Charger un son dont la copie a disparu »). Cela demande d'ajouter au contrat `LibraryStoring` une opération de réconciliation qui renvoie les entrées retirées, avec l'accord de l'architecte.
   4. SHA-256 portable, sans CryptoKit, calculé en flux ; vecteurs de test officiels (chaîne vide, « abc », un million de « a ») (RM-58).
   5. La suppression efface la copie de `Documents/Banque de sons/` puis l'entrée ; aucun fichier hors du bac à sable n'est touché (RM-49 ; 6.13 « Supprimer un son non chargé »).
   6. L'UUID d'une entrée ne change jamais (RM-58).
@@ -399,8 +400,8 @@ Toutes les stories de l'épopée sont du Swift pur, testées sous Linux, et ne f
   1. Chaîne de 5.3 : copie dans un fichier temporaire du même volume avec calcul de l'empreinte, validation par la sonde du protocole de décodage (décodable, non protégé, durée de 50 ms à 10 min, taille), déplacement atomique dans `Documents/Banque de sons/`, puis mise à jour de l'index (SF-02, RM-47, RM-48).
   2. Le fichier source n'est jamais modifié ; aucun signet ni chemin externe n'est conservé (SF-02 ; 6.1 « Un import ne modifie pas le fichier source »).
   3. Erreurs typées : espace insuffisant (contrôle préalable par un fournisseur d'espace injectable, puis erreur d'écriture), format non pris en charge, contenu protégé, fichier corrompu ou vide, trop long, trop court. Dans tous les cas, aucune copie n'est conservée et aucune entrée n'est ajoutée (6.1 « Échec de copie faute d'espace », « Importer un fichier incompatible », « Importer un fichier protégé », « Importer un fichier corrompu ou vide », « Importer un fichier trop long »).
-  4. Dédoublonnage : un contenu de même empreinte qu'une entrée existante ne crée pas de seconde copie ; l'entrée existante est renvoyée pour être chargée (SF-75 ; 6.1 « Importer un contenu déjà présent dans la bibliothèque »).
-  5. Le nom d'origine est conservé ; en cas de collision, un suffixe numérique unique est ajouté (anticipation de SF-60 et RM-43, point A3).
+  4. Dédoublonnage (critère P1 porté par cette story, D-01, D-19) : un contenu de même empreinte qu'une entrée existante ne crée pas de seconde copie ; l'entrée existante est renvoyée pour être chargée (SF-75 ; 6.1 « Importer un contenu déjà présent dans la bibliothèque »).
+  5. Le nom d'origine est conservé ; en cas de collision, un suffixe `_2`, `_3`… est ajouté avant l'extension (`voix_funk_2.wav`), sans jamais écraser une copie ; le titre de l'entrée est le nom de la copie (SF-02, SF-60, RM-43, D-12 ; 6.13 « Importer deux fichiers portant le même nom »).
   6. La bibliothèque fournit l'URL locale d'une entrée ; le rechargement ne dépend jamais de la source (6.1 « Recharger un son déjà importé sans accéder à Drive »).
   7. Un échec d'import n'a aucun effet sur l'index existant (RM-48).
   8. Tests Linux avec un décodeur factice (WAV PCM générés) et un espace disque simulé.
@@ -411,7 +412,7 @@ Toutes les stories de l'épopée sont du Swift pur, testées sous Linux, et ne f
 - **Dépendances :** 0.2
 - **Récit :** En tant que nouvel utilisateur, je veux un son de démonstration intégré, afin d'essayer le scratch tout de suite, sans rien importer.
 - **Critères d'acceptation :**
-  1. Un générateur procédural déterministe en Swift pur produit un `AudioClip` (0.2). Proposition pour PO-14 (point A6) : un « stab » à attaque franche à 0 s suivi d'une voix synthétique « ahh », 6 à 10 s, stéréo, 48 kHz ; libre de droits par construction, licence documentée.
+  1. Un générateur procédural déterministe en Swift pur produit un `AudioClip` (0.2). Décision pour PO-14 (D-20) : un « stab » à attaque franche à 0 s suivi d'une voix synthétique « ahh », 8 s, stéréo, 48 kHz ; titre « Son de démonstration » ; libre de droits par construction, sans licence tierce.
   2. Crête ≤ −1 dBFS ; aucune valeur NaN ; empreinte identique à chaque génération ; génération en 250 ms au plus.
   3. L'entrée « Démo » apparaît en tête de bibliothèque, ne peut pas être supprimée et n'a pas de copie sur disque (SF-74 ; 6.13 « Le son de démonstration ne peut pas être supprimé »).
   4. Le son n'est jamais chargé automatiquement (SF-76, RM-01 ; 6.1 « Charger le son de démonstration »).
@@ -457,7 +458,7 @@ Les stories de l'épopée avancent sur la façade moteur du contrat 0.2 et sur u
   1. Un `DeckViewModel` (`@Observable`) lit l'instantané par la façade du contrat 0.2 à la cadence d'affichage et envoie les commandes. Un faux moteur (`Preview/`) simule plateau, disque et position pour les aperçus et les tests.
   2. Le disque tourne selon l'angle publié, le plateau a son propre indicateur de rotation et le repère (autocollant) suit l'angle de repère publié, à 60 i/s au moins (SF-69, SF-70, NFR13 ; 6.9 « Le plateau tourne sous le disque retenu »).
   3. Le bouton START/STOP reflète l'état du moteur ; le sélecteur 33⅓ / 45 RPM est sur 33⅓ par défaut (3.1, RM-02 ; 6.2).
-  4. Titre, durée et position au format mm:ss.d (3.1, SF-03).
+  4. Titre (nom de la copie), durée et position au format `mm:ss,d` avec la virgule décimale (« 00:12,3 », « −00:01,2 » dans l'amorce, « --:--,- » sans son) (3.1, SF-03, D-28).
   5. Une platine vide propose « Importer » et « Charger la démo » ; START sans son fait tourner le plateau et met ces deux actions en avant (SF-01 ; 6.1 « Premier lancement sans fichier », 6.2 « Démarrer sans fichier »).
   6. Le protocole d'intentions de l'interface (importer sur une platine, charger la démo, importer un fichier déposé, ouvrir la bibliothèque, ouvrir les réglages) est défini ici ; l'AppModel l'implémente en 6.1.
   7. Disposition principale A | table de mixage | B pour l'iPad en paysage et le Mac, fenêtre Mac de 960 × 600 points au minimum (3.4). `RootView` affiche cette disposition sur le faux moteur jusqu'à 6.1.
@@ -471,7 +472,7 @@ Les stories de l'épopée avancent sur la façade moteur du contrat 0.2 et sur u
 - **Récit :** En tant que DJ, je veux une table de mixage à l'écran avec faders, crossfader et VU-mètres, afin de doser et couper les deux platines.
 - **Critères d'acceptation :**
   1. Faders de voie A et B (0 à 100 %, 100 % par défaut) et crossfader horizontal (A à gauche, B à droite, centre par défaut) (3.2, SF-65).
-  2. Réglage de courbe (douce ↔ coupure franche, coupure franche par défaut) et interrupteur Hamster (désactivé par défaut) (3.2, SF-66, SF-67 ; 6.10).
+  2. Réglage de courbe (douce ↔ coupure franche, coupure franche par défaut) et interrupteur Hamster (désactivé par défaut ; critère P1 porté par cette story, D-02) (3.2, SF-66, SF-67 ; 6.10). Sur iPhone, tous deux sont dans le panneau « Table » (D-30).
   3. VU-mètre par voie et indicateur de saturation ou de limitation, alimentés par l'instantané (SF-65 ; 6.8 « Pas de saturation à la somme des deux voies »).
   4. Indication de la sortie audio active et de l'état « Sortie audio indisponible » (3.2, SF-16, SF-82).
   5. Crossfader et faders restent manipulables pendant qu'un disque est tenu par un autre contact (SF-19 ; 6.4 « Scratch avec coupure rythmique »).
@@ -484,7 +485,7 @@ Les stories de l'épopée avancent sur la façade moteur du contrat 0.2 et sur u
 - **Dépendances :** 1.2, 4.1
 - **Récit :** En tant que DJ, je veux saisir et faire tourner chaque disque au doigt, à la souris ou au trackpad, afin de scratcher sur iPhone, iPad et Mac.
 - **Critères d'acceptation :**
-  1. iOS et iPadOS : une surface multitouch par disque (UIKit) transmet au suivi d'angle (1.2) les touches regroupées et prédites ; au moins trois contacts simultanés et indépendants : disque A, disque B, crossfader ou fader, dans les dispositions où les deux disques sont visibles (SF-19, SF-78, IC-05 ; 6.8 « Trois contacts simultanés »).
+  1. iOS et iPadOS : une surface multitouch par disque (UIKit) transmet au suivi d'angle (1.2) les touches regroupées et prédites ; au moins trois contacts simultanés et indépendants : disque A, disque B, crossfader ou fader dans les dispositions où les deux disques sont visibles ; disque affiché, crossfader et fader de voie sur iPhone en portrait (SF-19, SF-78, D-05 ; 6.8 « Trois contacts simultanés », « Trois contacts simultanés sur iPhone en portrait »). Les touches prédites suivent la décision de 1.2 (D-16).
   2. Les règles de saisie de 1.2 s'appliquent de bout en bout : geste commencé sur le disque, deuxième doigt ignoré, annulation système = relâchement, zone centrale (RM-60, RM-61 ; 6.3 « Gestes particuliers »).
   3. Mac : clic maintenu sur le disque = doigt posé ; clic-glisser circulaire = rotation (RM-59, SF-79 ; 6.14 « Retenir et scratcher à la souris »).
   4. Mac : défilement à deux doigts au-dessus du disque = rotation, relâchée 80 ms après le dernier événement (SF-79 ; 6.14 « Scratcher au trackpad »).
@@ -525,9 +526,9 @@ Les stories de l'épopée avancent sur la façade moteur du contrat 0.2 et sur u
 - **Récit :** En tant que DJ scratch, je veux voir la forme d'onde autour de la tête et sur tout le son, et y poser la tête d'un geste, afin de retrouver une attaque sans la chercher à l'oreille.
 - **Critères d'acceptation :**
   1. Les pics multirésolution d'un `AudioClip` sont calculés hors du fil principal : 10 min analysées en 1 s au plus sur Mac Apple Silicon, 2 Mo au plus par son (NFR4).
-  2. Bande zoomée centrée sur la tête (±1,8 s), qui défile dans le sens du geste, à 60 i/s au moins et sans retard visible (SF-70 ; 6.11 « La forme d'onde suit le scratch »).
+  2. Bande zoomée centrée sur la tête (±1,8 s), qui défile dans le sens du geste, redessinée à chaque image (60 i/s au moins, 120 i/s sur écran 120 Hz) depuis le dernier instantané, sans image perdue (SF-70, D-13 ; 6.11 « La forme d'onde suit le scratch »).
   3. Aperçu complet du son avec la position de la tête et du CUE ; l'amorce (−2 s à 0) est représentée (SF-70, SF-72).
-  4. Toucher ou cliquer l'aperçu place la tête à la position correspondante sans changer l'état du moteur ; le geste est ignoré pendant la tenue du disque (SF-71 ; 6.11 « Positionner la tête sur l'aperçu (needle drop) », « Needle drop ignoré pendant que je retiens le disque »).
+  4. Toucher ou cliquer l'aperçu place la tête à la position correspondante, **au relâchement**, sans changer l'état du moteur ; tête fantôme et temps visé pendant l'appui ; sortir de l'aperçu avant de relâcher annule le geste ; le geste est ignoré pendant la tenue du disque (SF-71, D-33 ; 6.11 « Annuler un needle drop » ; 6.11 « Positionner la tête sur l'aperçu (needle drop) », « Needle drop ignoré pendant que je retiens le disque »).
   5. Le repère du disque passe sous la tête quand la tête est au CUE (SF-69 ; 6.11 « Le repère suit le disque » ; 6.6 « Mémoriser un point CUE »).
   6. VoiceOver annonce la position de la tête et celle du CUE.
 
@@ -539,12 +540,12 @@ Les stories de l'épopée avancent sur la façade moteur du contrat 0.2 et sur u
 - **Dépendances :** 4.1, 4.2
 - **Récit :** En tant que DJ sur Mac, je veux piloter transport, CUE, pitch, coupures et crossfader au clavier et par les menus, afin de scratcher à la souris d'une main et de couper le son de l'autre.
 - **Critères d'acceptation :**
-  1. Raccourcis de 3.5 : `Q`/`P` START/STOP ; `A`/`S` et `L`/`K` SET CUE/CUE ; `F`/`J` coupure momentanée ; `Z`/`X` et `,`/`.` pitch ±0,1 % ; `←`/`→` crossfader par pas de 5 % ; `⇧←`/`⇧↓`/`⇧→` butée A, centre, butée B (6.14 « Piloter le transport au clavier », « Déplacer le crossfader au clavier »). Les touches suivent la décision UX sur les claviers AZERTY et QWERTY (position physique ou caractère, IC-08, point A10).
+  1. Raccourcis de 3.5 : `Q`/`P` START/STOP ; `A`/`S` et `L`/`K` SET CUE/CUE ; `F`/`J` coupure momentanée ; `Z`/`X` et `,`/`.` pitch ±0,1 % ; `←`/`→` crossfader par pas de 5 % vers la gauche ou la droite ; `⇧←`/`⇧↓`/`⇧→` butée gauche, centre, butée droite **physiques**, quel que soit le hamster (D-09) (6.14 « Piloter le transport au clavier », « Déplacer le crossfader au clavier » ; 6.10 « Butées au clavier avec le hamster (Mac) »). Les touches sont lues par position physique (code de touche, disposition QWERTY de référence), sur AZERTY comme sur QWERTY (D-08 ; 6.14 « Raccourcis sur un clavier AZERTY »).
   2. Coupure momentanée : la voie est ouverte tant que la touche est enfoncée et refermée au relâchement, y compris pendant un scratch à la souris, sans l'interrompre (3.5, SF-79 ; 6.14 « Couper le son au clavier pendant un scratch à la souris »).
-  3. La répétition automatique des touches ne redéclenche ni START/STOP, ni SET CUE, ni CUE, ni les coupures ; pour le pitch et le crossfader, elle suit la spec UX (point A10).
+  3. La répétition automatique des touches ne redéclenche ni START/STOP, ni SET CUE, ni CUE, ni les coupures, ni les butées ; elle est acceptée pour le pitch et pour `←`/`→` (D-25).
   4. Les raccourcis sont inactifs quand un champ de texte a le focus (6.14 « Raccourcis inactifs pendant la saisie de texte »).
-  5. Menus Fichier (« Importer sur la platine A… » ⌘O, « Importer sur la platine B… » ⇧⌘O, « Bibliothèque » ⌘L, « Afficher la bibliothèque dans le Finder »), Platine (transport, SET CUE, CUE, 33⅓/45 par platine) et Table (crossfader, courbe, hamster), avec leurs raccourcis (SF-79 ; 6.1 « Importer depuis le Finder sur Mac »). Les commandes sont livrées sous forme d'un type `Commands` que 6.2 attache à la scène.
-  6. Une carte unique des raccourcis alimente le clavier, les menus et une vue d'aide des raccourcis, intégrée aux réglages en 3.4.
+  5. Menus Fichier (« Importer sur la platine A… » ⌘O, « Importer sur la platine B… » ⇧⌘O, « Bibliothèque » ⌘L, « Afficher la bibliothèque dans le Finder »), Platine (transport, SET CUE, CUE, 33⅓/45 par platine) et Table (crossfader, courbe, hamster), avec leurs raccourcis, et Aide (raccourcis clavier) ; les éléments à touche simple sont désactivés pendant une saisie ou un dialogue ; `F` et `J` ne figurent que dans l'aide (SF-79, D-34 ; 6.1 « Importer depuis le Finder sur Mac »). Les commandes sont livrées sous forme d'un type `Commands` que 6.2 attache à la scène.
+  6. Une carte unique des raccourcis alimente le clavier, les menus et une vue d'aide des raccourcis, intégrée aux réglages en 3.4 ; l'aide et les menus affichent le caractère réel de la disposition de clavier active (D-08).
   7. Tests unitaires de la carte touche → commande et de la gestion appui/relâchement.
 
 #### Story 5.2 — Glisser-déposer sur une platine
@@ -556,7 +557,7 @@ Les stories de l'épopée avancent sur la façade moteur du contrat 0.2 et sur u
   1. Chaque platine accepte le dépôt d'un fichier depuis Fichiers (iPad) ou le Finder (Mac), avec un retour visuel pendant le survol (SF-73).
   2. Un fichier audio déposé déclenche l'intention d'import pour cette platine : l'AppModel l'importe (SF-02) puis le charge selon SF-15 (6.13 « Déposer un fichier sur une platine »).
   3. Un fichier non audio est refusé avec un message et la platine n'est pas modifiée (6.13 « Déposer un fichier non audio »).
-  4. Règle proposée (point A10) : un dépôt de plusieurs fichiers ne charge que le premier fichier audio et le signale.
+  4. Un dépôt de plusieurs fichiers est refusé dès le survol (« Un seul fichier à la fois ») et la platine n'est pas modifiée (SF-73, D-27 ; 6.13 « Déposer plusieurs fichiers à la fois »).
   5. Test unitaire du filtrage des types ; vérification au Finder en recette.
 
 #### Story 5.3 — Accessibilité : VoiceOver, actions et navigation clavier
@@ -567,7 +568,7 @@ Les stories de l'épopée avancent sur la façade moteur du contrat 0.2 et sur u
 - **Critères d'acceptation :**
   1. Chaque bouton, curseur et disque annonce un libellé et sa valeur ; un disque annonce sa platine, sa position et l'état de son moteur (SF-83 ; 6.16 « Libellés VoiceOver »).
   2. Pitch, résistance, faders de voie et crossfader s'ajustent par les actions d'accessibilité (incrément, décrément) avec annonce de la nouvelle valeur ; le pitch par pas de 0,1 % (SF-83 ; 6.16 « Régler le pitch par les actions d'accessibilité »).
-  3. Mac, accès clavier complet : la tabulation parcourt platine A, table, platine B ; un curseur qui a le focus se règle aux flèches, sinon les flèches déplacent le crossfader (3.5) — règle à confirmer par la spec UX (point A10) (6.16 « Navigation au clavier sur Mac »).
+  3. Mac, accès clavier complet : la tabulation parcourt platine A, table, platine B ; une commande réglable qui a le focus se règle aux flèches, sinon les flèches déplacent le crossfader ; Échap retire le focus (3.5, D-07 ; 6.16 « Navigation au clavier sur Mac », « Flèches sur une commande qui a le focus (Mac) »).
   4. Contraste des libellés conforme WCAG AA (≥ 4,5:1) pour les couleurs de la spec UX.
   5. START/STOP, CUE, crossfader et faders restent utilisables sans geste sur le disque (NFR8).
   6. Une liste de contrôle (Accessibility Inspector sur Mac, VoiceOver sur simulateur iOS) est jointe à la PR.
@@ -584,9 +585,9 @@ Les stories de l'épopée avancent sur la façade moteur du contrat 0.2 et sur u
   2. « Importer » ouvre le sélecteur du système pour la platine d'origine : Fichiers sur iPhone et iPad, panneau d'ouverture macOS filtré sur les formats audio. L'accès au fichier choisi (security-scoped) n'est ouvert que pendant la copie (SF-02 ; 6.1 « Importer un fichier WAV », « Importer depuis le Finder sur Mac »).
   3. Après un import réussi : entrée ajoutée à la bibliothèque, décodage hors du fil principal avec indicateur de chargement, son chargé sur la platine d'origine dans l'état SF-03 ; l'autre platine n'est pas modifiée (SF-02, SF-03, RM-57 ; 6.1).
   4. Annuler le sélecteur ne change rien (6.1 « Annuler l'importation »).
-  5. Chaque erreur affiche un message en français (espace de stockage insuffisant, format non pris en charge, fichiers protégés non pris en charge, fichier corrompu ou vide, durée maximale de 10 minutes) ; le son déjà chargé et son état sont conservés (RM-48 ; 6.1).
+  5. Chaque erreur affiche un message en français (espace de stockage insuffisant, format non pris en charge, fichiers protégés non pris en charge, fichier corrompu ou vide, durée maximale de 10 minutes) ; le son déjà chargé et son état sont conservés (RM-48 ; 6.1). Au lancement et avant chaque chargement, l'AppModel appelle la réconciliation de 3.1 : les entrées retirées sont signalées (bandeau au lancement, alerte « Son introuvable » au chargement) et la liste est mise à jour (D-11).
   6. « Charger la démo » charge le son de démonstration sur la platine, sans lecture (SF-76 ; 6.1 « Charger le son de démonstration »).
-  7. Remplacement (critère P1 porté par cette story, point A5) : platine active (moteur en marche, disque en mouvement ou tenu) ⇒ confirmation ; platine à l'arrêt ⇒ remplacement direct ; refus ⇒ son et état conservés, nouveau son gardé en bibliothèque ; après remplacement, état SF-03 (SF-15 ; 6.5 « Charger un deuxième fichier sur une platine active », « Charger un deuxième fichier sur une platine à l'arrêt », « Refuser le remplacement »).
+  7. Remplacement (critère P1 porté par cette story, point A5) : platine chargée et active (moteur en marche, disque en mouvement ou tenu, `DeckSnapshot.isActive`) ⇒ confirmation ; platine à l'arrêt ⇒ remplacement direct ; platine vide, même plateau en rotation ⇒ aucune confirmation, le chargement arrête le moteur (D-40) ; refus ⇒ son et état conservés, nouveau son gardé en bibliothèque ; après remplacement, état SF-03 (SF-15 ; 6.5 « Charger un deuxième fichier sur une platine active », « Charger un deuxième fichier sur une platine à l'arrêt », « Refuser le remplacement »).
   8. L'AppModel expose le chargement d'une entrée sur une platine, le déchargement d'une platine et la liste des platines qui portent une entrée (utilisés par 3.5 et 5.2).
   9. Tests unitaires macOS avec faux moteur, décodeur factice et bibliothèque en dossier temporaire.
 
@@ -599,7 +600,7 @@ Les stories de l'épopée avancent sur la façade moteur du contrat 0.2 et sur u
   1. L'AppModel utilise le vrai `ScratchEngine` (1.5) à travers l'hôte AVAudioEngine (2.1) et le décodeur AVFoundation (2.2) ; le faux moteur ne sert plus qu'aux aperçus et aux tests.
   2. Au lancement, deux platines et la table s'affichent, sans aucune lecture (SF-01, RM-10).
   3. Les menus et raccourcis de 5.1 sont attachés à la scène et reliés à l'AppModel.
-  4. Cycle de vie : sur iPhone et iPad, le passage en arrière-plan appelle `suspend()` (moteurs à STOP, sortie coupée) et le retour `resume()`, sans lecture, sons et positions conservés ; sur Mac, la lecture continue fenêtre inactive et la fermeture de la dernière fenêtre quitte l'app (SF-81, RM-56 ; 6.5 « Passer en arrière-plan (iPhone/iPad) », « Fenêtre inactive sur Mac »).
+  4. Cycle de vie : sur iPhone et iPad, le passage en arrière-plan appelle `suspend()` (moteurs à STOP, sortie coupée) et le retour `resume()`, sans lecture, sons et positions conservés ; l'écran de l'iPhone et de l'iPad ne se verrouille pas automatiquement tant qu'un moteur tourne ou qu'un disque est tenu (D-37) ; sur Mac, une seule fenêtre principale, la lecture continue fenêtre inactive et la fermeture de la fenêtre quitte l'app (SF-81, RM-56, D-38 ; 6.5 « Passer en arrière-plan (iPhone/iPad) », « Fenêtre inactive sur Mac »).
   5. Le nom de la sortie active et l'état « Sortie audio indisponible » s'affichent dans la table de mixage (SF-16, SF-82).
   6. Confidentialité et hors ligne : aucune requête réseau ; aucun droit réseau sur macOS ; manifeste de confidentialité (aucun suivi, aucune donnée collectée, raisons déclarées pour les API concernées) ; un contrôle CI échoue si une API réseau apparaît dans `Sources/` ou `App/` (SF-20 ; NFR6, NFR7).
   7. Le parcours P0 sur macOS est vérifié et décrit dans la PR : importer un WAV sur A, charger la démo sur B, START/STOP, scratcher à la souris et au trackpad, crossfader et coupures au clavier (spec, section 7, P0).
@@ -613,10 +614,10 @@ Les stories de l'épopée avancent sur la façade moteur du contrat 0.2 et sur u
 - **Critères d'acceptation :**
   1. `docs/qa/recette-v1.md` reprend chaque critère de la section 7 de la spec (P0 puis P1) avec son résultat, sa preuve (test XCTest, rapport de self-test, capture) et les anomalies, ouvertes en issues.
   2. Le self-test (2.4) et la CI sont ✅ sur `main` à la date de la recette.
-  3. Latence : tampon effectif relevé (objectif ≤ 256 trames à 48 kHz) ; latence geste→son mesurée selon une méthode décrite, puis consignée (SF-78, PO-07).
+  3. Latence : tampon effectif relevé (objectif ≤ 256 trames à 48 kHz) ; latence geste→son mesurée de l'horodatage système de l'événement à la sortie du son (latence de sortie annoncée incluse), sur les appareils de référence, puis consignée ; objectifs ≤ 20 ms sur écran 120 Hz et ≤ 30 ms sur écran 60 Hz, Bluetooth et AirPlay exclus ; un dépassement donne une gate CONCERNS et une issue de calibrage (SF-78, D-14, D-15).
   4. Mémoire : empreinte mesurée avec deux sons distincts de 10 min chargés (NFR4, PO-16).
   5. Sortie USB : essai avec une interface USB si elle est disponible (PO-08), sinon critère marqué « non testé, matériel indisponible ».
-  6. iOS et iPadOS : scénarios vérifiables sur simulateur exécutés ; scénarios exigeant un appareil (trois contacts, latence tactile, interruptions, casque) listés « à recetter sur appareil » (point A9).
+  6. iOS et iPadOS : scénarios vérifiables sur simulateur exécutés ; scénarios exigeant un appareil (trois contacts, latence tactile, interruptions, casque) listés « à recetter sur appareil » ; tant qu'ils ne sont pas recettés sur appareil, la gate est CONCERNS, documentée et acceptée par le PO pour le jalon (D-23).
   7. Décision de gate globale PASS, CONCERNS ou FAIL dans `docs/qa/gates/6.3-recette-v1.yml`.
 
 ## 8. Plan de livraison en vagues
@@ -770,6 +771,8 @@ Total : **26 stories** — EP1 : 5, EP2 : 4, EP3 : 5, EP4 : 6, EP5 : 3, EP6 : 3 
 La matrice de traçabilité complète (SF/RM → épopées) est tenue par Mary dans `traceability.md`.
 
 ## 10. Points à arbitrer par le PO
+
+> **Tranchés par le PO** dans [`po-validation.md`](po-validation.md) : A1 → D-03, A2 → D-04, A3 → D-12, A4 → D-18, A5 → D-19, A6 → D-20, A7 → D-21, A8 → D-22, A9 → D-23, A10 → D-07, D-08, D-24 à D-27, A11 → D-01, A12 → D-02 (hamster en P1), A13 → D-14 (iPad à puce M1 ou plus récente), A14 → D-15. Les critères des stories concernées sont à jour dans ce PRD (v1.1).
 
 | # | Sujet | Constat | Proposition du PM |
 |---|---|---|---|
