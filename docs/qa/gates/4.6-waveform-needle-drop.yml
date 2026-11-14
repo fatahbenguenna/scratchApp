@@ -1,0 +1,62 @@
+schema: 1
+story: "4.6"
+story_title: "Forme d'onde et needle drop"
+pr: 95
+issue: 38
+reviewed_sha: "833fa3c"
+gate: PASS
+status_reason: >-
+  Seul le commit propre à la 4.6 a été relu (d65a56f = 4.5 de #87). Les six critères sont
+  implémentés : pics multirésolution en Int16 (1,44 Mo pour 10 min), analysés hors du fil principal,
+  annulables, partagés entre platines (RM-57) ; bande zoomée en tuiles rendues une fois et translatées ;
+  aperçu avec amorce ; needle drop au relâchement, annulé hors de la zone, ignoré disque tenu à l'appui
+  ou au relâchement ; marqueurs CUE avec éclat ; accessibilité de l'aperçu. Rebase --onto obligatoire
+  après la fusion par squash de #87 (simulé sans conflit). Retouches de faible gravité dans #102.
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues:
+  - id: "NEEDLE-SYSTEM-CANCEL"
+    severity: low
+    finding: "Un DragGesture annulé par le système n'appelle pas onEnded : tête fantôme et bulle restent affichées jusqu'au toucher suivant ; NeedleDropGesture.reset() n'est jamais appelé."
+    suggested_action: "@GestureState pour l'état du geste, ou reset() à l'annulation (#102)."
+  - id: "NFR4-NOT-MEASURED"
+    severity: low
+    finding: "testAnalysisTime_NFR4 sauté en Debug : l'objectif de 1 s n'est jamais mesuré en CI."
+    suggested_action: "L'ajouter au filtre de l'étape release de la CI (#82) ; mesure QA : 0,063 s en repli scalaire (#102)."
+checks:
+  - item: "CA 1 (NFR4, RM-57)"
+    result: "300 points par seconde, niveaux par deux, 1,44 Mo pour 10 min ; Task.detached annulable ; analyse unique pour A et B ; clip gardé pendant l'analyse puis rendu sur le fil principal."
+  - item: "CA 2 (bande zoomée)"
+    result: "±1,8 s, tête fixe, frame.positionSeconds ; tuiles de 512 pt equatable translatées ; hachures raccordées."
+  - item: "CA 3 (aperçu)"
+    result: "[−2 s ; durée], amorce proportionnelle ; enveloppe réduite une fois par largeur, partie lue par masque."
+  - item: "CA 4 (needle drop, D-33)"
+    result: "Fantôme et bulle mm:ss,d ; .seek au relâchement ; annulation au-delà de 44 pt ; ignoré disque tenu à l'appui ou au relâchement (instantané ou contact reçu)."
+  - item: "CA 5 (CUE)"
+    result: "Marqueur sur les deux formes d'onde, éclat de 150 ms par setCueCount, supprimé avec Réduire les animations."
+  - item: "CA 6 (accessibilité)"
+    result: "Bande masquée ; « Aperçu du son, platine A », valeur avec CUE ou « aucun CUE », ±5 %, sans effet disque tenu."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Sans objet."
+  performance:
+    status: PASS
+    notes: "Analyse hors du fil principal (0,063 s pour 10 min, mesure QA) ; aucune enveloppe recalculée par image."
+  reliability:
+    status: PASS
+    notes: "Analyse annulable et partagée ; garde du disque tenu ; réserve sur l'annulation système du geste (#102)."
+  maintainability:
+    status: PASS
+    notes: "Géométrie, enveloppe et geste purs et testés."
+evidence:
+  ci: "wait-ci sur 833fa3c : Linux ✅, macOS ✅ (rapport b57c998)"
+  linux_tests: "scripts/linux-test.sh sur le rebase simulé (squash de #87 sur e08e501, puis 833fa3c) : 234/234"
+  merge_check: "Sans conflit avec main, #84, #87, #88, #89, #99 ; rebase --onto origin/main d65a56f sans conflit"
+  analysis_probe: "WaveformAnalyzer en repli scalaire, release, Linux : 10 min à 48 kHz en 0,063 s, 1 439 992 octets"
+recommendations:
+  immediate:
+    - action: "Après la fusion de #87 : git rebase --onto origin/main d65a56f, puis fusionner."
+  future:
+    - action: "#102 : réinitialiser le geste à l'annulation système ; mesurer NFR4 dans l'étape release."
+    - action: "Recette (#44) : 120 i/s sans image perdue pendant un scratch, needle drop au doigt, VoiceOver sur l'aperçu."
