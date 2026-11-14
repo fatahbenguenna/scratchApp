@@ -1,0 +1,34 @@
+{
+  "checks" : {
+    "babyScratchReturnsToStart" : true,
+    "catchUpWithinSlipmatTime" : true,
+    "closedChannelSilent" : true,
+    "cutInWithin1ms" : true,
+    "noClickAtReversals" : true,
+    "noNaN" : true,
+    "nominalSpeedReached" : true,
+    "peakAtMost0dBFS" : true,
+    "platterSpinsWhileHeld" : true,
+    "rateSignFollowsGesture" : true,
+    "renderedThroughAVAudioEngine" : true,
+    "silentWhileHeldStill" : true
+  },
+  "details" : {
+    "babyReturnErrorSeconds" : 4.3604401689378847e-07,
+    "catchUpSeconds" : 0.05866666666666642,
+    "closedPeakDBFS" : -400,
+    "cutInRatioMinimum" : 0.8493944811530395,
+    "durationSeconds" : 1.929771065711975,
+    "framesRendered" : 374400,
+    "heldPeakDBFS" : -178.82444373790705,
+    "nominalRateMaximum" : 1,
+    "nominalRateMinimum" : 0.9999999354527889,
+    "nonFiniteSamples" : 0,
+    "peakDBFS" : -5.494991825519716,
+    "platterTravelWhileHeld" : 1.7127497726323782,
+    "pullRateMaximum" : -1.719712761523826,
+    "pushRateMinimum" : 1.7127689660421177,
+    "reversalsChecked" : 17
+  },
+  "passed" : true
+}
