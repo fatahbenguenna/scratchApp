@@ -19,6 +19,7 @@ struct DeckBandView: View {
             if model.deck == .a { panel }
         }
         .frame(maxWidth: .infinity)
+        .deckDropZone(model: model, intents: intents)  // 5.2: drop target over the whole band (UX §5.9)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Platine \(model.deck.rawValue)")
     }
