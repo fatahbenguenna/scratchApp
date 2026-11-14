@@ -1,0 +1,55 @@
+schema: 1
+story: "2.4"
+story_title: "Self-test de scratch complet en CI"
+pr: 82
+issue: 27
+reviewed_sha: "4fb6c4b"
+gate: PASS
+status_reason: >-
+  ScratchApp --selftest joue ScratchScenario avec le son de démonstration sur A et B à travers un
+  AVAudioEngine en rendu manuel (48 kHz, tranches de 256 trames) ; 12 vérifications nommées, toutes
+  vraies, en 1,96 s ; un son muet fait échouer le test. Étape release en CI (charge 4,7 %, 0 allocation,
+  0 retenue), compteur d'allocations exigé, retain_n et release_n comptés, mesures publiées au rapport.
+  Seule réserve : nœud privé TODO(2.1) en attendant ScratchAudioGraph (#84), suivi par #90.
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues:
+  - id: "SELFTEST-GRAPH"
+    severity: low
+    finding: "Nœud source privé (makeSourceNode, TODO(2.1)) branché sur mainMixerNode au lieu de la fabrique partagée de la 2.1 (CA 1)."
+    suggested_action: "Basculer sur ScratchAudioGraph.offline une fois #82 et #84 fusionnées (#90)."
+checks:
+  - item: "Self-test (CA 1 à 4)"
+    result: "selftest.json : passed true, 11 vérifications de ScratchScenario.checkNames plus renderedThroughAVAudioEngine, framesRendered 374 400, durationSeconds 1,96 ; code de retour non nul en cas d'échec ; pipefail sur l'étape."
+  - item: "Son muet"
+    result: "testSelfTestFailsOnSilentClip : passed faux, cutInWithin1ms faux, noNaN vrai."
+  - item: "Étape release et compteur exigé"
+    result: "swift test -c release -enable-testing --filter RenderLoadTests|RealTimeAllocationTests ; requireCounter() échoue au lieu de sauter ; isAvailable exige tous les crochets et le drapeau de swizzling."
+  - item: "retain_n / release_n"
+    result: "Crochets RetainN et ReleaseN : un appel _n compte pour n ; sonde QA : 0 appel _n sur le chemin de rendu actuel."
+  - item: "Mesures au rapport"
+    result: "Bloc « Mesures temps réel (macOS, NFR2 et NFR3) » : NFR3 63,5 % en debug, 251 µs = 4,7 % en release ; NFR2 0 allocation, 0 retenue de clip (debug et release), 0 retenue au total en release."
+  - item: "Graphe privé TODO(2.1)"
+    result: "Corps du bloc identique à ScratchAudioGraph.renderBlock(for:) de #84 ; passage par mainMixerNode transparent pour les seuils, non garanti exact à l'échantillon près."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Sans objet."
+  performance:
+    status: PASS
+    notes: "Self-test en 1,96 s (< 30 s) ; charge de rendu 4,7 % en release (NFR3 ≤ 30 %), publiée à chaque PR."
+  reliability:
+    status: PASS
+    notes: "Échec franc sur un son muet ; pipefail ; compteur d'allocations exigé en CI."
+  maintainability:
+    status: PASS
+    notes: "Vérifications partagées avec ScratchScenario ; dette du graphe privé marquée et suivie (#90)."
+evidence:
+  ci: "Rapport CI b5b6797 (4fb6c4b fusionné dans 3839e8f) : Linux ✅, macOS ✅ (étape release comprise)"
+  linux_tests: "scripts/linux-test.sh : code de retour 0 (compteur d'allocations disponible sous Linux)"
+  merge_check: "git merge-tree avec origin/main (5d7565c) et avec story/2.1-audio-engine-host : sans conflit"
+recommendations:
+  immediate:
+    - action: "Fusionner ; ordre indifférent avec #84."
+  future:
+    - action: "#90 : SelfTest sur ScratchAudioGraph.offline (branchement direct sur outputNode)."
