@@ -1,4 +1,7 @@
-/// Moteur audio de ScratchApp : deux platines et une table de mixage (architecture §3, §5.1 et §6.2).
+import Foundation
+
+/// Moteur audio de ScratchApp : deux platines et une table de mixage (architecture §3, §5.1 et §6.2 ;
+/// story 1.5).
 ///
 /// Fils d'exécution :
 /// - **fil de contrôle** (fil principal dans l'app) : `send`, `latestSnapshot`, `drainReleasedClips`,
@@ -7,10 +10,17 @@
 ///
 /// Communication : file SPSC de commandes (contrôle → audio), triple tampon d'instantanés
 /// (audio → contrôle), file SPSC de retour des clips remplacés (audio → contrôle). `render` ne
-/// prend aucun verrou, n'alloue rien et ne libère aucun objet.
+/// prend aucun verrou, n'alloue rien, ne libère aucun objet et ne touche jamais un `AudioClip` : il
+/// lit ses échantillons par une `ClipView` construite sur le fil de contrôle (aucun comptage de
+/// références sur le fil audio).
 ///
-/// Version minimale (story 0.2) : les commandes sont appliquées et reflétées dans l'instantané,
-/// le rendu produit du silence. La physique et le DSP arrivent avec les stories 1.1 à 1.5 (James).
+/// Rendu (§6.2) : commandes en attente, puis blocs de 512 trames au plus — physique (1.1), voix
+/// (1.3), table de mixage (1.4) — puis un instantané complet par appel, dont les mesures (crêtes,
+/// réduction du limiteur) couvrent **tous** les blocs de l'appel.
+///
+/// Remplacement d'un son en lecture (SF-15) : l'ancien clip reste sur le fil audio le temps d'un
+/// fondu de sortie de 5 ms, à la position et à la vitesse qu'il avait, puis rejoint la file de
+/// retour (aucune coupure nette).
 public final class ScratchEngine: EngineControlling, @unchecked Sendable {
     /// Capacité de la file de commandes (plus de 2 s de touches regroupées à 240 Hz sur deux disques).
     public static let commandCapacity = 1024
@@ -33,6 +43,7 @@ public final class ScratchEngine: EngineControlling, @unchecked Sendable {
     private var motorTimings = MotorTimings.defaults
     private var outputSampleRate: Double
     private var sampleTime: Int64 = 0
+    private var meters = RenderMeters()
     private let scratch: RenderScratch
 
     /// - Parameter outputSampleRate: fréquence de sortie initiale (modifiable par
@@ -47,14 +58,14 @@ public final class ScratchEngine: EngineControlling, @unchecked Sendable {
         self.snapshots = SnapshotBuffer(initialValue: EngineSnapshot(outputSampleRate: rate))
         assert(_isPOD(RenderCommand.self), "RenderCommand must stay trivial (real-time rule)")
         assert(_isPOD(EngineSnapshot.self), "EngineSnapshot must stay trivial (real-time rule)")
-        // Warm-up: run the audio-side code paths once off the audio thread.
+        warmUp()
         pump()
     }
 
     deinit {
         while let command = commands.pop() { command.releaseUnsentClip() }
-        deckA.clip?.release()
-        deckB.clip?.release()
+        deckA.releaseAll()
+        deckB.releaseAll()
         while let clip = releases.pop() { clip.release() }
     }
 
@@ -88,10 +99,17 @@ public final class ScratchEngine: EngineControlling, @unchecked Sendable {
         return released
     }
 
+    /// Applique les commandes et publie un instantané sans rendre d'audio ni avancer le temps
+    /// (hôte arrêté). Les mesures publiées sont nulles : rien n'est rendu.
     public func pump() {
         audioRole.enter("ScratchEngine.pump called while the audio thread is rendering")
         defer { audioRole.exit() }
         applyPendingCommands()
+        // Nothing is rendered: a replaced clip has no sound to fade out and goes back at once.
+        deckA.abandonFadeOut()
+        deckB.abandonFadeOut()
+        returnFadedClips()
+        meters = RenderMeters()
         publishSnapshot()
     }
 
@@ -102,17 +120,20 @@ public final class ScratchEngine: EngineControlling, @unchecked Sendable {
     ///
     /// Ordre : commandes en attente, puis blocs de `maximumBlockFrames` au plus (physique →
     /// lecture → mixage), puis publication d'un instantané. Temps réel : aucune allocation, aucun
-    /// verrou, aucune libération d'objet.
+    /// verrou, aucune libération d'objet, aucun comptage de références.
     public func render(frameCount: Int, left: UnsafeMutablePointer<Float>, right: UnsafeMutablePointer<Float>) {
         audioRole.enter("ScratchEngine.render called concurrently (two audio threads, or pump during render)")
         defer { audioRole.exit() }
         applyPendingCommands()
+        meters = RenderMeters()
         var offset = 0
         while offset < frameCount {
             let count = min(ScratchEngine.maximumBlockFrames, frameCount - offset)
             renderBlock(frameCount: count, left: left + offset, right: right + offset)
+            meters.accumulate(mixer)
             offset += count
         }
+        returnFadedClips()
         sampleTime += Int64(max(0, frameCount))
         publishSnapshot()
     }
@@ -120,8 +141,8 @@ public final class ScratchEngine: EngineControlling, @unchecked Sendable {
     // MARK: Interne
 
     private func renderBlock(frameCount: Int, left: UnsafeMutablePointer<Float>, right: UnsafeMutablePointer<Float>) {
-        deckA.render(frameCount: frameCount, scratch: scratch.a)
-        deckB.render(frameCount: frameCount, scratch: scratch.b)
+        deckA.render(frameCount: frameCount, scratch: scratch.a, outgoing: scratch.outgoing)
+        deckB.render(frameCount: frameCount, scratch: scratch.b, outgoing: scratch.outgoing)
         mixer.mix(
             a: (UnsafePointer(scratch.a.left), UnsafePointer(scratch.a.right)),
             b: (UnsafePointer(scratch.b.left), UnsafePointer(scratch.b.right)),
@@ -129,6 +150,12 @@ public final class ScratchEngine: EngineControlling, @unchecked Sendable {
             left: left,
             right: right
         )
+    }
+
+    /// Rend à la file de retour les clips dont le fondu de sortie est fini, s'il y a de la place.
+    private func returnFadedClips() {
+        if releases.availableCapacity > 0, let clip = deckA.takeFadedOutgoing() { _ = releases.push(clip) }
+        if releases.availableCapacity > 0, let clip = deckB.takeFadedOutgoing() { _ = releases.push(clip) }
     }
 
     private func applyPendingCommands() {
@@ -140,13 +167,13 @@ public final class ScratchEngine: EngineControlling, @unchecked Sendable {
 
     private func apply(_ command: RenderCommand) {
         switch command {
-        case let .load(deck, clip):
+        case let .load(deck, clip, view):
             withDeck(deck) { channel in
-                if let previous = channel.replaceClip(with: clip) { _ = releases.push(previous) }
+                if let previous = channel.replaceClip(with: clip, view: view) { _ = releases.push(previous) }
             }
         case let .unload(deck):
             withDeck(deck) { channel in
-                if let previous = channel.replaceClip(with: nil) { _ = releases.push(previous) }
+                if let previous = channel.replaceClip(with: nil, view: nil) { _ = releases.push(previous) }
             }
         case let .motor(deck, on): withDeck(deck) { $0.physics.setMotor(on) }
         case let .speed(deck, speed): withDeck(deck) { $0.physics.setSpeed(speed) }
@@ -201,9 +228,25 @@ public final class ScratchEngine: EngineControlling, @unchecked Sendable {
         }
     }
 
+    /// Échauffement (architecture §6.1 règle 7) : rend un bloc sur des copies des composants, hors du
+    /// fil audio, pour instancier les métadonnées et parcourir le code du rendu avant le premier
+    /// appel réel. L'état du moteur n'est pas modifié.
+    private func warmUp() {
+        var channel = deckA
+        var mixerCopy = mixer
+        channel.render(frameCount: ScratchEngine.maximumBlockFrames, scratch: scratch.a, outgoing: scratch.outgoing)
+        mixerCopy.mix(
+            a: (UnsafePointer(scratch.a.left), UnsafePointer(scratch.a.right)),
+            b: (UnsafePointer(scratch.a.left), UnsafePointer(scratch.a.right)),
+            frameCount: ScratchEngine.maximumBlockFrames,
+            left: scratch.b.left,
+            right: scratch.b.right
+        )
+    }
+
     private func publishSnapshot() {
         snapshots.write(EngineSnapshot(
-            decks: DeckPair(a: deckA.snapshot(peak: mixer.channelPeaks.a), b: deckB.snapshot(peak: mixer.channelPeaks.b)),
+            decks: DeckPair(a: deckA.snapshot(peak: meters.channelPeaks.a), b: deckB.snapshot(peak: meters.channelPeaks.b)),
             mixer: MixerSnapshot(
                 crossfader: mixer.crossfader,
                 crossfaderCurve: mixer.crossfaderCurve,
@@ -211,8 +254,8 @@ public final class ScratchEngine: EngineControlling, @unchecked Sendable {
                 lineFaders: mixer.lineFaders,
                 momentaryCuts: mixer.momentaryCuts,
                 channelGains: mixer.channelGains,
-                outputPeak: mixer.outputPeak,
-                limiterReduction: mixer.limiterReduction
+                outputPeak: meters.outputPeak,
+                limiterReduction: meters.limiterReduction
             ),
             motorTimings: motorTimings,
             outputSampleRate: outputSampleRate,
@@ -221,51 +264,128 @@ public final class ScratchEngine: EngineControlling, @unchecked Sendable {
     }
 }
 
-/// Une platine côté fil audio : clip (référence non gérée), physique et lecture.
+/// Mesures d'un appel de rendu : maximum sur tous ses blocs (un tampon d'hôte de plus de 512 trames
+/// est rendu en plusieurs blocs).
+struct RenderMeters {
+    var channelPeaks = DeckPair<Double>(repeating: 0)
+    var outputPeak: Double = 0
+    var limiterReduction: Double = 0
+
+    mutating func accumulate(_ mixer: MixerRenderer) {
+        channelPeaks = DeckPair(a: max(channelPeaks.a, mixer.channelPeaks.a), b: max(channelPeaks.b, mixer.channelPeaks.b))
+        outputPeak = max(outputPeak, mixer.outputPeak)
+        limiterReduction = max(limiterReduction, mixer.limiterReduction)
+    }
+}
+
+/// Une platine côté fil audio : clip (référence non gérée et vue), physique, voix, et fondu de sortie
+/// du clip remplacé.
 struct DeckChannel {
     private(set) var clip: Unmanaged<AudioClip>?
+    private(set) var view: ClipView?
     var physics: DeckPhysics
     var renderer: DeckRenderer
+
+    // Clip being faded out after a replacement (kept on the audio thread until the fade ends).
+    private var outgoing: Unmanaged<AudioClip>?
+    private var outgoingView: ClipView?
+    private var outgoingRenderer: DeckRenderer
+    private var outgoingPosition = 0.0
+    private var outgoingRate = 0.0
+    private var outgoingRemaining = 0
+    private var outgoingLength = 1
 
     init(sampleRate: Double) {
         physics = DeckPhysics(sampleRate: sampleRate)
         renderer = DeckRenderer(outputSampleRate: sampleRate)
+        outgoingRenderer = renderer
+        updateFadeLength(sampleRate)
     }
 
-    /// Remplace le clip et revient à l'état initial (SF-03) ; renvoie l'ancien, à rendre au fil de
-    /// contrôle par la file de retour.
-    mutating func replaceClip(with newClip: Unmanaged<AudioClip>?) -> Unmanaged<AudioClip>? {
-        let previous = clip
+    /// Un clip remplacé est encore en cours de fondu de sortie (diagnostic, tests).
+    var isFadingOut: Bool { outgoing != nil && outgoingRemaining > 0 }
+
+    /// Remplace le clip et revient à l'état initial (SF-03). Le clip remplacé reste en fondu de sortie
+    /// s'il était audible ; renvoie le clip à rendre **tout de suite** par la file de retour (au plus
+    /// un : celui d'un remplacement précédent encore présent).
+    mutating func replaceClip(with newClip: Unmanaged<AudioClip>?, view newView: ClipView?) -> Unmanaged<AudioClip>? {
+        let immediate = outgoing
+        outgoing = clip
+        outgoingView = view
+        outgoingRenderer = renderer
+        outgoingPosition = physics.positionSeconds
+        outgoingRate = physics.playbackRate
+        outgoingRemaining = clip != nil && renderer.isAudible ? outgoingLength : 0
         clip = newClip
-        let duration = newClip.map { $0._withUnsafeGuaranteedRef { $0.duration } } ?? 0
-        physics.reset(duration: duration)
+        view = newView
+        physics.reset(duration: newView?.duration ?? 0)
         renderer.reset()
-        return previous
+        return immediate
+    }
+
+    /// Hôte arrêté (`pump`) : le fondu de sortie ne peut pas avancer ; le clip est rendu tout de suite.
+    mutating func abandonFadeOut() { outgoingRemaining = 0 }
+
+    /// Clip remplacé dont le fondu est fini, à rendre par la file de retour.
+    mutating func takeFadedOutgoing() -> Unmanaged<AudioClip>? {
+        guard let done = outgoing, outgoingRemaining == 0 else { return nil }
+        outgoing = nil
+        outgoingView = nil
+        return done
+    }
+
+    /// Fil de contrôle (`deinit` du moteur) : rend les +1 du clip courant et du clip en fondu.
+    mutating func releaseAll() {
+        clip?.release()
+        outgoing?.release()
+        clip = nil
+        outgoing = nil
     }
 
     mutating func setOutputSampleRate(_ rate: Double) {
         physics.setSampleRate(rate)
         renderer.setOutputSampleRate(rate)
+        outgoingRenderer.setOutputSampleRate(rate)
+        updateFadeLength(rate)
     }
 
-    mutating func render(frameCount: Int, scratch: RenderScratch.Deck) {
+    private mutating func updateFadeLength(_ rate: Double) {
+        outgoingLength = max(1, Int((TurntableConstants.jumpFadeDuration * rate).rounded()))
+        outgoingRemaining = min(outgoingRemaining, outgoingLength)
+    }
+
+    /// Fil audio uniquement. Physique, saut, voix, puis fondu de sortie du clip remplacé, ajouté à la
+    /// voix dans `scratch.left/right`.
+    mutating func render(frameCount: Int, scratch: RenderScratch.Deck, outgoing work: RenderScratch.Deck) {
         // A jump (CUE, needle drop) is applied between blocks: the voice fades the old position out.
         if let origin = physics.takeJumpOrigin() { renderer.beginJumpCrossfade(from: origin) }
         physics.process(frameCount: frameCount, positions: scratch.positions, rates: scratch.rates)
-        if let clip {
-            clip._withUnsafeGuaranteedRef { audioClip in
-                renderer.render(clip: audioClip, positions: scratch.positions, rates: scratch.rates,
-                                frameCount: frameCount, left: scratch.left, right: scratch.right)
-            }
-        } else {
-            renderer.render(clip: nil, positions: scratch.positions, rates: scratch.rates,
-                            frameCount: frameCount, left: scratch.left, right: scratch.right)
+        renderer.render(clip: view, positions: scratch.positions, rates: scratch.rates,
+                        frameCount: frameCount, left: scratch.left, right: scratch.right)
+        guard outgoingRemaining > 0, let outgoingView else { return }
+        // The replaced sound carries on at its last speed while it fades out (raised cosine).
+        let dt = renderer.outputSampleRate > 0 ? 1 / renderer.outputSampleRate : 0
+        let upper = outgoingView.duration
+        let count = min(frameCount, outgoingRemaining)
+        for index in 0..<count {
+            outgoingPosition = min(upper, max(-TurntableConstants.leadInSeconds, outgoingPosition + outgoingRate * dt))
+            work.positions[index] = outgoingPosition
+            work.rates[index] = outgoingRate
         }
+        outgoingRenderer.render(clip: outgoingView, positions: work.positions, rates: work.rates,
+                                frameCount: count, left: work.left, right: work.right)
+        for index in 0..<count {
+            let progress = Double(outgoingLength - outgoingRemaining + index + 1) / Double(outgoingLength)
+            let gain = Float(0.5 + 0.5 * cos(Double.pi * progress))
+            scratch.left[index] += work.left[index] * gain
+            scratch.right[index] += work.right[index] * gain
+        }
+        outgoingRemaining -= count
     }
 
     func snapshot(peak: Double) -> DeckSnapshot {
         DeckSnapshot(
-            clipID: clip.map { $0._withUnsafeGuaranteedRef { $0.id } },
+            clipID: view?.id,
             durationSeconds: physics.durationSeconds,
             positionSeconds: physics.positionSeconds,
             playbackRate: physics.playbackRate,
@@ -285,7 +405,8 @@ struct DeckChannel {
     }
 }
 
-/// Tampons de travail préalloués du rendu (un jeu par platine).
+/// Tampons de travail préalloués du rendu : un jeu par platine et un jeu pour le fondu de sortie des
+/// clips remplacés (partagé, utilisé une platine après l'autre).
 final class RenderScratch {
     struct Deck {
         let positions: UnsafeMutablePointer<Double>
@@ -297,6 +418,7 @@ final class RenderScratch {
     let capacity: Int
     let a: Deck
     let b: Deck
+    let outgoing: Deck
 
     init(capacity: Int) {
         self.capacity = capacity
@@ -313,10 +435,11 @@ final class RenderScratch {
         }
         a = make()
         b = make()
+        outgoing = make()
     }
 
     deinit {
-        for deck in [a, b] {
+        for deck in [a, b, outgoing] {
             deck.positions.deallocate()
             deck.rates.deallocate()
             deck.left.deallocate()

@@ -1,10 +1,11 @@
 /// Forme interne d'`EngineCommand` transportée par la file SPSC.
 ///
 /// Identique à `EngineCommand`, sauf que le clip voyage comme référence **non gérée** déjà
-/// retenue (+1) par `send` : l'élément de file est trivial, le fil audio ne fait aucun comptage
-/// de références et ne libère jamais un clip (ADR-03, ADR-05).
+/// retenue (+1) par `send`, accompagnée de sa `ClipView` construite sur le fil de contrôle :
+/// l'élément de file est trivial, le fil audio ne touche jamais l'objet (aucun comptage de
+/// références, même en débogage) et ne libère jamais un clip (ADR-03, ADR-05 ; story 1.5).
 enum RenderCommand {
-    case load(DeckID, Unmanaged<AudioClip>)
+    case load(DeckID, Unmanaged<AudioClip>, ClipView)
     case unload(DeckID)
     case motor(DeckID, on: Bool)
     case speed(DeckID, TurntableSpeed)
@@ -31,7 +32,7 @@ enum RenderCommand {
     /// appeler `releaseUnsentClip()` si la commande n'a pas pu être mise en file.
     init(_ command: EngineCommand) {
         switch command {
-        case let .load(deck, clip): self = .load(deck, Unmanaged.passRetained(clip))
+        case let .load(deck, clip): self = .load(deck, Unmanaged.passRetained(clip), ClipView(clip))
         case let .unload(deck): self = .unload(deck)
         case let .motor(deck, on): self = .motor(deck, on: on)
         case let .speed(deck, speed): self = .speed(deck, speed)
@@ -59,6 +60,6 @@ enum RenderCommand {
 
     /// Rend le +1 pris par `init(_:)` sur une commande qui n'est pas partie (fil de contrôle).
     func releaseUnsentClip() {
-        if case let .load(_, clip) = self { clip.release() }
+        if case let .load(_, clip, _) = self { clip.release() }
     }
 }

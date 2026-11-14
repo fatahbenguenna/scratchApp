@@ -47,11 +47,11 @@ final class VoiceHarness {
         self.sampleRate = sampleRate
         channel = DeckChannel(sampleRate: sampleRate)
         channel.physics = DeckPhysics(sampleRate: sampleRate, fingerConfiguration: finger)
-        _ = channel.replaceClip(with: clip.map { Unmanaged.passRetained($0) })
+        _ = channel.replaceClip(with: clip.map { Unmanaged.passRetained($0) }, view: clip.map(ClipView.init))
     }
 
     deinit {
-        channel.replaceClip(with: nil)?.release()
+        channel.releaseAll()
     }
 
     var time: Double { Double(sampleCount) / sampleRate }
@@ -103,7 +103,7 @@ final class VoiceHarness {
         while remaining > 0 {
             let count = min(block, remaining, scratch.capacity)
             deliverDueTouches()
-            channel.render(frameCount: count, scratch: deck)
+            channel.render(frameCount: count, scratch: deck, outgoing: scratch.outgoing)
             output.left.append(contentsOf: UnsafeBufferPointer(start: deck.left, count: count))
             output.right.append(contentsOf: UnsafeBufferPointer(start: deck.right, count: count))
             output.positions.append(contentsOf: UnsafeBufferPointer(start: deck.positions, count: count))
