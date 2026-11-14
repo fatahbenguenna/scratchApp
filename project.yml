@@ -30,6 +30,10 @@ targets:
         product: ScratchUI
       - package: ScratchKit
         product: ScratchAudio
+      - package: ScratchKit
+        product: ScratchLibrary
+      - package: ScratchKit
+        product: ScratchCore
     info:
       path: App/iOS/Info.plist
       properties:
@@ -67,6 +71,10 @@ targets:
         product: ScratchUI
       - package: ScratchKit
         product: ScratchAudio
+      - package: ScratchKit
+        product: ScratchLibrary
+      - package: ScratchKit
+        product: ScratchCore
     info:
       path: App/macOS/Info.plist
       properties:

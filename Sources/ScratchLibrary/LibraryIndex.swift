@@ -13,7 +13,8 @@ import ScratchCore
 ///   sans jamais écraser un document déjà mis de côté) et la bibliothèque repart vide. Une entrée
 ///   isolée illisible, en double ou qui se présente comme la démo est ignorée ; le document
 ///   d'origine est alors copié de la même façon, pour qu'aucune donnée ne soit perdue, et
-///   `LoadResult.isPartial` demande au magasin de réécrire l'index nettoyé (une seule mise de côté).
+///   `LoadResult.recovery` vaut `.partial` : le magasin réécrit alors l'index nettoyé (une seule mise
+///   de côté, #51).
 struct LibraryIndex: Sendable {
     /// Version du format écrit et seule version lue.
     static let currentVersion = 1
@@ -27,9 +28,9 @@ struct LibraryIndex: Sendable {
         var entries: [LibraryEntry]
         /// Copie mise de côté du document lu, s'il était illisible en tout ou en partie.
         var setAsideURL: URL?
-        /// Le document était lisible mais des entrées ont été ignorées : il doit être réécrit avec
-        /// les seules entrées lues, pour n'être mis de côté qu'une fois (#51).
-        var isPartial = false
+        /// Issue de la lecture (D-49) : `.partial` demande de réécrire l'index avec les seules entrées
+        /// lues, pour qu'il ne soit mis de côté qu'une fois (#51).
+        var recovery = LibraryIndexRecovery.none
     }
 
     /// Lit l'index. Ne lève jamais d'erreur : un index absent donne une liste vide.
@@ -40,7 +41,7 @@ struct LibraryIndex: Sendable {
               let document = try? Self.makeDecoder().decode(StoredDocument.self, from: data),
               document.version == Self.currentVersion
         else {
-            return LoadResult(entries: [], setAsideURL: setAside(keepingOriginal: false))
+            return LoadResult(entries: [], setAsideURL: setAside(keepingOriginal: false), recovery: .reset)
         }
         var seen: Set<UUID> = []
         var entries: [LibraryEntry] = []
@@ -52,7 +53,7 @@ struct LibraryIndex: Sendable {
         }
         let skippedSome = entries.count != document.entries.count
         return LoadResult(entries: entries, setAsideURL: skippedSome ? setAside(keepingOriginal: true) : nil,
-                          isPartial: skippedSome)
+                          recovery: skippedSome ? .partial : .none)
     }
 
     /// Écrit l'index de façon atomique (le son de démonstration est toujours exclu).
@@ -129,4 +130,17 @@ struct LibraryIndex: Sendable {
             return nil
         }
     }
+}
+
+/// Issue de la lecture de l'index au premier accès du magasin (NFR12 ; D-49, story 6.1 CA 10).
+///
+/// Exposée par le type concret `LibraryStore`, hors de `Contracts/` : l'`AppModel` affiche le
+/// bandeau correspondant une seule fois au lancement.
+public enum LibraryIndexRecovery: Equatable, Sendable {
+    /// Index absent ou lu en entier.
+    case none
+    /// Index illisible ou d'une version inconnue, mis de côté : la bibliothèque est repartie vide.
+    case reset
+    /// Index lisible dont des entrées ont été ignorées : il a été réécrit avec les autres.
+    case partial
 }
