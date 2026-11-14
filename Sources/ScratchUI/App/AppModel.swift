@@ -173,6 +173,13 @@ public final class AppModel {
         return try await library.importFile(at: url)
     }
 
+    /// Fichier déposé (5.2) : importé puis chargé comme un fichier choisi. La copie temporaire d'un
+    /// dépôt depuis Fichiers (iPad) est supprimée ensuite ; un fichier du Finder n'est jamais touché.
+    public func importDroppedFileAndWait(_ url: URL, on deck: DeckID) async {
+        await importAndLoad(url, on: deck)
+        DroppedFileLoader.removeStaged(url)
+    }
+
     // MARK: - Chargement (CA 3, 5, 6, 7, 8)
 
     /// Charge `entry` sur `deck` selon les règles de remplacement (SF-15, D-40) : utilisé par
@@ -314,7 +321,7 @@ extension AppModel: DeckIntents {
 
     /// Dépôt d'un fichier sur la platine : même parcours qu'un import (SF-73 ; 5.2).
     public func importDroppedFile(_ url: URL, on deck: DeckID) {
-        Task { await self.importAndLoad(url, on: deck) }
+        Task { await self.importDroppedFileAndWait(url, on: deck) }
     }
 
     /// Écran Bibliothèque : story 3.5.

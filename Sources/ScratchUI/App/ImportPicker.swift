@@ -12,7 +12,7 @@ struct ImportPicker: ViewModifier {
     @Bindable var model: AppModel
 
     /// Types acceptés : WAV, AIFF, MP3, M4A (AAC ou ALAC).
-    static let contentTypes: [UTType] = [.wav, .aiff, .mp3, .mpeg4Audio]
+    static let contentTypes: [UTType] = AudioDropFilter.acceptedTypes
 
     func body(content: Content) -> some View {
         content
