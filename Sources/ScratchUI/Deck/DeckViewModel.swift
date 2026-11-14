@@ -1,3 +1,4 @@
+import Foundation
 import Observation
 import ScratchCore
 import ScratchLibrary
@@ -60,6 +61,14 @@ public final class DeckViewModel {
     @ObservationIgnored private var confirmedClipID: AudioClip.ID?
     @ObservationIgnored private var previousClipID: AudioClip.ID?
 
+    // Commanded values shown until a snapshot confirms them (#57).
+    @ObservationIgnored private var commandedMotor = CommandedValue<Bool>()
+    @ObservationIgnored private var commandedSpeed = CommandedValue<TurntableSpeed>()
+    @ObservationIgnored private var commandedPitch = CommandedValue<Double>()
+    @ObservationIgnored private var commandedResistance = CommandedValue<Double>()
+    /// Horloge monotone des confirmations (injectée par les tests).
+    @ObservationIgnored var clock: () -> Double = { ProcessInfo.processInfo.systemUptime }
+
     public init(deck: DeckID, engine: any EngineControlling) {
         self.deck = deck
         self.engine = engine
@@ -116,10 +125,16 @@ public final class DeckViewModel {
     func apply(_ snapshot: DeckSnapshot) {
         if frame != snapshot { frame = snapshot }
         if isLoaded != snapshot.isLoaded { isLoaded = snapshot.isLoaded }
-        if motorOn != snapshot.motorOn { motorOn = snapshot.motorOn }
-        if speed != snapshot.speed { speed = snapshot.speed }
-        if pitch != snapshot.pitch { pitch = snapshot.pitch }
-        if resistance != snapshot.resistance { resistance = snapshot.resistance }
+        // A commanded value stays shown until a snapshot confirms it (#57).
+        let now = clock()
+        let shownMotor = commandedMotor.resolve(snapshot.motorOn, at: now)
+        if motorOn != shownMotor { motorOn = shownMotor }
+        let shownSpeed = commandedSpeed.resolve(snapshot.speed, at: now)
+        if speed != shownSpeed { speed = shownSpeed }
+        let shownPitch = commandedPitch.resolve(snapshot.pitch, at: now)
+        if pitch != shownPitch { pitch = shownPitch }
+        let shownResistance = commandedResistance.resolve(snapshot.resistance, at: now)
+        if resistance != shownResistance { resistance = shownResistance }
         if cueSeconds != snapshot.cueSeconds { cueSeconds = snapshot.cueSeconds }
         if isHeld != snapshot.isHeld { isHeld = snapshot.isHeld }
         if isAtEnd != snapshot.isAtEnd { isAtEnd = snapshot.isAtEnd }
@@ -194,18 +209,23 @@ public final class DeckViewModel {
     public func setMotor(_ on: Bool) {
         guard engine.send(.motor(deck, on: on)) else { return }
         motorOn = on
+        commandedMotor.command(on, at: clock())
         if on, !isLoaded { emptyDeckHighlightCount &+= 1 }
     }
 
     /// 33⅓ / 45 RPM (SF-04).
     public func setSpeed(_ newSpeed: TurntableSpeed) {
-        if engine.send(.speed(deck, newSpeed)) { speed = newSpeed }
+        guard engine.send(.speed(deck, newSpeed)) else { return }
+        speed = newSpeed
+        commandedSpeed.command(newSpeed, at: clock())
     }
 
     /// Pitch en fraction, quantifié au pas de 0,1 % et borné à ±8 % (SF-11).
     public func setPitch(_ value: Double) {
         let quantized = Self.quantizedPitch(value)
-        if engine.send(.pitch(deck, quantized)) { pitch = quantized }
+        guard engine.send(.pitch(deck, quantized)) else { return }
+        pitch = quantized
+        commandedPitch.command(quantized, at: clock())
     }
 
     /// Pitch ± `steps` × 0,1 % (clavier Mac, actions d'accessibilité : 3.5, 6.16).
@@ -229,7 +249,9 @@ public final class DeckViewModel {
     /// Résistance du vinyle 0…1 (SF-21).
     public func setResistance(_ value: Double) {
         let clamped = value.clamped(to: 0...1, fallback: TurntableConstants.defaultResistance)
-        if engine.send(.resistance(deck, clamped)) { resistance = clamped }
+        guard engine.send(.resistance(deck, clamped)) else { return }
+        resistance = clamped
+        commandedResistance.command(clamped, at: clock())
     }
 
     /// SET CUE (SF-13).

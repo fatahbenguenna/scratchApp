@@ -10,18 +10,27 @@ import UIKit
 /// Horloge d'affichage : appelle `AppModel.tick()` une fois par image de l'écran (UX §10.1 ; ADR-12).
 ///
 /// `CADisplayLink` sur iOS (80 à 120 Hz demandés), `NSView.displayLink(target:selector:)` sur
-/// macOS 14. La boucle se suspend quand l'instantané est au repos (`EngineSnapshot.isIdle`) si une
-/// source de réveil est branchée (`DisplayWakingEngine`) ; elle reprend à la commande suivante.
-/// Sans source de réveil, elle ne se suspend jamais. Fil principal uniquement.
+/// macOS 14. La boucle se suspend quand l'instantané est au repos (`EngineSnapshot.isIdle`) sans
+/// interruption pendant `idleGracePeriod`, si une source de réveil est branchée
+/// (`DisplayWakingEngine`) ; elle reprend à la commande suivante. Le délai de grâce couvre le retard
+/// de l'instantané sur les commandes quand l'hôte audio rend le son (bug #57) : après un réveil,
+/// les premières images lisent encore un instantané au repos. Sans source de réveil, la boucle ne se
+/// suspend jamais. Fil principal uniquement.
 @MainActor
 public final class DisplayLinkDriver {
     private let frameHandler: @MainActor () -> Bool
     private var link: CADisplayLink?
     private let target = DisplayLinkTarget()
 
+    /// Repos continu exigé avant la suspension, compté depuis la dernière image active ou le dernier
+    /// réveil : bien plus long que deux périodes de rendu (≤ 23 ms).
+    public static let idleGracePeriod = 0.1
+
     /// Autorise la suspension au repos (une source de réveil appelle `wake()`).
     public var allowsSuspension = false
     public private(set) var isSuspended = false
+    /// Début du repos en cours (horloge des images), `nil` si la dernière image n'était pas au repos.
+    private var idleSince: Double?
 
     /// - Parameter onFrame: travail d'une image ; renvoie `true` si rien ne bouge (boucle suspendable).
     public init(onFrame: @escaping @MainActor () -> Bool) {
@@ -29,8 +38,10 @@ public final class DisplayLinkDriver {
         target.driver = self
     }
 
-    /// Reprend la boucle suspendue (à appeler à chaque commande envoyée au moteur).
+    /// Reprend la boucle suspendue et relance le délai de grâce (à appeler à chaque commande envoyée
+    /// au moteur).
     public func wake() {
+        idleSince = nil
         guard isSuspended else { return }
         isSuspended = false
         link?.isPaused = false
@@ -42,9 +53,15 @@ public final class DisplayLinkDriver {
         link = nil
     }
 
-    func step() {
-        let isIdle = frameHandler()
-        if isIdle, allowsSuspension, !isSuspended {
+    /// Une image, à l'instant `now` (secondes, horloge monotone des images).
+    func step(now: Double) {
+        guard frameHandler() else {
+            idleSince = nil
+            return
+        }
+        let since = idleSince ?? now
+        idleSince = since
+        if allowsSuspension, !isSuspended, now - since >= Self.idleGracePeriod {
             isSuspended = true
             link?.isPaused = true
         }
@@ -74,7 +91,7 @@ private final class DisplayLinkTarget: NSObject {
     weak var driver: DisplayLinkDriver?
 
     @objc func step(_ link: CADisplayLink) {
-        MainActor.assumeIsolated { driver?.step() }
+        MainActor.assumeIsolated { driver?.step(now: link.timestamp) }
     }
 }
 

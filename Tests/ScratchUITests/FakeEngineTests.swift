@@ -157,15 +157,18 @@ final class FakeEngineTests: XCTestCase {
         let environment = PreviewEnvironment()
         let session = RootSession(model: environment.model, intents: environment.intents)
         XCTAssertTrue(session.driver.allowsSuspension, "the preview engine is a wake source")
-        session.driver.step()
-        XCTAssertTrue(session.driver.isSuspended, "empty decks, motors off: idle")
+        session.driver.step(now: 1)
+        XCTAssertFalse(session.driver.isSuspended, "idle, but within the grace period")
+        session.driver.step(now: 1 + DisplayLinkDriver.idleGracePeriod)
+        XCTAssertTrue(session.driver.isSuspended, "empty decks, motors off: idle for the whole grace period")
         session.model.deckA.setMotor(true)
         XCTAssertFalse(session.driver.isSuspended, "a command wakes the loop")
-        session.driver.step()
+        session.driver.step(now: 2)
         XCTAssertFalse(session.driver.isSuspended, "motor on: not idle")
 
         let unwired = DisplayLinkDriver { true }
-        unwired.step()
+        unwired.step(now: 0)
+        unwired.step(now: 10)
         XCTAssertFalse(unwired.isSuspended, "without a wake source the loop never sleeps")
     }
 }
