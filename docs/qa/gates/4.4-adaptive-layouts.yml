@@ -1,0 +1,52 @@
+schema: 1
+story: "4.4"
+story_title: "Dispositions iPhone et iPad"
+pr: 85
+issue: 36
+reviewed_sha: "e7441be"
+gate: PASS
+status_reason: >-
+  Seuls les commits propres à la 4.4 ont été relus ; la 5.1 est identique à #80 (range-diff). Critères
+  implémentés ; métriques testées sur les tailles de référence (P à ± 1 pt de l'UX) ; build iOS vert ;
+  aucun conflit avec main ni avec #83. D-29 (règle par taille de zone sûre), iPhone portrait
+  (sélecteur, cancelAll, panneau Table D-30), iPad empilé, rotation qui relâche les disques sans
+  toucher aux moteurs (RM-60), bouton Bibliothèque dans toutes les dispositions iOS. Multitouch et
+  rotation pendant un geste en recette (#44).
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues: []
+checks:
+  - item: "D-29"
+    result: "Mac → côte à côte ; largeur < 600 → une platine ; hauteur < 500 → compacte ; largeur < hauteur → empilée ; sinon côte à côte ; multitâche de l'iPad par la même règle."
+  - item: "Tailles de plateau"
+    result: "309 (iPhone 15 portrait), 229 (SE), 174 (iPhone 15 paysage, 236|8|246|8|236), 432 (iPad portrait, bandes 780 × 456), 362 et 396 inchangés."
+  - item: "iPhone portrait"
+    result: "Sélecteur avec pastilles et VoiceOver ; cancelAll sur la platine quittée ; platine masquée active ; panneau Table (D-30)."
+  - item: "iPad portrait"
+    result: "Bandes, B en miroir, table de 780 × 176 sur trois lignes ; zone de dépôt sur la bande."
+  - item: "Rotation (RM-60)"
+    result: "Changement de taille sur iOS → cancelAll des deux platines, aucune commande moteur ; Mac inchangé (6.14)."
+  - item: "Bibliothèque"
+    result: "LibraryButton (library.open) dans les trois dispositions iOS ; barre d'outils sur Mac."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Sans objet."
+  performance:
+    status: PASS
+    notes: "Métriques en calcul pur."
+  reliability:
+    status: PASS
+    notes: "Disques relâchés à chaque changement de taille sur iOS, moteurs intacts."
+  maintainability:
+    status: PASS
+    notes: "LayoutMetrics centralisé et testé ; composants réutilisés ; aperçus par disposition."
+evidence:
+  ci: "Rapport CI 542e05c (fusion dans 3839e8f) : Linux ✅, macOS ✅ (build iOS compris)"
+  linux_tests: "scripts/linux-test.sh : 234/234 (cœur inchangé)"
+  merge_check: "git merge-tree avec origin/main et avec chore/5.2-gate-followups : sans conflit"
+recommendations:
+  immediate:
+    - action: "Fusionner après #80, puis rebaser."
+  future:
+    - action: "Recette sur appareil (#44) : trois contacts par disposition, rotation pendant un geste, platine masquée, multitâche de l'iPad."
