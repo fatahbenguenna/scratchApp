@@ -34,7 +34,9 @@ public enum ContentHasher {
         SHA256.hexString(SHA256.hash(data))
     }
 
-    private static func withLocalAutoreleasePool<Result>(_ body: () throws -> Result) rethrows -> Result {
+    /// Exécute `body` dans un bassin d'autolibération local sur les plateformes Apple (lectures par
+    /// blocs : la mémoire reste à un bloc) ; appel direct ailleurs.
+    static func withLocalAutoreleasePool<Result>(_ body: () throws -> Result) rethrows -> Result {
         #if canImport(ObjectiveC)
         return try autoreleasepool(invoking: body)
         #else

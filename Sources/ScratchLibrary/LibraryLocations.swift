@@ -22,6 +22,12 @@ public struct LibraryLocations: Sendable {
         documentsDirectory.appendingPathComponent("Enregistrements", isDirectory: true)
     }
 
+    /// Fichiers temporaires d'import : `Application Support/ScratchApp/Imports/`, sur le même volume
+    /// que `Banque de sons` pour un déplacement atomique ; purgés au premier accès du magasin.
+    public var importsDirectory: URL {
+        supportDirectory.appendingPathComponent("Imports", isDirectory: true)
+    }
+
     /// Index de la bibliothèque : `Application Support/ScratchApp/library.json`.
     public var libraryIndexURL: URL {
         supportDirectory.appendingPathComponent("library.json", isDirectory: false)
