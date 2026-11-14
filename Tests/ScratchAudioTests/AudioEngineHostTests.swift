@@ -1,36 +1,251 @@
+import AVFoundation
 import Foundation
 import ScratchCore
 import XCTest
 @testable import ScratchAudio
 
-/// Hôte audio (squelette 0.2) : sans sortie matérielle, l'horloge de secours fait tourner le moteur
-/// en silence (décision Q14, SF-82) ; `suspend()` arrête les moteurs et tout rendu (RM-56, SF-81).
+/// Hôte audio (story 2.1). L'exécuteur de CI n'a pas de périphérique audio : la sortie matérielle
+/// est remplacée par un double, et le graphe est vérifié en rendu manuel hors ligne.
 @MainActor
 final class AudioEngineHostTests: XCTestCase {
+    /// Double de la sortie matérielle : succès ou échec scriptés. Il note, à chaque démarrage, si
+    /// l'horloge de secours tournait encore.
+    private final class FakeOutput: AudioHardwareOutput {
+        var onConfigurationChange: (() -> Void)?
+        var failure: Error?
+        var info = AudioOutputInfo(name: "MPC Sample (USB)", sampleRate: 44_100, bufferFrames: 256, outputLatency: 0.004)
+        var isFallbackRunning: (() -> Bool)?
+        private(set) var fallbackRunningAtStart: [Bool] = []
+        private(set) var stopCount = 0
+        private(set) var deactivateCount = 0
+
+        func start(rendering engine: ScratchEngine) throws -> AudioOutputInfo {
+            fallbackRunningAtStart.append(isFallbackRunning?() ?? false)
+            if let failure { throw failure }
+            engine.send(.outputSampleRate(info.sampleRate))
+            return info
+        }
+
+        func stop() { stopCount += 1 }
+        func deactivate() { deactivateCount += 1 }
+    }
+
+    private func makeHost(engine: ScratchEngine = ScratchEngine(), failing: Bool) -> (AudioEngineHost, FakeOutput) {
+        let output = FakeOutput()
+        if failing { output.failure = AudioOutputError.noOutput }
+        let host = AudioEngineHost(engine: engine, output: output)
+        output.isFallbackRunning = { [unowned host] in host.isFallbackRunning }
+        return (host, output)
+    }
+
+    private static func sine(frequency: Double, seconds: Double, sampleRate: Double = 48_000) -> AudioClip {
+        AudioClip(title: "sine", sampleRate: sampleRate, frameCount: Int(seconds * sampleRate)) { left, right in
+            for index in 0 ..< left.count {
+                let value = Float(0.8 * sin(2 * Double.pi * frequency * Double(index) / sampleRate))
+                left[index] = value
+                right[index] = value
+            }
+        }
+    }
+
+    // MARK: - CA 6, 8 (SF-82, SF-81, RM-56, RM-10)
+
+    /// CA 6 — SF-82, D-35, scénario « Aucune sortie » : `.unavailable`, l'horloge de secours fait
+    /// tourner le moteur en temps réel, et les commandes s'appliquent sans `pump()`. CA 8 :
+    /// `suspend()` arrête les moteurs et tout rendu ; `resume()` ne relance aucun moteur.
     func testUnavailableOutputKeepsTheEngineRunningOnTheFallbackClock_SF82() async throws {
         let engine = ScratchEngine()
-        let host = AudioEngineHost(engine: engine)
+        let (host, output) = makeHost(engine: engine, failing: true)
         host.start()
         XCTAssertTrue(host.isRenderingAudio)
-        if case .unavailable = host.status {} else { XCTFail("expected .unavailable, got \(host.status)") }
+        XCTAssertTrue(host.isFallbackRunning)
+        XCTAssertEqual(host.status, .unavailable(reason: "Aucune sortie audio disponible."))
         engine.send(.motor(.a, on: true))
         try await Task.sleep(nanoseconds: 200_000_000)
         let snapshot = engine.latestSnapshot()
         XCTAssertGreaterThan(snapshot.sampleTime, 0, "the fallback clock renders")
+        XCTAssertEqual(snapshot.outputSampleRate, 48_000)
         XCTAssertTrue(snapshot[.a].motorOn, "commands are applied without pump()")
 
         host.suspend()
         XCTAssertFalse(host.isRenderingAudio)
+        XCTAssertFalse(host.isFallbackRunning)
+        XCTAssertEqual(output.deactivateCount, 1)
         engine.pump()
         XCTAssertFalse(engine.latestSnapshot()[.a].motorOn, "suspend() stops every motor (RM-56)")
         let frozen = engine.latestSnapshot().sampleTime
         try await Task.sleep(nanoseconds: 50_000_000)
         XCTAssertEqual(engine.latestSnapshot().sampleTime, frozen, "no render while suspended")
+        host.start()
+        XCTAssertFalse(host.isRenderingAudio, "start() is ignored while suspended")
 
         host.resume()
         XCTAssertTrue(host.isRenderingAudio)
+        try await Task.sleep(nanoseconds: 50_000_000)
         XCTAssertFalse(engine.latestSnapshot()[.a].motorOn, "resume() never restarts a motor (RM-10)")
         host.stop()
         XCTAssertEqual(host.status, .stopped)
+        XCTAssertFalse(host.isFallbackRunning)
+    }
+
+    /// CA 2, CA 5 — SF-01, RM-10 : une sortie qui démarre publie son nom, sa fréquence, son tampon
+    /// et sa latence. Le moteur reçoit la fréquence matérielle, et ni moteur ni son n'est lancé.
+    func testStartNeverStartsMotors_RM10() {
+        let engine = ScratchEngine()
+        let (host, output) = makeHost(engine: engine, failing: false)
+        host.start()
+        XCTAssertEqual(host.status, .running(output.info))
+        XCTAssertTrue(host.isRenderingAudio)
+        XCTAssertFalse(host.isFallbackRunning)
+        engine.pump() // the fake output renders nothing: apply the commands sent by the host
+        let snapshot = engine.latestSnapshot()
+        XCTAssertEqual(snapshot.outputSampleRate, 44_100, "outputSampleRate is sent before starting")
+        for deck in DeckID.allCases {
+            XCTAssertFalse(snapshot[deck].motorOn)
+            XCTAssertFalse(snapshot[deck].isLoaded)
+        }
+        host.start()
+        XCTAssertEqual(output.fallbackRunningAtStart.count, 1, "start() is idempotent")
+    }
+
+    /// CA 9 — architecture §3.3 : l'horloge de secours est arrêtée avant chaque démarrage de la
+    /// sortie, et relancée seulement si la sortie ne démarre pas. Il n'y a jamais deux fils de rendu.
+    func testSingleRenderThreadDuringSwitch() {
+        let (host, output) = makeHost(failing: true)
+        host.start()
+        XCTAssertTrue(host.isFallbackRunning)
+
+        output.failure = nil
+        output.onConfigurationChange?() // e.g. a device appears or the default output changes
+        XCTAssertEqual(output.fallbackRunningAtStart, [false, false], "the clock stops before the output starts")
+        XCTAssertFalse(host.isFallbackRunning)
+        XCTAssertTrue(host.status.isRunning)
+
+        output.failure = AudioOutputError.noOutput
+        output.onConfigurationChange?()
+        XCTAssertTrue(host.isFallbackRunning, "the clock takes over when the output cannot restart")
+        XCTAssertTrue(host.isRenderingAudio)
+        if case .unavailable = host.status {} else { XCTFail("expected .unavailable, got \(host.status)") }
+
+        host.stop()
+        XCTAssertFalse(host.isFallbackRunning)
+        output.onConfigurationChange?()
+        XCTAssertEqual(output.fallbackRunningAtStart.count, 3, "no restart once stopped")
+    }
+
+    /// CA 1, 6 : la vraie sortie démarre sur le périphérique par défaut ou, sans périphérique (CI),
+    /// bascule proprement sur l'horloge de secours. Dans les deux cas, le moteur est rendu.
+    func testRealOutputStartsOrFallsBack_SF82() async throws {
+        let engine = ScratchEngine()
+        let host = AudioEngineHost(engine: engine)
+        host.start()
+        XCTAssertTrue(host.isRenderingAudio)
+        switch host.status {
+        case let .running(info):
+            XCTAssertGreaterThan(info.sampleRate, 0)
+            XCTAssertGreaterThan(info.bufferFrames, 0)
+            XCTAssertFalse(info.name.isEmpty)
+        case .unavailable:
+            XCTAssertTrue(host.isFallbackRunning)
+        default:
+            XCTFail("unexpected status \(host.status)")
+        }
+        try await Task.sleep(nanoseconds: 200_000_000)
+        XCTAssertGreaterThan(engine.latestSnapshot().sampleTime, 0)
+        host.stop()
+        XCTAssertFalse(host.isRenderingAudio)
+    }
+
+    // MARK: - CA 7
+
+    /// CA 7 — UX §5.17 : libellés de la sortie.
+    func testOutputNameMapping() {
+        XCTAssertEqual(OutputNaming.displayName(kind: .builtInSpeaker, systemName: "Speaker"), "Haut-parleur")
+        XCTAssertEqual(OutputNaming.displayName(kind: .headphones, systemName: "Headphones"), "Casque")
+        XCTAssertEqual(OutputNaming.displayName(kind: .bluetooth, systemName: "AirPods Pro"), "AirPods Pro")
+        XCTAssertEqual(OutputNaming.displayName(kind: .usb, systemName: "MPC Sample"), "MPC Sample (USB)")
+        XCTAssertEqual(OutputNaming.displayName(kind: .usb, systemName: "MPC Sample (USB)"), "MPC Sample (USB)")
+        XCTAssertEqual(OutputNaming.displayName(kind: .hdmi, systemName: "LG TV"), "LG TV (HDMI)")
+        XCTAssertEqual(OutputNaming.displayName(kind: .airPlay, systemName: "Salon"), "Salon (AirPlay)")
+        XCTAssertEqual(OutputNaming.displayName(kind: .other, systemName: "Haut-parleurs MacBook Pro"),
+                       "Haut-parleurs MacBook Pro")
+        XCTAssertEqual(OutputNaming.displayName(kind: .other, systemName: "  "), "Sortie audio")
+        #if os(macOS)
+        XCTAssertEqual(OutputNaming.kind(forTransportType: kAudioDeviceTransportTypeUSB), .usb)
+        XCTAssertEqual(OutputNaming.kind(forTransportType: kAudioDeviceTransportTypeBuiltIn), .other)
+        XCTAssertEqual(OutputNaming.kind(forTransportType: kAudioDeviceTransportTypeHDMI), .hdmi)
+        XCTAssertEqual(OutputNaming.kind(forTransportType: kAudioDeviceTransportTypeBluetooth), .bluetooth)
+        #endif
+    }
+
+    // MARK: - CA 1, 10, 11
+
+    /// CA 1, CA 10 — scénario « Rendu manuel identique au rendu direct » (base de 2.4) : le graphe
+    /// AVAudioEngine en rendu manuel, à 48 kHz et par tranches de 256 trames, rejoue `ScratchScenario`
+    /// et produit la même sortie que le rendu direct du moteur, à l'échantillon près.
+    func testManualRenderMatchesDirectRender_SampleExact() throws {
+        let clipA = Self.sine(frequency: 440, seconds: 10)
+        let clipB = Self.sine(frequency: 220, seconds: 10)
+        let scenario = ScratchScenario(clipA: clipA, clipB: clipB, sampleRate: 48_000, blockFrames: 256)
+        let direct = scenario.run(on: ScratchEngine())
+
+        let engine = ScratchEngine()
+        let graph = try ScratchAudioGraph.offline(engine: engine, sampleRate: 48_000, maximumFrameCount: 512)
+        try graph.avEngine.start()
+        defer { graph.avEngine.stop() }
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: graph.avEngine.manualRenderingFormat, frameCapacity: 256))
+        var left: [Float] = [], right: [Float] = []
+        left.reserveCapacity(Int(scenario.totalFrames))
+        right.reserveCapacity(Int(scenario.totalFrames))
+        var frame: Int64 = 0
+        while frame < scenario.totalFrames {
+            for command in scenario.events(forBlockStartingAt: frame) { engine.send(command) }
+            let count = Int(min(256, scenario.totalFrames - frame))
+            let status = try graph.avEngine.renderOffline(AVAudioFrameCount(count), to: buffer)
+            XCTAssertEqual(status, .success)
+            let channels = try XCTUnwrap(buffer.floatChannelData)
+            XCTAssertEqual(Int(buffer.frameLength), count)
+            left.append(contentsOf: UnsafeBufferPointer(start: channels[0], count: count))
+            right.append(contentsOf: UnsafeBufferPointer(start: channels[1], count: count))
+            engine.drainReleasedClips()
+            frame += Int64(count)
+        }
+
+        XCTAssertEqual(left.count, direct.left.count)
+        let count = min(left.count, direct.left.count)
+        let firstLeft = (0 ..< count).first { left[$0].bitPattern != direct.left[$0].bitPattern }
+        let firstRight = (0 ..< count).first { right[$0].bitPattern != direct.right[$0].bitPattern }
+        XCTAssertNil(firstLeft, "left differs from frame \(firstLeft ?? -1)")
+        XCTAssertNil(firstRight, "right differs from frame \(firstRight ?? -1)")
+        XCTAssertGreaterThan(left.reduce(Float(0)) { max($0, abs($1)) }, 0.1, "the scenario is audible")
+    }
+
+    /// CA 11 — D-15 : la sonde mesure la latence geste→son par le graphe en rendu manuel. Sa partie
+    /// moteur est la même qu'en rendu direct (CA 10). Valeur de référence sous Linux, en rendu
+    /// direct : 18,5 ms à 48 kHz et 256 trames (affichage à 120 Hz), soit 23,8 ms sans la latence du
+    /// périphérique.
+    func testGestureLatencyProbe_D15() throws {
+        let measurement = try GestureLatencyProbe.measure(sampleRate: 48_000, bufferFrames: 256, displayRate: 120,
+                                                          outputLatency: 0.004)
+        XCTAssertEqual(measurement.bufferDuration, 256.0 / 48_000, accuracy: 1e-12)
+        XCTAssertEqual(measurement.outputLatency, 0.004)
+        XCTAssertEqual(measurement.total, measurement.engineDelay + measurement.bufferDuration + 0.004, accuracy: 1e-12)
+        XCTAssertGreaterThan(measurement.engineDelay, 0.005)
+        XCTAssertLessThan(measurement.engineDelay, 0.06)
+
+        let engine = ScratchEngine()
+        let left = UnsafeMutablePointer<Float>.allocate(capacity: 256)
+        let right = UnsafeMutablePointer<Float>.allocate(capacity: 256)
+        defer {
+            left.deallocate()
+            right.deallocate()
+        }
+        let direct = GestureLatencyProbe.engineDelay(engine: engine, sampleRate: 48_000, bufferFrames: 256, displayRate: 120) {
+            engine.render(frameCount: 256, left: left, right: right)
+        }
+        XCTAssertEqual(measurement.engineDelay, try XCTUnwrap(direct), accuracy: 1e-12)
+
+        let hostMeasurement = try AudioEngineHost(engine: ScratchEngine()).measureGestureLatency()
+        XCTAssertEqual(hostMeasurement.engineDelay, measurement.engineDelay, accuracy: 1e-12, "48 kHz, 256 frames without output")
     }
 }
