@@ -1,0 +1,64 @@
+schema: 1
+story: "3.4"
+story_title: "Préférences persistantes et écran Réglages"
+pr: 89
+issue: 31
+reviewed_sha: "b51ed69"
+gate: PASS
+status_reason: >-
+  Les sept critères sont implémentés et testés. Lecture tolérante et bornée (clé absente, document
+  illisible ou d'un autre type → valeurs par défaut) ; lancement sans motor ni load ; écritures
+  regroupées 0,5 s après le dernier changement, avec les valeurs de l'instantané, et seulement après
+  confirmation des préférences du lancement ; Réglages en feuille sur iOS et en fenêtre ⌘, sur Mac ;
+  launch() garde applyPreferences() et la purge des dépôts de #83. Retouches de faible gravité dans #97.
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues:
+  - id: "PREFS-PAIR-TOLERANCE"
+    severity: low
+    finding: "DeckPair exige a et b : une moitié illisible d'une paire (decks, lineFaders) remet l'autre moitié, lisible, à sa valeur par défaut (sonde QA sous Linux)."
+    suggested_action: "Décoder a et b séparément dans AppPreferences ; ajouter les cas au test (#97)."
+  - id: "PREFS-PITCH-STEP"
+    severity: low
+    finding: "Pitch restauré borné mais pas ramené au pas de 0,1 % (0,0533 → 5,33 % au moteur, « +5,3 % » affiché)."
+    suggested_action: "Quantifier dans sanitized() (#97)."
+  - id: "PREFS-MAC-QUIT"
+    severity: low
+    finding: "Sur Mac, quitter moins de 0,5 s après un réglage le perd."
+    suggested_action: "6.2 : savePreferencesNow() aussi à la fermeture (#97)."
+checks:
+  - item: "Lecture tolérante (CA 1 à 3)"
+    result: "Décodage champ par champ puis sanitized() ; bornes, champ illisible, clé absente, document illisible ou d'un autre type testés sous Linux."
+  - item: "Lancement (CA 4)"
+    result: "engineCommands sans motor ni load ; aucune platine chargée (testLaunchAppliesPreferencesWithoutPlayback_RM10)."
+  - item: "Écritures (CA 5)"
+    result: "Valeurs de l'instantané, délai relancé à chaque changement (0,5 s), annulé au retour à la valeur enregistrée ; rien avant confirmation (PreferencesTracker, 1 s au plus) ; savePreferencesNow()."
+  - item: "Écran Réglages (CA 6)"
+    result: "iOS : SettingsSheet ; Mac : scène Settings et openSettings ; section Clavier vers KeyboardHelpWindow ; pas et plages ; valeurs commandées (#57)."
+  - item: "Conflit launch() avec #83"
+    result: "applyPreferences() puis DroppedFileLoader.purgeStaging() : les deux ajouts présents."
+  - item: "Accessibilité (CA 7)"
+    result: "« 0,7 seconde », « 60 millisecondes » ; identifiants settings.* ; champ Mac à virgule ou point."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Document local borné à la lecture et à l'écriture."
+  performance:
+    status: PASS
+    notes: "Une comparaison par image ; une écriture par rafale, jamais depuis le fil audio."
+  reliability:
+    status: PASS
+    notes: "Aucun document lu ne fait échouer le lancement ; jamais de valeur non confirmée enregistrée ; granularité de la tolérance (#97)."
+  maintainability:
+    status: PASS
+    notes: "PreferencesTracker et SettingsFormatting purs et testés ; extension AppModel+Preferences séparée."
+evidence:
+  ci: "Rapport CI 70f324f : Linux ✅, macOS ✅ ; 4 tests Linux et 5 tests macOS"
+  linux_tests: "scripts/linux-test.sh sur la fusion avec main (f2a9e25) : 238/238"
+  merge_check: "git merge-tree avec origin/main (f2a9e25), #84, #87 et #88 : sans conflit"
+  tolerance_probe: "Sonde QA sous Linux : lineFaders {a: 0.4, b: \"x\"} → 1,0 / 1,0 ; decks.b non objet → platine A aux valeurs par défaut"
+recommendations:
+  immediate:
+    - action: "Fusionner."
+  future:
+    - action: "#97 : tolérance par moitié de paire, pitch au pas, enregistrement à la fermeture sur Mac (6.2)."

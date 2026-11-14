@@ -1,0 +1,65 @@
+schema: 1
+story: "2.1"
+story_title: "Hôte AVAudioEngine et sortie temps réel"
+pr: 84
+issue: 24
+reviewed_sha: "455434b"
+gate: CONCERNS
+status_reason: >-
+  Les 11 critères sont implémentés et testés : bloc de rendu conforme aux règles temps réel, horloge de
+  secours arrêtée de façon synchrone avant chaque démarrage (un seul fil de rendu), redémarrage sur
+  AVAudioEngineConfigurationChange sans toucher aux moteurs, tampon de 256 trames demandé puis relu,
+  rendu manuel identique au rendu direct bit à bit. CONCERNS par la règle R2 / D-15 : la première mesure
+  (23,8 ms à 120 Hz sans la latence du périphérique) dépasse l'objectif de 20 ms ; en régime appris,
+  la QA mesure 25,2 ms à 120 Hz et 35,8 ms à 60 Hz. Fusion possible ; calibrage suivi par #91 et #92.
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues:
+  - id: "LAT-D15"
+    severity: medium
+    finding: "Latence geste→son au-delà de D-15 : 23,8 ms au premier geste (48 kHz, 256 trames, 120 Hz), 25,2 ms (120 Hz) et 35,8 ms (60 Hz) en régime appris, sans latence du périphérique."
+    suggested_action: "Calibrer rejeu, touches prédites ou tampon de 128 trames (17,2 ms en régime appris à 120 Hz) ; à défaut, décision PO (#91)."
+  - id: "PROBE-WARM"
+    severity: low
+    finding: "La sonde ne mesure que le premier geste (retard initial fixe de 14 ms) : ni le régime appris ni l'effet de la cadence d'affichage."
+    suggested_action: "Geste d'échauffement puis second geste mesuré ; publier les deux valeurs (#92)."
+checks:
+  - item: "Horloge de secours (D-35, CA 6, CA 9)"
+    result: "fallbackClock.stop() (cancel puis queue.sync) en tête de startOutput() ; relance seulement dans le catch après output.stop() ; testSingleRenderThreadDuringSwitch : [false, false]."
+  - item: "Un seul fil de rendu"
+    result: "RoleGuard du rôle audio du moteur en debug ; isRenderingAudio vrai pendant toute la bascule, sur le fil principal comme AppModel.tick()."
+  - item: "AVAudioEngineConfigurationChange"
+    result: "Observateur sur l'AVAudioEngine, file principale ; arrêt puis redémarrage, fréquence relue et outputSampleRate renvoyé, moteurs intacts ; pas d'observateur en .unavailable ni d'anti-rebond (2.3)."
+  - item: "Tampon de 256 trames (CA 2)"
+    result: "macOS : requestBufferFrameSize(256) dans la plage du périphérique, relu après start() ; iOS : durée d'E/S préférée 256/48 000 s, relue."
+  - item: "Sonde de latence (CA 11)"
+    result: "Partie moteur par le graphe en rendu manuel = rendu direct (10⁻¹²) ; 23,8 ms reproduits par la QA ; borne haute (lecture en fin de tampon)."
+  - item: "drainReleasedClips"
+    result: "Jamais appelé par l'hôte ; AppModel.tick() l'appelle à chaque image sur le fil principal."
+  - item: "Bascule de SelfTest"
+    result: "#82 non fusionnée : suivi par #90."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Sans objet."
+  performance:
+    status: CONCERNS
+    notes: "Latence geste→son au-delà de D-15 (#91, #92) ; bloc de rendu sans allocation, verrou ni appel Objective-C."
+  reliability:
+    status: PASS
+    notes: "Un seul fil de rendu ; repli sans exception sur l'horloge de secours ; suspension sans rendu ; aucun moteur relancé."
+  maintainability:
+    status: PASS
+    notes: "Sortie injectable (AudioHardwareOutput), libellés en logique pure testée, graphe partagé temps réel / rendu manuel / sonde."
+evidence:
+  ci: "Rapport CI cdc9be4 (455434b fusionné dans baa5fbc) : Linux ✅, macOS ✅ ; 7 tests AudioEngineHostTests exécutés"
+  linux_tests: "scripts/linux-test.sh sur la fusion avec main (d51f147) : 234/234"
+  merge_check: "git merge-tree avec origin/main (5d7565c) et avec story/2.4-scratch-selftest : sans conflit"
+  latency_probe: "Sonde QA jetable (rendu direct, Linux) : premier geste 23,8 / 23,8 / 18,5 / 35,2 ms ; régime appris 25,2 / 35,8 / 17,2 / 37,7 ms (48 kHz-256-120 Hz / 48 kHz-256-60 Hz / 48 kHz-128-120 Hz / 44,1 kHz-512-120 Hz)"
+recommendations:
+  immediate:
+    - action: "Fusionner ; ordre indifférent avec #82."
+  future:
+    - action: "#91 : calibrage de la latence (D-15) ; #92 : sonde en régime appris ; #90 : SelfTest sur ScratchAudioGraph."
+    - action: "6.2 : appeler engine.pump() à la fin de suspend() pour publier aussitôt l'état STOP."
+    - action: "Recette (#44) : tampon de 256 trames effectivement obtenu sur le Mac (sinon le demander sur outputNode.audioUnit), interface USB multicanal, changement de sortie par défaut pendant la lecture."

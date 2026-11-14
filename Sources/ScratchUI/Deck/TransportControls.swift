@@ -1,21 +1,38 @@
 import ScratchCore
 import SwiftUI
 
-/// Rangée de transport d'une platine (spec 3.1 ; UX §5.2, §5.3) : START/STOP, 33⅓ / 45, puis les
-/// emplacements de SET CUE et CUE (story 4.5).
+/// Rangée de transport d'une platine (spec 3.1 ; UX §5.2, §5.3, §5.6) : START/STOP, 33⅓ / 45, SET CUE
+/// et CUE (story 4.5).
 struct TransportControls: View {
     let model: DeckViewModel
     let metrics: MainLayoutMetrics
+    /// Grille 2 × 2 de boutons 136 × 56 (bande de l'iPad portrait, UX §4.4).
+    var grid = false
 
     var body: some View {
+        if grid {
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    StartStopButton(model: model).frame(width: 136, height: 56)
+                    SpeedSelector(model: model, segmentWidth: 68).frame(height: 56)
+                }
+                CueButtons(model: model, setCueSize: CGSize(width: 136, height: 56),
+                           cueSize: CGSize(width: 136, height: 56))
+            }
+        } else {
+            row
+        }
+    }
+
+    private var row: some View {
         HStack(spacing: metrics.transportSpacing) {
             StartStopButton(model: model)
                 .frame(width: metrics.startStopWidth, height: metrics.transportHeight)
             SpeedSelector(model: model, segmentWidth: metrics.speedSegmentWidth)
                 .frame(height: metrics.transportHeight)
-            // Slots reserved for SET CUE and CUE (story 4.5).
-            Color.clear.frame(width: metrics.setCueWidth + metrics.transportSpacing + metrics.cueWidth)
-                .accessibilityHidden(true)
+            CueButtons(model: model, setCueSize: CGSize(width: metrics.setCueWidth, height: metrics.transportHeight),
+                       cueSize: CGSize(width: metrics.cueWidth, height: metrics.transportHeight),
+                       spacing: metrics.transportSpacing, isCompact: metrics.idiom == .phoneLandscape)
         }
     }
 }

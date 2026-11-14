@@ -1,0 +1,34 @@
+schema: 1
+story: "5.2-followups"
+story_title: "Retouches de la gate 5.2 (glisser-déposer)"
+pr: 83
+issue: null
+reviewed_sha: "7fb05f8"
+gate: PASS
+status_reason: >-
+  Les trois recommandations de la gate 5.2 sont traitées et testées : jeton Theme.danger ; purge au
+  lancement des copies de dépôt de plus de 10 minutes ; normalisation des chemins dans removeStaged,
+  avec un défaut latent corrigé (un fichier à la racine du dossier des dépôts aurait fait supprimer
+  le dossier entier). CI Linux et macOS verte ; fusion sans conflit avec main.
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues: []
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Suppression limitée aux dossiers uniques de dépôt ; .. ne sort jamais du dossier des dépôts."
+  performance:
+    status: PASS
+    notes: "Purge d'un petit dossier temporaire au lancement."
+  reliability:
+    status: PASS
+    notes: "Dépôt en cours jamais purgé (seuil de 10 minutes) ; tests en parallèle sans interférence."
+  maintainability:
+    status: PASS
+    notes: "Jeton de couleur partagé."
+evidence:
+  ci: "Rapport CI e9776e6 (fusion dans c86b673) : Linux ✅, macOS ✅"
+  merge_check: "git merge-tree avec origin/main (après #77, #78, #79) : sans conflit"
+recommendations:
+  immediate: []
+  future: []

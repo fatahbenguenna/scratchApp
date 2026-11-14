@@ -2,7 +2,8 @@ import ScratchCore
 import SwiftUI
 
 /// Platine en arrangement « colonne » (UX §4.1) : en-tête, forme d'onde et aperçu (4.6),
-/// [plateau P | pitch (4.5)], transport, résistance (4.5). Conteneur d'accessibilité « Platine A ».
+/// [plateau P | pitch], transport (START/STOP, 33⅓ / 45, SET CUE, CUE), résistance. Conteneur
+/// d'accessibilité « Platine A ».
 ///
 /// Les emplacements des stories suivantes sont réservés dès maintenant : le diamètre du plateau suit
 /// déjà les règles de taille de l'UX (§4.5, §4.6).
@@ -14,17 +15,17 @@ struct DeckView: View {
     var body: some View {
         let spacings = metrics.rowSpacings
         VStack(alignment: .leading, spacing: 0) {
-            DeckHeaderView(model: model, intents: intents, width: metrics.columnWidth)
+            DeckHeaderView(model: model, intents: intents, width: metrics.columnWidth, height: metrics.headerHeight)
             reserved(height: metrics.waveformHeight).padding(.top, spacings[0])     // waveform (4.6)
             reserved(height: metrics.overviewHeight).padding(.top, spacings[1])     // overview (4.6)
             HStack(spacing: metrics.platterSpacing) {
                 TurntableView(model: model, intents: intents, platter: metrics.platter)
-                reserved(height: metrics.platter).frame(width: metrics.pitchWidth)  // pitch (4.5)
+                PitchFader(model: model, height: metrics.platter, showsLabel: metrics.idiom != .phoneLandscape)
             }
             .frame(maxWidth: .infinity)
             .padding(.top, spacings[2])
             TransportControls(model: model, metrics: metrics).padding(.top, spacings[3])
-            reserved(height: metrics.resistanceHeight).padding(.top, spacings[4])   // resistance (4.5)
+            ResistanceSlider(model: model, isCompact: metrics.idiom == .phoneLandscape).padding(.top, spacings[4])
         }
         .frame(width: metrics.columnWidth)
         .deckDropZone(model: model, intents: intents)  // 5.2 (Hugo): drop target over the whole deck
