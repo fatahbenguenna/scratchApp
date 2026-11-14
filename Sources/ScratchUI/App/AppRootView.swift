@@ -28,7 +28,7 @@ public struct AppRootView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button { model.openLibrary() } label: {
-                        Label("Bibliothèque", systemImage: "books.vertical")
+                        Label("Bibliothèque", systemImage: "music.note.list")
                     }
                     .help("Bibliothèque (⌘L)")
                     .accessibilityIdentifier("library.open")
