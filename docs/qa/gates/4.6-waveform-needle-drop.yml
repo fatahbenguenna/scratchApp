@@ -4,6 +4,10 @@ story_title: "Forme d'onde et needle drop"
 pr: 95
 issue: 38
 reviewed_sha: "833fa3c"
+addendum:
+  - sha: "1eac185"
+    gate: PASS
+    note: "Bande zoomée sans tête de lecture sur une platine vide (UX §5.7, état Vide)."
 gate: PASS
 status_reason: >-
   Seul le commit propre à la 4.6 a été relu (d65a56f = 4.5 de #87). Les six critères sont
