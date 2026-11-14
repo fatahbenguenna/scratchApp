@@ -56,6 +56,12 @@ public struct AppAlert: Identifiable, Equatable, Sendable {
                  message: "La copie de \(DeckFormatting.quoted(name)) a été supprimée ou modifiée en dehors de ScratchApp. Ce son a été retiré de la bibliothèque ; importez-le de nouveau.")
     }
 
+    /// Échec de la suppression d'une copie (UX §8.3).
+    public static func deletionFailed(name: String) -> AppAlert {
+        AppAlert(title: "Suppression impossible",
+                 message: "\(DeckFormatting.quoted(name)) n'a pas pu être supprimé. Réessayez.")
+    }
+
     /// Le sélecteur n'a pas pu fournir le fichier choisi.
     static let pickerFailure = AppAlert(title: "Échec de l'import",
                                         message: "Le fichier choisi n'a pas pu être ouvert. Réessayez.")
@@ -103,12 +109,15 @@ public struct ReplacementConfirmation: Identifiable, Equatable, Sendable {
     /// Entrée à charger (« nouveau » : l'entrée existante en cas de dédoublonnage).
     public let entry: LibraryEntry
     let reason: LoadReason
+    /// Chargement demandé depuis la feuille Bibliothèque, fermée après le remplacement (3.5).
+    let closesLibrary: Bool
 
-    init(deck: DeckID, currentTitle: String, entry: LibraryEntry, reason: LoadReason) {
+    init(deck: DeckID, currentTitle: String, entry: LibraryEntry, reason: LoadReason, closesLibrary: Bool = false) {
         self.deck = deck
         self.currentTitle = currentTitle
         self.entry = entry
         self.reason = reason
+        self.closesLibrary = closesLibrary
     }
 
     public var title: String { "Remplacer le son de la platine \(deck.rawValue)\u{00A0}?" }
@@ -146,6 +155,35 @@ enum BannerText {
             return "\(DeckFormatting.quoted(removed[0].title)) a été retiré de la bibliothèque : sa copie a été supprimée ou modifiée en dehors de ScratchApp."
         default:
             return "\(removed.count) sons ont été retirés de la bibliothèque : leurs copies ont été supprimées ou modifiées en dehors de ScratchApp."
+        }
+    }
+}
+
+/// Confirmation de suppression d'un son de la bibliothèque (RM-49, UX §8.4) : **Supprimer**
+/// (destructif) ou Annuler (par défaut). Le message nomme les platines qui portent le son.
+public struct DeletionConfirmation: Identifiable, Equatable, Sendable {
+    public let id = UUID()
+    public let entry: LibraryEntry
+    /// Platines qui portent le son au moment de la demande.
+    public let decks: [DeckID]
+
+    public init(entry: LibraryEntry, decks: [DeckID]) {
+        self.entry = entry
+        self.decks = decks
+    }
+
+    public var title: String { "Supprimer \(DeckFormatting.quoted(entry.title))\u{00A0}?" }
+
+    public var message: String {
+        let copy = "La copie de ce son sera supprimée de ScratchApp. Le fichier d'origine n'est pas modifié."
+        switch decks.count {
+        case 0:
+            return copy
+        case 1:
+            return "Ce son est chargé sur la platine \(decks[0].rawValue)\u{00A0}: elle sera vidée et arrêtée. \(copy)"
+        default:
+            let names = decks.map(\.rawValue).joined(separator: " et ")
+            return "Ce son est chargé sur les platines \(names)\u{00A0}: elles seront vidées et arrêtées. \(copy)"
         }
     }
 }
