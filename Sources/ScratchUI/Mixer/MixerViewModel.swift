@@ -1,3 +1,4 @@
+import Foundation
 import Observation
 import ScratchCore
 
@@ -19,23 +20,42 @@ public final class MixerViewModel {
     public private(set) var lineFaders = DeckPair(repeating: TurntableConstants.defaultLineFader)
     public private(set) var momentaryCuts = DeckPair(repeating: false)
 
+    // Commanded values shown until a snapshot confirms them (#57).
+    @ObservationIgnored private var commandedCrossfader = CommandedValue<Double>()
+    @ObservationIgnored private var commandedCurve = CommandedValue<Double>()
+    @ObservationIgnored private var commandedHamster = CommandedValue<Bool>()
+    @ObservationIgnored private var commandedLineFaders = CommandedValue<DeckPair<Double>>()
+    @ObservationIgnored private var commandedCuts = CommandedValue<DeckPair<Bool>>()
+    /// Horloge monotone des confirmations (injectée par les tests).
+    @ObservationIgnored var clock: () -> Double = { ProcessInfo.processInfo.systemUptime }
+
     public init(engine: any EngineControlling) {
         self.engine = engine
     }
 
+    /// Applique l'instantané de l'image ; une valeur commandée reste affichée jusqu'à confirmation
+    /// (#57, `CommandedValue`).
     func apply(_ snapshot: MixerSnapshot) {
         if frame != snapshot { frame = snapshot }
-        if crossfader != snapshot.crossfader { crossfader = snapshot.crossfader }
-        if crossfaderCurve != snapshot.crossfaderCurve { crossfaderCurve = snapshot.crossfaderCurve }
-        if hamster != snapshot.hamster { hamster = snapshot.hamster }
-        if lineFaders != snapshot.lineFaders { lineFaders = snapshot.lineFaders }
-        if momentaryCuts != snapshot.momentaryCuts { momentaryCuts = snapshot.momentaryCuts }
+        let now = clock()
+        let shownCrossfader = commandedCrossfader.resolve(snapshot.crossfader, at: now)
+        if crossfader != shownCrossfader { crossfader = shownCrossfader }
+        let shownCurve = commandedCurve.resolve(snapshot.crossfaderCurve, at: now)
+        if crossfaderCurve != shownCurve { crossfaderCurve = shownCurve }
+        let shownHamster = commandedHamster.resolve(snapshot.hamster, at: now)
+        if hamster != shownHamster { hamster = shownHamster }
+        let shownFaders = commandedLineFaders.resolve(snapshot.lineFaders, at: now)
+        if lineFaders != shownFaders { lineFaders = shownFaders }
+        let shownCuts = commandedCuts.resolve(snapshot.momentaryCuts, at: now)
+        if momentaryCuts != shownCuts { momentaryCuts = shownCuts }
     }
 
     /// Position 0 (butée A) … 1 (butée B) (SF-12).
     public func setCrossfader(_ value: Double) {
         let clamped = value.clamped(to: 0...1, fallback: TurntableConstants.defaultCrossfader)
-        if engine.send(.crossfader(clamped)) { crossfader = clamped }
+        guard engine.send(.crossfader(clamped)) else { return }
+        crossfader = clamped
+        commandedCrossfader.command(clamped, at: clock())
     }
 
     /// Clavier Mac `←` / `→` : pas de 5 % (3.5, 6.14).
@@ -52,22 +72,30 @@ public final class MixerViewModel {
     /// Courbe 0 (douce) … 1 (coupure franche) (SF-66).
     public func setCrossfaderCurve(_ value: Double) {
         let clamped = value.clamped(to: 0...1, fallback: TurntableConstants.defaultCrossfaderCurve)
-        if engine.send(.crossfaderCurve(clamped)) { crossfaderCurve = clamped }
+        guard engine.send(.crossfaderCurve(clamped)) else { return }
+        crossfaderCurve = clamped
+        commandedCurve.command(clamped, at: clock())
     }
 
     /// Hamster (SF-67).
     public func setHamster(_ on: Bool) {
-        if engine.send(.hamster(on)) { hamster = on }
+        guard engine.send(.hamster(on)) else { return }
+        hamster = on
+        commandedHamster.command(on, at: clock())
     }
 
     /// Fader de voie 0…1 (SF-65).
     public func setLineFader(_ deck: DeckID, _ value: Double) {
         let clamped = value.clamped(to: 0...1, fallback: TurntableConstants.defaultLineFader)
-        if engine.send(.lineFader(deck, clamped)) { lineFaders[deck] = clamped }
+        guard engine.send(.lineFader(deck, clamped)) else { return }
+        lineFaders[deck] = clamped
+        commandedLineFaders.command(lineFaders, at: clock())
     }
 
     /// Coupure momentanée `F` / `J` : ouverte tant que la touche est maintenue (3.5, IC-06).
     public func setMomentaryCut(_ deck: DeckID, open: Bool) {
-        if engine.send(.momentaryCut(deck, open: open)) { momentaryCuts[deck] = open }
+        guard engine.send(.momentaryCut(deck, open: open)) else { return }
+        momentaryCuts[deck] = open
+        commandedCuts.command(momentaryCuts, at: clock())
     }
 }
