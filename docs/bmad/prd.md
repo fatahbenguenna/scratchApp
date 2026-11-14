@@ -5,7 +5,7 @@
 - **Auteur :** 📋 John, Product Manager BMAD
 - **Statut :** proposition, à valider par 📝 Sarah (PO)
 - **Références :** [spécifications v2.0](../specs/scratchapp_specifications_v2_0.md) (font foi), [revue v1.9 → v2.0](../specs/REVUE_v1.9_vers_v2.0.md), [charte d'équipe](TEAM.md), [`CONTRIBUTING.md`](../../CONTRIBUTING.md).
-- **Artefacts rédigés en parallèle :** brief et traçabilité (Mary, `project-brief.md`, `traceability.md`), spécification UX (Sally, `front-end-spec.md`), architecture et contrats de code (Winston, `architecture.md`, story 0.2).
+- **Artefacts liés :** [brief produit](project-brief.md) et [matrice de traçabilité](traceability.md) (Mary, fusionnés) ; spécification UX (Sally, `front-end-spec.md`) et architecture et contrats de code (Winston, `architecture.md`, story 0.2), rédigées en parallèle. Les incohérences IC-01 à IC-12 et les questions Q-01 à Q-03 renvoient au brief.
 
 > Ce PRD ne réécrit pas la spécification : chaque exigence renvoie aux identifiants SF, RM, PO et E de la v2.0 et aux scénarios Gherkin de la section 6. En cas d'écart, la spécification v2.0 prime.
 
@@ -57,7 +57,7 @@ Le développement suit BMAD (charte `TEAM.md`) : trois développeurs travaillent
 
 | Version | Date | Auteur | Modification |
 |---|---|---|---|
-| 1.0 | 2026-11-14 | John (PM) | Création : objectifs, FR1 à FR32, NFR1 à NFR14, hypothèses techniques, épopées EP1 à EP6, 26 stories, plan en cinq vagues, points à arbitrer. |
+| 1.0 | 2026-11-14 | John (PM) | Création : objectifs, FR1 à FR32, NFR1 à NFR14, hypothèses techniques, épopées EP1 à EP6, 26 stories, plan en cinq vagues, points à arbitrer A1 à A14 (dont IC-01, IC-02, Q-01 et Q-02 du brief). |
 
 ## 2. Exigences fonctionnelles
 
@@ -102,7 +102,7 @@ Chaque FR regroupe des exigences de la spec sans les reformuler : le texte de r�
 
 | NFR | Objet | Exigence | Vérification | Stories |
 |---|---|---|---|---|
-| NFR1 | Latence et tampon | SF-78 : tampon de 256 trames à 48 kHz (≈ 5,3 ms) au plus quand le matériel le permet ; latence geste→son ≤ 20 ms sur iPhone/iPad récents et Mac. Toutes les touches disponibles sont exploitées (regroupées et prédites). Les événements de geste et de crossfader partent vers le moteur dans le cycle d'événements qui les reçoit, sans attendre un rafraîchissement de l'interface. | Tampon effectif et latence de sortie publiés (2.1) ; mesure consignée en recette (6.3, PO-07) | 1.2, 2.1, 4.2, 4.3, 6.3 |
+| NFR1 | Latence et tampon | SF-78 : tampon de 256 trames à 48 kHz (≈ 5,3 ms) au plus quand le matériel le permet ; latence geste→son ≤ 20 ms sur les appareils de référence (point A13, Q-01), hors sorties Bluetooth dont la latence propre dépasse l'objectif (point A14, Q-02). Toutes les touches disponibles sont exploitées (regroupées et prédites). Les événements de geste et de crossfader partent vers le moteur dans le cycle d'événements qui les reçoit, sans attendre un rafraîchissement de l'interface. | Tampon effectif et latence de sortie publiés (2.1) ; mesure consignée en recette (6.3, PO-07) | 1.2, 2.1, 4.2, 4.3, 6.3 |
 | NFR2 | Temps réel | Dans le fil de rendu : aucune allocation, aucun verrou bloquant, aucun appel Objective-C ou Swift susceptible d'allouer (journalisation, tableaux dynamiques, chaînes, closures créées à la volée), aucune entrée-sortie. Interface → audio : file SPSC sans verrou, bornée, qui ne bloque jamais quand elle est pleine. Audio → interface : instantané d'état lu sans verrou. Un clip remplacé n'est jamais libéré dans le fil de rendu. | Test de comptage d'allocations (1.5) ; revue QA de chaque PR (case du modèle de PR) | 1.1 à 1.5, 2.1 |
 | NFR3 | Charge CPU | Rendu de 256 trames, deux platines à ±16× avec anti-repliement : 30 % au plus de la durée du tampon sur Mac Apple Silicon. | Mesure de performance (1.5), indicative en CI | 1.3, 1.5 |
 | NFR4 | Mémoire | Deux sons distincts de 10 min (SF-80) chargés sur les deux platines sans plantage ni alerte mémoire (PCM Float32 stéréo à 48 kHz : ≈ 230 Mo par son). Un même son chargé sur A et B n'est pas dupliqué. Un son remplacé est libéré : empreinte stable après 20 remplacements. Pic de décodage ≤ 1,5 × la taille du clip. Forme d'onde ≤ 2 Mo par son. Empreinte totale cible ≤ 650 Mo. | Mesure en recette (6.3) ; alimente PO-16 | 1.5, 2.2, 4.6, 6.1, 6.3 |
@@ -286,10 +286,10 @@ Toutes les stories de l'épopée sont du Swift pur, testées sous Linux, et ne f
 - **Récit :** En tant que DJ scratch, je veux une table de mixage dont le crossfader coupe net et ne touche jamais à la lecture, afin de rythmer mes scratchs entre A et B.
 - **Critères d'acceptation :**
   1. Gain d'une voie = fader de voie × gain du crossfader pour cette voie (SF-65, RM-52). Valeurs initiales : faders à 100 %, crossfader au centre, courbe « coupure franche », hamster désactivé (3.2, SF-66).
-  2. Courbe conforme à 5.2 : le tableau de 6.10 « Gain des voies selon la courbe » est respecté à ±0,05 ; en courbe douce, chaque voie est à −3 dB ± 0,5 dB au centre (6.4 « Crossfader en position intermédiaire avec courbe douce ») ; en coupure franche, la voie est à plein niveau en 3 % de course au plus depuis la butée opposée (SF-66 ; 6.4 « Ouvrir la voie avec un déplacement minimal (cut-in) ») ; les valeurs intermédiaires de la courbe varient de façon monotone (5.2). Courbe intermédiaire et hamster : critères P1 portés par cette story (point A5).
+  2. Courbe conforme à 5.2 : le tableau de 6.10 « Gain des voies selon la courbe » est respecté à ±0,05 ; en courbe douce, chaque voie est à −3 dB ± 0,5 dB au centre (6.4 « Crossfader en position intermédiaire avec courbe douce ») ; en coupure franche, la voie est à plein niveau en 3 % de course au plus depuis la butée opposée (SF-66 ; 6.4 « Ouvrir la voie avec un déplacement minimal (cut-in) ») ; les valeurs intermédiaires de la courbe varient de façon monotone (5.2). Courbe intermédiaire et hamster sont livrés dès le P0 (point A12).
   3. Lissage à la fréquence audio : faders et crossfader en 5 ms au plus ; temps de montée de 1 ms au plus en coupure franche (RM-52, RM-08).
   4. Hamster : le sens du crossfader est inversé ; la bascule est lissée en 5 ms au plus, sans clic (SF-67 ; 6.10 « Activer le hamster »).
-  5. Coupure momentanée par platine (« transformer », 3.5) : tant qu'elle est active, le gain de crossfader de la voie vaut 1, avec la même montée qu'en coupure franche (6.14 « Couper le son au clavier pendant un scratch à la souris »).
+  5. Coupure momentanée par platine (« transformer », 3.5) : tant qu'elle est active, le gain de crossfader de la voie vaut 1, avec la même montée qu'en coupure franche ; le fader de voie continue de s'appliquer et une voie déjà ouverte n'est pas modifiée (IC-06 ; 6.14 « Couper le son au clavier pendant un scratch à la souris »).
   6. Les gains n'agissent que sur le niveau : position et vitesse de chaque platine sont identiques, à l'échantillon près, avec ou sans mouvement du mixeur (SF-12, RM-06 ; 6.4 « Fermer complètement la voie A au crossfader », « Ouvrir la voie A au crossfader », « Fader de voie »).
   7. Sortie sans écrêtage numérique (marge et limiteur doux) : deux sinusoïdes à 0 dBFS, crossfader au centre en coupure franche, donnent une crête de sortie ≤ −0,1 dBFS et lèvent l'indicateur de limitation (SF-65 ; 6.8 « Pas de saturation à la somme des deux voies »).
   8. Un VU-mètre par voie et un indicateur de saturation de sortie sont publiés dans l'instantané (3.2, SF-65). Proposition : niveau de voie après fader, avant crossfader (point A10).
@@ -307,7 +307,7 @@ Toutes les stories de l'épopée sont du Swift pur, testées sous Linux, et ne f
   4. Les événements de geste (1.2) pilotent la tenue et l'angle cible du disque de la platine visée ; le toucher est prioritaire sur le moteur (SF-06 à SF-10, RM-03).
   5. CUE (critères P1 portés par cette story, point A5) : SET CUE mémorise la tête ; CUE y ramène sans changer l'état du moteur ; sans CUE, retour à 0 s ; disque tenu, le rappel ré-ancre le geste sur la position du CUE, sans clic (SF-13 ; 6.6 « Mémoriser un point CUE », « Revenir au point CUE », « Rappeler CUE sans point enregistré », « Définir un CUE pendant que je retiens le disque », « Rappeler le CUE pendant que je retiens le disque »).
   6. Needle drop : la commande de positionnement est ignorée tant que le disque est tenu, lissée en 5 ms au plus sinon, et ne change pas l'état du moteur (SF-71 ; 6.11 « Positionner la tête sur l'aperçu (needle drop) », « Needle drop ignoré pendant que je retiens le disque »).
-  7. Repère : l'angle de repère publié passe sous la tête quand la tête est au CUE (ou à 0 s sans CUE) et reste cohérent avec le disque après une sortie de borne (SF-69, RM-13 ; 6.11 « Le repère suit le disque »).
+  7. Repère : l'angle de repère publié passe sous la tête quand la tête est au CUE (ou à 0 s sans CUE) et reste juste après une sortie de borne, un rappel de CUE ou un needle drop : sa place sur l'étiquette est recalculée à chaque saut de position (SF-69, RM-13, IC-09 ; 6.11 « Le repère suit le disque »). Le repère existe dès le P0 (6.3 « Lancer le son depuis le repère », IC-01).
   8. Arrêt général : une commande met immédiatement les deux moteurs à STOP, sans rampe, positions conservées (RM-56) ; utilisée par 2.1 et 2.3.
   9. Temps réel (NFR2) : 10 000 rendus de 256 trames, deux platines à ±16× et un flux continu de commandes, ne font aucune allocation (compteur d'allocations sous Linux et macOS) ; aucun verrou ; quand la file est pleine, la politique du contrat 0.2 s'applique sans bloquer ; un clip remplacé n'est jamais libéré dans le fil de rendu.
   10. Scénario hors ligne déterministe, codé dans `Diagnostics/` (hors cible de test) et paramétré par le clip pour être réutilisé par 2.4 : START → vitesse nominale → tenue immobile → scratch avant et arrière → relâchement → coupures au crossfader. Vérifications : silence pendant la tenue immobile et plateau en rotation, signe de la vitesse conforme au geste, vitesse du plateau retrouvée dans le temps de rattrapage, voie fermée ≤ −60 dBFS. Un même flux de commandes produit la même sortie à l'échantillon près (NFR11).
@@ -355,7 +355,7 @@ Toutes les stories de l'épopée sont du Swift pur, testées sous Linux, et ne f
   1. iOS et iPadOS, interruption de session : les deux moteurs passent immédiatement à STOP, positions conservées ; à la fin de l'interruption, rien ne reprend et START est nécessaire (SF-18, RM-10, RM-56 ; 6.5 « Recevoir une interruption système (iPhone/iPad) »).
   2. iOS et iPadOS, casque filaire ou Bluetooth déconnecté : STOP avant toute sortie sur le haut-parleur (6.5 « Débrancher le casque (iPhone/iPad) »).
   3. Interface USB retirée : aucun plantage, la nouvelle route du système est suivie, les moteurs passent à STOP, la reprise est manuelle (6.5 « Perdre le périphérique audio »).
-  4. macOS, changement de configuration (nouveau périphérique par défaut, autre fréquence) : le moteur audio redémarre sur la nouvelle sortie ; hauteur et vitesse nominale inchangées ; positions conservées ; moteurs à STOP selon l'équivalence 0.3 (point A2) (6.5 « Changer de périphérique de sortie sur Mac »).
+  4. macOS, choix d'un autre périphérique de sortie par défaut, éventuellement à une autre fréquence : le moteur audio redémarre sur la nouvelle sortie ; hauteur et vitesse nominale inchangées ; positions conservées ; les moteurs gardent leur état (point A2, IC-04) (6.5 « Changer de périphérique de sortie sur Mac »).
   5. macOS, mise en veille : moteurs à STOP (0.3).
   6. Aucune sortie disponible : état « Sortie audio indisponible », interface utilisable, nouvel essai automatique dès qu'une sortie apparaît, sans redémarrer l'app (SF-82 ; 6.5 « Aucune sortie audio disponible »).
   7. Le nom de la sortie publié est mis à jour à chaque changement (6.5 « Brancher une interface audio USB »).
@@ -383,7 +383,7 @@ Toutes les stories de l'épopée sont du Swift pur, testées sous Linux, et ne f
 - **Critères d'acceptation :**
   1. Implémente la partie index du protocole de bibliothèque (0.2) : chaque entrée porte un UUID stable, une empreinte SHA-256, le nom, la durée, la date d'import, l'origine (« Import » ou « Démo ») et le nom de sa copie locale (RM-58, SF-74).
   2. L'index `Application Support/ScratchApp/library.json` est écrit de façon atomique (fichier temporaire puis remplacement) (5.3). Un index illisible est mis de côté et la bibliothèque repart vide avec un message, sans plantage (NFR12).
-  3. Au chargement, toute entrée dont la copie est absente ou de taille différente est écartée et signalée (RM-48).
+  3. Au chargement de l'index et avant chaque chargement d'un son, toute entrée dont la copie est absente ou de taille différente (copie supprimée depuis Fichiers ou le Finder) est écartée et signalée (RM-48, IC-10).
   4. SHA-256 portable, sans CryptoKit, calculé en flux ; vecteurs de test officiels (chaîne vide, « abc », un million de « a ») (RM-58).
   5. La suppression efface la copie de `Documents/Banque de sons/` puis l'entrée ; aucun fichier hors du bac à sable n'est touché (RM-49 ; 6.13 « Supprimer un son non chargé »).
   6. L'UUID d'une entrée ne change jamais (RM-58).
@@ -484,7 +484,7 @@ Les stories de l'épopée avancent sur la façade moteur du contrat 0.2 et sur u
 - **Dépendances :** 1.2, 4.1
 - **Récit :** En tant que DJ, je veux saisir et faire tourner chaque disque au doigt, à la souris ou au trackpad, afin de scratcher sur iPhone, iPad et Mac.
 - **Critères d'acceptation :**
-  1. iOS et iPadOS : une surface multitouch par disque (UIKit) transmet au suivi d'angle (1.2) les touches regroupées et prédites ; au moins trois contacts simultanés et indépendants : disque A, disque B, crossfader ou fader (SF-19, SF-78 ; 6.8 « Trois contacts simultanés »).
+  1. iOS et iPadOS : une surface multitouch par disque (UIKit) transmet au suivi d'angle (1.2) les touches regroupées et prédites ; au moins trois contacts simultanés et indépendants : disque A, disque B, crossfader ou fader, dans les dispositions où les deux disques sont visibles (SF-19, SF-78, IC-05 ; 6.8 « Trois contacts simultanés »).
   2. Les règles de saisie de 1.2 s'appliquent de bout en bout : geste commencé sur le disque, deuxième doigt ignoré, annulation système = relâchement, zone centrale (RM-60, RM-61 ; 6.3 « Gestes particuliers »).
   3. Mac : clic maintenu sur le disque = doigt posé ; clic-glisser circulaire = rotation (RM-59, SF-79 ; 6.14 « Retenir et scratcher à la souris »).
   4. Mac : défilement à deux doigts au-dessus du disque = rotation, relâchée 80 ms après le dernier événement (SF-79 ; 6.14 « Scratcher au trackpad »).
@@ -539,7 +539,7 @@ Les stories de l'épopée avancent sur la façade moteur du contrat 0.2 et sur u
 - **Dépendances :** 4.1, 4.2
 - **Récit :** En tant que DJ sur Mac, je veux piloter transport, CUE, pitch, coupures et crossfader au clavier et par les menus, afin de scratcher à la souris d'une main et de couper le son de l'autre.
 - **Critères d'acceptation :**
-  1. Raccourcis de 3.5 : `Q`/`P` START/STOP ; `A`/`S` et `L`/`K` SET CUE/CUE ; `F`/`J` coupure momentanée ; `Z`/`X` et `,`/`.` pitch ±0,1 % ; `←`/`→` crossfader par pas de 5 % ; `⇧←`/`⇧↓`/`⇧→` butée A, centre, butée B (6.14 « Piloter le transport au clavier », « Déplacer le crossfader au clavier »).
+  1. Raccourcis de 3.5 : `Q`/`P` START/STOP ; `A`/`S` et `L`/`K` SET CUE/CUE ; `F`/`J` coupure momentanée ; `Z`/`X` et `,`/`.` pitch ±0,1 % ; `←`/`→` crossfader par pas de 5 % ; `⇧←`/`⇧↓`/`⇧→` butée A, centre, butée B (6.14 « Piloter le transport au clavier », « Déplacer le crossfader au clavier »). Les touches suivent la décision UX sur les claviers AZERTY et QWERTY (position physique ou caractère, IC-08, point A10).
   2. Coupure momentanée : la voie est ouverte tant que la touche est enfoncée et refermée au relâchement, y compris pendant un scratch à la souris, sans l'interrompre (3.5, SF-79 ; 6.14 « Couper le son au clavier pendant un scratch à la souris »).
   3. La répétition automatique des touches ne redéclenche ni START/STOP, ni SET CUE, ni CUE, ni les coupures ; pour le pitch et le crossfader, elle suit la spec UX (point A10).
   4. Les raccourcis sont inactifs quand un champ de texte a le focus (6.14 « Raccourcis inactifs pendant la saisie de texte »).
@@ -773,16 +773,21 @@ La matrice de traçabilité complète (SF/RM → épopées) est tenue par Mary d
 
 | # | Sujet | Constat | Proposition du PM |
 |---|---|---|---|
-| A1 | Temps de rattrapage | **Contradiction dans la spec** : 5.1 §2 parle d'une « constante de temps » de 60 ms (≈ 95 % de la vitesse atteinte en 180 ms), alors que SF-10, 6.3 et 6.9 décrivent une durée (« rattrape la vitesse du plateau en 60 ms environ », « pendant environ 300 ms »). | Lire le réglage comme une durée : vitesse du plateau atteinte à 5 % près au terme du temps de rattrapage (CA 1.1-6). Corriger 5.1 §2 en v2.1. |
-| A2 | Changement volontaire de sortie sur Mac (6.5) | Le scénario ne dit pas si les moteurs s'arrêtent ; l'équivalence 0.3 assimile un changement de configuration à une interruption (SF-18). | STOP, positions conservées (CA 2.3-4). |
-| A3 | Nommage des copies en V1 | SF-60 et RM-43 (conserver le nom d'origine, suffixe en cas de collision) sont classés P2, mais la V1 doit déjà éviter les collisions dans `Banque de sons/`. | Appliquer cette règle dès la V1 (CA 3.2-5). |
+| A1 | Temps de rattrapage (IC-03) | **Contradiction dans la spec** : 5.1 §2 parle d'une « constante de temps » de 60 ms (≈ 95 % de la vitesse atteinte en 180 ms), alors que SF-10, 6.3 et 6.9 décrivent une durée (« rattrape la vitesse du plateau en 60 ms environ », « pendant environ 300 ms »). | Lire le réglage comme une durée : vitesse du plateau atteinte à 5 % près au terme du temps de rattrapage (CA 1.1-6). Corriger 5.1 §2 en v2.1. |
+| A2 | Changements de sortie (IC-04) | 0.3 assimile sur Mac un changement de configuration à une interruption (SF-18), alors que 6.5 « Changer de périphérique de sortie sur Mac » attend que le son passe sur la nouvelle interface. | Règle unique : un choix volontaire de sortie sur Mac garde l'état des moteurs ; la perte d'une sortie (USB retiré, casque débranché), une interruption ou la veille mettent les moteurs à STOP (CA 2.3-1 à 2.3-5). |
+| A3 | Nommage des copies en V1 (IC-10) | SF-60 et RM-43 (conserver le nom d'origine, suffixe en cas de collision) sont classés P2, mais la V1 doit déjà éviter les collisions dans `Banque de sons/`. | Appliquer cette règle dès la V1 (CA 3.2-5). |
 | A4 | Écran Réglages | Les scénarios de réglage des durées (6.2) et du rattrapage (6.9) sont dans des features P0, mais la recette P0 (section 7) ne les cite pas. | Réglages pris en charge par le cœur dès P0 (1.1) ; écran Réglages en P1 (3.4). |
-| A5 | Critères P1 dans des stories P0 | Pour éviter des stories trop petites : résistance (1.1), courbe intermédiaire et hamster (1.4), CUE et needle drop (1.5), confirmation de remplacement SF-15 (6.1), raccourcis pitch et CUE (5.1). | Accepter ; ces critères restent recettés en P1. |
+| A5 | Critères P1 dans des stories P0 | Pour éviter des stories trop petites : résistance (1.1), CUE et needle drop (1.5), confirmation de remplacement SF-15 (6.1), raccourcis pitch et CUE (5.1). | Accepter ; ces critères restent recettés en P1. |
 | A6 | Son de démonstration (PO-14) | Contenu et licence ouverts. | Son généré par l'app (« stab » + « ahh », 6 à 10 s) : aucune licence tierce, déterministe pour la CI (3.3). |
-| A7 | Mémoire (PO-16) | 10 min stéréo en Float32 à 48 kHz ≈ 230 Mo par son. | Décodage complet en mémoire en V1, sans lecture en flux ; budget ≤ 650 Mo avec deux sons de 10 min, à confirmer par la mesure de 6.3. |
+| A7 | Mémoire (PO-16, R-06) | 10 min stéréo en Float32 à 48 kHz ≈ 230 Mo par son. | Décodage complet en mémoire en V1, sans lecture en flux ; stockage Float32 ou compact (Int16) au choix de l'architecte ; budget ≤ 650 Mo avec deux sons de 10 min, à confirmer par la mesure de 6.3. |
 | A8 | Conversion de fréquence | Au décodage ou dans la voix : impact sur le changement de périphérique Mac. | Dans la voix (5.2) ; décision de Winston. |
 | A9 | Recette iOS et iPadOS sur appareil | La CI ne construit que pour le simulateur ; multitouch, latence tactile, interruptions et casque exigent un appareil. | Recette macOS bloquante pour la V1 ; recette sur appareil iOS consignée comme réserve (gate CONCERNS) et planifiée hors de cet environnement. |
-| A10 | Questions UX pour Sally | Gain du défilement trackpad → rotation ; flèches quand un curseur a le focus ; répétition des touches pitch et crossfader ; VU-mètre avant ou après crossfader ; dépôt de plusieurs fichiers. | Trancher dans `front-end-spec.md` ; les CA 1.2-7, 1.4-8, 5.1-3, 5.2-4 et 5.3-3 s'y alignent. |
+| A10 | Questions UX pour Sally | Gain du défilement trackpad → rotation ; flèches quand un curseur a le focus (IC-07) ; claviers AZERTY et QWERTY (IC-08) ; répétition des touches pitch et crossfader ; VU-mètre avant ou après crossfader ; dépôt de plusieurs fichiers. | Trancher dans `front-end-spec.md` ; les CA 1.2-7, 1.4-8, 5.1-1, 5.1-3, 5.2-4 et 5.3-3 s'y alignent. |
+
+| A11 | Scénarios P1 dans la feature 6.1 [P0] (IC-01) | Rechargement depuis la bibliothèque, dédoublonnage, démo, fichiers refusés et durée maximale sont vérifiés par des scénarios P0 mais classés P1 ailleurs. | Arbitrage du PM : le socle reste P0 (index, copie, rechargement depuis la copie, dédoublonnage, refus explicites, démo : 2.2, 3.1, 3.2, 3.3, 6.1) ; l'écran Bibliothèque est P1 (3.5). Au P0, « Recharger un son déjà importé sans accéder à Drive » est vérifié par l'API de bibliothèque (CA 3.2-6) ; par l'écran en P1. |
+| A12 | E-02 et E-06 classés P0 par la revue, mais 6.10 et la mesure de latence en P1 (IC-02) | Écart de priorité. | Arbitrage du PM : courbe et hamster livrés dès le P0 dans le cœur (1.4) et la vue (4.2) ; conception basse latence dès le P0 (2.1, 4.3) ; mesure de latence en recette (6.3). |
+| A13 | Appareils de référence (Q-01) | « Récents » (SF-78) n'est pas défini. | Mac Apple Silicon (M1 ou plus récent) pour la recette V1 ; iPhone 13 ou plus récent et iPad à puce M1 ou A15 ou plus récente pour la recette sur appareil. |
+| A14 | Sorties Bluetooth (Q-02) | Leur latence propre dépasse 20 ms. | Hors de l'objectif de 20 ms ; la latence de sortie publiée (2.1) est consignée telle quelle en recette. |
 
 Restent ouverts sans effet sur le plan : PO-07 (mesure de latence, en 6.3), PO-08 (matériel USB, en 6.3), PO-15 (calibrage de la résistance sur appareil).
 
@@ -790,7 +795,7 @@ Restent ouverts sans effet sur le plan : PO-07 (mesure de latence, en 6.3), PO-0
 
 ### 11.1 Pour 📝 Sarah (Product Owner)
 
-> Valide ce PRD avec la checklist PO, en le croisant avec `front-end-spec.md` (Sally) et `architecture.md` (Winston) : couverture des exigences V1 (section 9), découpage et priorités (P0 seul = app jouable sur macOS), dépendances et vagues (section 8), cohérence avec les contrats de la story 0.2 (section 5.3). Tranche les points A1 à A10 de la section 10 et consigne tes décisions dans `docs/bmad/po-validation.md`. Toute modification d'une story (critère, priorité, dépendance) se reporte dans ce PRD avant le passage à Bob.
+> Valide ce PRD avec la checklist PO, en le croisant avec `front-end-spec.md` (Sally) et `architecture.md` (Winston) : couverture des exigences V1 (section 9), découpage et priorités (P0 seul = app jouable sur macOS), dépendances et vagues (section 8), cohérence avec les contrats de la story 0.2 (section 5.3). Tranche les points A1 à A14 de la section 10 et consigne tes décisions dans `docs/bmad/po-validation.md`. Toute modification d'une story (critère, priorité, dépendance) se reporte dans ce PRD avant le passage à Bob.
 
 ### 11.2 Pour 🏃 Bob (Scrum Master)
 
@@ -801,3 +806,4 @@ Restent ouverts sans effet sur le plan : PO-07 (mesure de latence, en 6.3), PO-0
 - 🏗️ **Winston** : vérifier que la story 0.2 fournit les attendus de la section 5.3 et trancher A8.
 - 🎨 **Sally** : répondre aux questions UX de A10.
 - 💻 **James, Léa, Hugo** : démarrer la vague 1 dès la fusion de 0.2.
+- 🧪 **Quinn** : reprendre dans la recette (6.3) les lacunes de couverture et les exigences à recetter sur appareil de `traceability.md` (sections 6 et 7).
