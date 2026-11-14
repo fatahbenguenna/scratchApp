@@ -355,6 +355,37 @@ final class MixerRendererTests: XCTestCase {
         XCTAssertEqual(engine.latestSnapshot().mixer.channelGains.b, 0, accuracy: 1e-15)
     }
 
+    /// CA7, CA8 — 6.8 « Pas de saturation à la somme des deux voies », de bout en bout : deux
+    /// platines lisant une sinusoïde à 0 dBFS (voix de la 1.3), crossfader au centre en coupure
+    /// franche : sortie ≤ −0,1 dBFS, « limiteur actif » et pas d'écrêtage dans l'instantané ;
+    /// VU-mètres de voie publiés (`DeckSnapshot.peakLevel`).
+    func testEngineSumOfTwoFullScaleDecksIsLimited_6_8() {
+        let engine = ScratchEngine()
+        engine.send(.load(.a, TestClips.sine(frequency: 1_000, seconds: 10)))
+        engine.send(.load(.b, TestClips.sine(frequency: 1_000, seconds: 10)))
+        engine.send(.motor(.a, on: true))
+        engine.send(.motor(.b, on: true))
+        var left = [Float](repeating: 0, count: 256)
+        var right = [Float](repeating: 0, count: 256)
+        var largest = 0.0
+        for buffer in 0..<400 {
+            left.withUnsafeMutableBufferPointer { l in
+                right.withUnsafeMutableBufferPointer { r in
+                    engine.render(frameCount: 256, left: l.baseAddress!, right: r.baseAddress!)
+                }
+            }
+            if buffer >= 300 { largest = max(largest, peak(left), peak(right)) }
+        }
+        let snapshot = engine.latestSnapshot()
+        XCTAssertEqual(snapshot[.a].playbackRate, 1, accuracy: 1e-6, "both decks play at speed")
+        XCTAssertLessThanOrEqual(largest, ceiling)
+        XCTAssertTrue(snapshot.mixer.limiterActive, "reduction \(snapshot.mixer.limiterReduction) dB")
+        XCTAssertFalse(snapshot.mixer.isClipping)
+        // Sampled crest of a 1 kHz sine at 48 kHz: between cos(π/48) ≈ 0.9979 and 1.
+        XCTAssertEqual(snapshot[.a].peakLevel, 1, accuracy: 3e-3, "channel VU after the line fader")
+        XCTAssertEqual(snapshot[.b].peakLevel, 1, accuracy: 3e-3)
+    }
+
     /// CA9 : sorties finies, gains et enveloppe du limiteur exacts au repos (pas de dénormaux),
     /// fréquence de sortie modifiable.
     func testSilenceAndSampleRateChange() {
