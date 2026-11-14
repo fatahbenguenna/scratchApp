@@ -67,10 +67,12 @@ public final class DeckViewModel {
     /// VU-mètre de la voie (niveau après le fader de voie, avant le crossfader ; SF-65, D-26),
     /// mis à jour à chaque image. Lu seulement par les VU-mètres de la table de mixage.
     public private(set) var channelMeter = VUMeterBallistics()
-    /// Incrémenté à chaque SET CUE accepté : éclat de 150 ms du marqueur et annonce VoiceOver (4.5).
+    /// Incrémenté à chaque SET CUE accepté : éclat de 150 ms du marqueur (4.5, 4.6).
     public private(set) var setCueCount = 0
-    /// Annonce du dernier SET CUE : « Point CUE mémorisé à 12,3 secondes » (UX §5.6).
+    /// Annonce du dernier SET CUE : « Point CUE mémorisé à 12,3 secondes » (UX §5.6), avec le CUE
+    /// confirmé par l'instantané (#94) ; émise à chaque incrément de `setCueAnnouncementCount`.
     public private(set) var setCueAnnouncement = ""
+    public private(set) var setCueAnnouncementCount = 0
     /// Incrémenté à chaque START sur une platine vide : la vue met alors en avant « Importer » et
     /// « Charger la démo » et VoiceOver l'annonce (PO-01, UX §5.2).
     public private(set) var emptyDeckHighlightCount = 0
@@ -85,6 +87,8 @@ public final class DeckViewModel {
     @ObservationIgnored private var commandedSpeed = CommandedValue<TurntableSpeed>()
     @ObservationIgnored private var commandedPitch = CommandedValue<Double>()
     @ObservationIgnored private var commandedResistance = CommandedValue<Double>()
+    /// SET CUE envoyé, en attente du CUE de l'instantané : CUE précédent, position affichée et date.
+    @ObservationIgnored private var pendingSetCue: (previous: Double?, position: Double, time: Double)?
     /// Horloge monotone des confirmations (injectée par les tests).
     @ObservationIgnored var clock: () -> Double = { ProcessInfo.processInfo.systemUptime }
 
@@ -175,6 +179,7 @@ public final class DeckViewModel {
         if isHeld != snapshot.isHeld { isHeld = snapshot.isHeld }
         if isAtEnd != snapshot.isAtEnd { isAtEnd = snapshot.isAtEnd }
         reconcileLoadedClip(with: snapshot.clipID)
+        announceConfirmedCue(snapshot, at: now)
         updateTexts(for: snapshot)
     }
 
@@ -313,9 +318,21 @@ public final class DeckViewModel {
     /// une platine vide.
     public func setCue() {
         guard isLoaded, engine.send(.setCue(deck)) else { return }
-        let tenths = DeckFormatting.tenths(frame.positionSeconds)
-        setCueAnnouncement = "Point CUE mémorisé à " + DeckFormatting.spokenTime(tenths: tenths)
+        pendingSetCue = (cueSeconds, frame.positionSeconds, clock())
         setCueCount &+= 1
+    }
+
+    /// Annonce le CUE mémorisé par le moteur, qui le prend une image et un tampon après l'affichage
+    /// (#94) : au premier instantané qui montre un nouveau CUE, ou après le délai de confirmation de
+    /// #57 (100 ms), avec le CUE de l'instantané (SET CUE au même endroit) ou la position affichée.
+    private func announceConfirmedCue(_ snapshot: DeckSnapshot, at now: Double) {
+        guard let pending = pendingSetCue else { return }
+        let confirmed = snapshot.cueSeconds != nil && snapshot.cueSeconds != pending.previous
+        guard confirmed || now - pending.time >= CommandedValue<Double>.timeout else { return }
+        pendingSetCue = nil
+        let tenths = DeckFormatting.tenths(snapshot.cueSeconds ?? pending.position)
+        setCueAnnouncement = "Point CUE mémorisé à " + DeckFormatting.spokenTime(tenths: tenths)
+        setCueAnnouncementCount &+= 1
     }
 
     /// CUE (SF-13) : ramène la tête au CUE, ou à 0 s sans CUE, sans changer le moteur, y compris
