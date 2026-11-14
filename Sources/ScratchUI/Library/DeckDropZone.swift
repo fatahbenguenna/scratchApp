@@ -90,14 +90,14 @@ struct DeckDropDelegate: DropDelegate {
         let providers = info.itemProviders(for: [.item])
         let itemTypes = providers.map(\.registeredTypeIdentifiers)
         let token: Int? = MainActor.assumeIsolated {
-            let token = zone.enter(itemTypes: itemTypes, isBusy: !deckModel.isImportEnabled)
-            if let text = zone.text { AccessibilityNotification.Announcement(text).post() }
+            let token = self.zone.enter(itemTypes: itemTypes, isBusy: !self.deckModel.isImportEnabled)
+            if let text = self.zone.text { AccessibilityNotification.Announcement(text).post() }
             return token
         }
         guard let token, let provider = providers.first else { return }
-        let zone = self.zone
+        let target = self.zone
         DroppedFileLoader.fileURL(from: provider) { url in
-            Task { @MainActor in zone.didResolve(url, session: token) }
+            Task { @MainActor in target.didResolve(url, session: token) }
         }
     }
 
@@ -114,15 +114,15 @@ struct DeckDropDelegate: DropDelegate {
         let providers = info.itemProviders(for: [.item])
         let count = providers.count
         let accepted: Bool = MainActor.assumeIsolated {
-            let accepted = zone.acceptsDrop && count == 1
-            zone.exit()
+            let accepted = self.zone.acceptsDrop && count == 1
+            self.zone.exit()
             return accepted
         }
         guard accepted, let provider = providers.first else { return false }
-        let zone = self.zone
+        let target = self.zone
         let intents = self.intents
         DroppedFileLoader.load(provider) { url in
-            Task { @MainActor in zone.deliver(url, to: intents) }
+            Task { @MainActor in target.deliver(url, to: intents) }
         }
         return true
     }
