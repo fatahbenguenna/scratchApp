@@ -274,6 +274,30 @@ final class AppLifecycleTests: XCTestCase {
         XCTAssertGreaterThan(wakes, wakesAfterOutput, "still observed after the first change")
     }
 
+    /// Réveil de la boucle affichée : SwiftUI reconstruit `RootView`, donc une `RootSession`, à chaque
+    /// réévaluation de la vue parente, et `@State` ne garde que la première. Une session construite
+    /// puis jetée ne détourne pas les réveils : la boucle affichée, suspendue au repos, repart à la
+    /// commande suivante (capture CI de la 6.2 : écran figé avant ce correctif).
+    func testRebuiltRootViewKeepsTheDisplayedLoopWakeable() {
+        let waking = DisplayWakingEngine(wrapping: RecordingEngine())
+        let model = makeModel(engine: waking)
+        let displayed = RootSession(model: model, intents: model)
+        displayed.connectWakeSource() // onAppear of the displayed view
+        _ = RootSession(model: model, intents: model) // rebuilt by SwiftUI, never displayed
+
+        displayed.driver.step(now: 1)
+        displayed.driver.step(now: 1 + DisplayLinkDriver.idleGracePeriod)
+        XCTAssertTrue(displayed.driver.isSuspended, "idle for the whole grace period")
+        model.wakeDisplay() // output status change (no command)
+        XCTAssertFalse(displayed.driver.isSuspended, "a host status change wakes the displayed loop")
+
+        displayed.driver.step(now: 2)
+        displayed.driver.step(now: 2 + DisplayLinkDriver.idleGracePeriod)
+        XCTAssertTrue(displayed.driver.isSuspended)
+        model.deckB.setMotor(true)
+        XCTAssertFalse(displayed.driver.isSuspended, "a command wakes the displayed loop")
+    }
+
     /// Sans hôte (aperçus), rien ne démarre et l'état reste « arrêté ».
     func testLaunchWithoutHost() async {
         let engine = RecordingEngine()

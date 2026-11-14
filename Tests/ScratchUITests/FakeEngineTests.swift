@@ -156,6 +156,8 @@ final class FakeEngineTests: XCTestCase {
     func testDisplayLoopSuspendsWhenIdleAndWakesOnCommand() async {
         let environment = PreviewEnvironment()
         let session = RootSession(model: environment.model, intents: environment.intents)
+        XCTAssertFalse(session.driver.allowsSuspension, "not displayed yet")
+        session.connectWakeSource() // onAppear
         XCTAssertTrue(session.driver.allowsSuspension, "the preview engine is a wake source")
         session.driver.step(now: 1)
         XCTAssertFalse(session.driver.isSuspended, "idle, but within the grace period")

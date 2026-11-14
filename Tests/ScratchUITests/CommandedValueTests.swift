@@ -123,6 +123,7 @@ final class CommandedValueTests: XCTestCase {
     func testDisplayLoopStaysAwakeUntilTheSnapshotCatchesUp() async {
         let model = makeModel(lag: 2)
         let session = RootSession(model: model, intents: PreviewDeckIntents(model: model))
+        session.connectWakeSource() // onAppear
         var now = 10.0
         func step() {
             now += frame
