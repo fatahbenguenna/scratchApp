@@ -59,6 +59,12 @@ jobs:
           set -o pipefail
           mkdir -p ci-output
           swift test --parallel 2>&1 | tee ci-output/macos-swift-test.log
+      - name: Mesures temps réel en release (allocations, charge NFR2 et NFR3)
+        run: |
+          set -o pipefail
+          mkdir -p ci-output
+          swift test -c release -Xswiftc -enable-testing --filter 'RenderLoadTests|RealTimeAllocationTests' 2>&1 \
+            | tee ci-output/macos-release-tests.log
       - name: Générer le projet Xcode
         run: |
           brew install xcodegen
