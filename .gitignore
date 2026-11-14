@@ -1,0 +1,25 @@
+# Xcode / XcodeGen
+*.xcodeproj/
+*.xcworkspace/
+!Package.swift
+xcuserdata/
+DerivedData/
+build/
+*.xcresult
+
+# SwiftPM
+.build/
+.swiftpm/
+Package.resolved.bak
+
+# macOS
+.DS_Store
+
+# Artefacts locaux
+*.log
+ci-output/
+
+# Générés par XcodeGen depuis project.yml
+App/iOS/Info.plist
+App/macOS/Info.plist
+App/macOS/ScratchApp.entitlements
