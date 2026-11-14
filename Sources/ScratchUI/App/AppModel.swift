@@ -120,11 +120,13 @@ public final class AppModel {
 
     // MARK: - Lancement (CA 5, CA 10)
 
-    /// Au premier appel : lecture de l'index, réconciliation (D-11), liste à jour et bandeau unique.
+    /// Au premier appel : purge des copies de dépôts interrompus (5.2), lecture de l'index,
+    /// réconciliation (D-11), liste à jour et bandeau unique.
     /// Un index illisible ou partiellement illisible prime sur les entrées retirées (D-49).
     public func launch() async {
         guard !hasLaunched else { return }
         hasLaunched = true
+        DroppedFileLoader.purgeStaging()
         let recovery = await indexRecovery()
         let removed = await library.reconcile()
         await refreshLibrary()

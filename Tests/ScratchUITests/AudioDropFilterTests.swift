@@ -133,4 +133,41 @@ final class AudioDropFilterTests: XCTestCase {
         XCTAssertEqual(model.deckA.loadedEntry?.fileName, "finder.wav")
         XCTAssertTrue(FileManager.default.fileExists(atPath: finderFile.path), "a Finder file is never removed")
     }
+
+    /// Suivi de la gate 5.2 : un chemin contenant `..` ne sort jamais du dossier des dépôts ; seule
+    /// une copie de dépôt est supprimée, jamais un fichier voisin.
+    func testStagedPathsCannotEscapeWithDotDot() throws {
+        let staging = DroppedFileLoader.stagingDirectory
+        let escaping = staging.appendingPathComponent("abc/../../ScratchApp-Drops-voisin/boucle.wav")
+        XCTAssertFalse(DroppedFileLoader.isStaged(escaping))
+        XCTAssertFalse(DroppedFileLoader.isStaged(staging.appendingPathComponent("../boucle.wav")))
+        XCTAssertTrue(DroppedFileLoader.isStaged(staging.appendingPathComponent("abc/../def/boucle.wav")))
+
+        let neighbour = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ScratchApp-Drops-voisin-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: neighbour, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: neighbour) }
+        let outside = neighbour.appendingPathComponent("boucle.wav")
+        try Data("original".utf8).write(to: outside)
+        DroppedFileLoader.removeStaged(staging.appendingPathComponent("x/../../\(neighbour.lastPathComponent)/boucle.wav"))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: outside.path), "a path with .. never deletes outside the drops")
+    }
+
+    /// Suivi de la gate 5.2 : le lancement purge les copies laissées par un dépôt interrompu ; une
+    /// copie récente (dépôt en cours) est gardée.
+    func testLaunchPurgesInterruptedDrops() async throws {
+        let library = try TemporaryLibrary()
+        defer { library.remove() }
+        let stale = try XCTUnwrap(DroppedFileLoader.stage(try library.source("interrompu.wav"), suggestedName: nil, type: .wav))
+        let fresh = try XCTUnwrap(DroppedFileLoader.stage(try library.source("en-cours.wav", seed: 2), suggestedName: nil, type: .wav))
+        defer { DroppedFileLoader.removeStaged(fresh) }
+        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-86_400)],
+                                              ofItemAtPath: stale.deletingLastPathComponent().path)
+        let decoder = FakeDecoder()
+        let model = AppModel(engine: RecordingEngine(), host: nil, library: library.makeStore(decoder: decoder),
+                             preferences: InMemoryPreferencesStore(), decoder: decoder)
+        await model.launch()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: stale.deletingLastPathComponent().path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fresh.path), "a recent drop is never purged")
+    }
 }

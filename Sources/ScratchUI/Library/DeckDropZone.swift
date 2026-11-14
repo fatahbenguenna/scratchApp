@@ -185,10 +185,29 @@ enum DroppedFileLoader {
         url.standardizedFileURL.path.hasPrefix(stagingDirectory.standardizedFileURL.path + "/")
     }
 
-    /// Supprime la copie temporaire d'un dépôt et son dossier ; sans effet sur tout autre fichier.
+    /// Supprime la copie temporaire d'un dépôt et son dossier unique ; sans effet sur tout autre
+    /// fichier. Le chemin est d'abord normalisé : `..` ne peut pas sortir du dossier des dépôts.
     static func removeStaged(_ url: URL) {
         guard isStaged(url) else { return }
-        try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
+        let file = url.standardizedFileURL
+        let folder = file.deletingLastPathComponent()
+        let isUniqueFolder = folder.path != stagingDirectory.standardizedFileURL.path
+        try? FileManager.default.removeItem(at: isUniqueFolder ? folder : file)
+    }
+
+    /// Purge, au lancement de l'app, les copies laissées par un dépôt interrompu (suivi de la gate
+    /// 5.2). Seules les copies de plus de `age` secondes sont supprimées : un dépôt en cours n'est
+    /// jamais touché.
+    static func purgeStaging(olderThan age: TimeInterval = 600, now: Date = Date()) {
+        let fileManager = FileManager.default
+        guard let folders = try? fileManager.contentsOfDirectory(at: stagingDirectory,
+                                                                 includingPropertiesForKeys: [.contentModificationDateKey])
+        else { return }
+        for folder in folders {
+            let modified = (try? folder.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            if let modified, now.timeIntervalSince(modified) < age { continue }
+            try? fileManager.removeItem(at: folder)
+        }
     }
 }
 
@@ -198,13 +217,11 @@ enum DroppedFileLoader {
 struct DropZoneOverlay: View {
     let zone: DeckDropZoneModel
 
-    static let danger = Color(hex: 0xFF6369)
-
     var body: some View {
         ZStack {
             if let text = zone.text {
                 let accepted = zone.state == .accepted
-                let color = accepted ? Theme.deckColor(zone.deck) : Self.danger
+                let color = accepted ? Theme.deckColor(zone.deck) : Theme.danger
                 RoundedRectangle(cornerRadius: Theme.panelRadius)
                     .fill(color.opacity(accepted ? 0.12 : 0.08))
                     .overlay(
