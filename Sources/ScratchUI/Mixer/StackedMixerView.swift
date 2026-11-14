@@ -27,7 +27,7 @@ struct StackedMixerView: View {
             }
             .frame(height: 44)
             HStack(spacing: 16) {
-                CrossfaderCurveControl(mixer: mixer).frame(width: 200)
+                CrossfaderCurveControl(mixer: mixer, showsGraph: false).frame(width: 200)
                 CrossfaderView(mixer: mixer, height: 56).frame(maxWidth: 360)
                 HamsterToggle(mixer: mixer).frame(width: 140)
             }

@@ -74,7 +74,7 @@ public final class MixerViewModel {
     /// Largeur de cut-in `w = lerp(1 ; 0,03 ; courbe)` ; repères affichés quand `w ≤ 0,2`, à `w`
     /// (plein niveau de la voie de droite) et `1 − w` (voie de gauche) (UX §5.12).
     public var cutInWidth: Double? {
-        let width = 1 + (TurntableConstants.crossfaderCutInWidth - 1) * crossfaderCurve
+        let width = CrossfaderCurve.cutInWidth(curve: crossfaderCurve)   // core formula (#75)
         return width <= 0.2 ? width : nil
     }
 
