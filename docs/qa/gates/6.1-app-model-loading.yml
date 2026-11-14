@@ -1,0 +1,63 @@
+schema: 1
+story: "6.1"
+story_title: "AppModel et parcours de chargement"
+pr: 71
+issue: 42
+reviewed_sha: "5de832d"
+gate: PASS
+status_reason: >-
+  Les 10 critères d'acceptation sont implémentés, testés (12 tests macOS, 1 test Linux) et vérifiés
+  par la capture CI (app lancée avec le vrai modèle). CI Linux et macOS verte ; fusion sans conflit.
+  D-40 correctement appliquée (confirmation seulement pour une platine chargée et active) ; conditions
+  de D-52 respectées. Les quatre écarts du dev sont acceptables. Le point « Fichier inaccessible »,
+  ouvert depuis 2.2 et 3.2, est désormais suivi dans #73.
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues: []
+deviations:
+  - id: "DEV-1"
+    description: "Sans hôte démarré, le vrai moteur n'avance pas : le plateau ne tourne plus à l'écran avant la 6.2."
+    verdict: PASS
+    rationale: "Conséquence de D-52 ; le CA1 exige les composants réels ; brancher FakeEngine montrerait une animation sans son ; aucune version distribuée entre 6.1 et 6.2."
+  - id: "DEV-2"
+    description: "Titre du panneau d'ouverture macOS non réglable : le texte est affiché comme message."
+    verdict: PASS
+    rationale: "Limite de fileImporter ; sur macOS récent, une feuille n'affiche pas de titre et le message est le texte visible ; bouton « Importer »."
+  - id: "DEV-3"
+    description: "« Fichier inaccessible » affiché comme « Échec de l'import »."
+    verdict: PASS
+    rationale: "Hors du CA5 de 6.1, renvoyé à Winston par la story ; suivi par #73, créée par la QA."
+  - id: "DEV-4"
+    description: "LibraryStore.indexRecovery public mais hors contrat."
+    verdict: PASS
+    rationale: "Prescrit par D-49 et le CA10 (type concret, sans changement de contrat)."
+checks:
+  - item: "D-40"
+    result: "Confirmation seulement si isLoaded && isActive, évaluée à la fin de la copie ; platine à l'arrêt ou vide (plateau en rotation) remplacée directement ; testReplacementRules_SF15_D40 couvre les 5 cas et la démo sur une platine tenue."
+  - item: "D-52"
+    result: "Aucun DisplayWakingEngine ; hôte composé mais pas démarré ; loadedClip et loadedEntry posés ensemble après send(.load)."
+  - item: "project.yml"
+    result: "Produits ScratchLibrary et ScratchCore ajoutés aux cibles iOS et macOS, déclarés dans Package.swift ; builds verts."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Accès à portée de sécurité limité à la copie ; aucun signet conservé."
+  performance:
+    status: PASS
+    notes: "Décodage et démo détachés du fil principal ; démo mise en cache et partagée (RM-57)."
+  reliability:
+    status: PASS
+    notes: "Erreurs typées sans effet sur la platine ; « Son introuvable » avec liste mise à jour ; bandeau d'index unique."
+  maintainability:
+    status: PASS
+    notes: "AppModel documenté par étapes ; textes regroupés dans AppAlerts ; API explicite pour 3.5 et 5.2."
+evidence:
+  linux_tests: "scripts/linux-test.sh sur 5de832d : 195/195"
+  ci: "Rapport CI 09bc1df (fusion dans c1c5a1b) : Linux ✅, macOS ✅, self-test passed"
+  screenshot: "ci-shots/pr-71 : app lancée avec le vrai modèle, platines vides"
+recommendations:
+  immediate: []
+  future:
+    - action: "6.2 : fenêtre principale unique sur Mac (D-38) plutôt que WindowGroup (plusieurs fenêtres, deux tick() par image)."
+    - action: "6.2 : démarrer l'hôte ; brancher DisplayWakingEngine seulement après #57 et sa PR #70 (D-52)."
+    - action: "Winston et Sarah : décider du cas « Fichier inaccessible » (#73)."

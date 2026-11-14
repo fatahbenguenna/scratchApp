@@ -17,7 +17,12 @@
 ///   saut ni de dépassement) jusqu'au lot suivant, ce qui rallonge aussitôt le retard.
 /// - Le retard appris (`delay`) sert de retard initial au geste suivant.
 /// - Le relâchement (`end`) est lui aussi rejoué : le disque n'est relâché qu'après le dernier
-///   mouvement, avec le même retard.
+///   mouvement, avec le même retard. Un `begin` reçu pendant ce rejeu (doigt reposé moins d'un
+///   retard après le relâchement) prolonge le geste au lieu d'être perdu (story 1.2) : le rejeu va
+///   jusqu'au bout, le disque reste tenu entre les deux contacts, puis suit le nouveau doigt depuis
+///   le point de relâchement, sans saut.
+/// - Les touches prédites sont ignorées (D-16, calibrage de la story 1.2) : aucun gain de retard
+///   sans dépassement aux inversions.
 ///
 /// Latence ajoutée = `delay` : ≈ 13 ms avec un affichage à 120 Hz, ≈ 21 ms à 60 Hz
 /// (architecture §6.4). Fil audio uniquement, aucune allocation.
@@ -62,6 +67,8 @@ struct FingerTrajectory {
     private var hasFreshEvents = false
     private var isStarving = false
     private var endTime: Double?
+    /// Décalage des angles d'un geste repris pendant le rejeu du relâchement précédent.
+    private var angleOffset: Double = 0
 
     /// Dernière cible produite (angle cumulé du doigt).
     private(set) var output: Double = 0
@@ -84,9 +91,18 @@ struct FingerTrajectory {
     private var newestTime: Double { times[(oldest + count - 1) & Self.indexMask] }
     private var newestAngle: Double { angles[(oldest + count - 1) & Self.indexMask] }
 
-    /// Début d'un geste (un `begin` pendant un rejeu en cours le remplace).
+    /// Le geste est fini et son relâchement est en cours de rejeu.
+    var isReleasing: Bool { isActive && endTime != nil }
+
+    /// Début d'un geste. Pendant le rejeu d'un relâchement, le nouveau geste prolonge l'ancien ;
+    /// pendant un geste en cours, il le remplace (`DeckPhysics` ignore alors un second doigt, RM-60).
     mutating func begin(angle: Double, time: Double) {
         guard angle.isFinite, time.isFinite else { return }
+        if isReleasing {
+            resume(angle: angle, time: time)
+            return
+        }
+        angleOffset = 0
         oldest = 0
         count = 1
         times[0] = time
@@ -106,7 +122,7 @@ struct FingerTrajectory {
     /// Nouvel événement. Les temps non strictement croissants et les valeurs non finies sont ignorés.
     mutating func append(angle: Double, time: Double) {
         guard isActive, endTime == nil, angle.isFinite, time.isFinite, time > newestTime else { return }
-        push(time: time, angle: angle)
+        push(time: time, angle: angle + angleOffset)
         hasFreshEvents = true
     }
 
@@ -118,6 +134,17 @@ struct FingerTrajectory {
             push(time: releaseTime, angle: newestAngle)
         }
         endTime = releaseTime
+    }
+
+    /// Reprise pendant le rejeu du relâchement : le rejeu continue jusqu'au relâchement, le disque
+    /// reste tenu jusqu'au nouveau contact, puis suit le nouveau doigt depuis le point de relâchement.
+    private mutating func resume(angle: Double, time: Double) {
+        endTime = nil
+        angleOffset = newestAngle - angle
+        if time > newestTime {
+            push(time: time, angle: newestAngle)
+            hasFreshEvents = true
+        }
     }
 
     /// Arrêt immédiat, sans rejouer la fin (chargement d'un autre son, remise à zéro).

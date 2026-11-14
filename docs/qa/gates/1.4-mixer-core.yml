@@ -1,0 +1,59 @@
+schema: 1
+story: "1.4"
+story_title: "Table de mixage (cœur)"
+pr: 64
+issue: 22
+reviewed_sha: "b54aaf7"
+gate: PASS
+status_reason: >-
+  Les 9 critères d'acceptation sont implémentés et testés (193/193 ; 211/211 après fusion locale avec
+  le main qui contient la 1.2) ; CI Linux et macOS verte. Courbe intermédiaire (maximum des familles
+  douce et franche) vérifiée de façon indépendante : monotone en x et en c, tableau 6.10 exact,
+  extrémités exactes. Le lerp des Dev Notes n'est pas monotone. D-06, D-26, D-02 et D-13 respectés ;
+  mix sans allocation. Mesures des rendus de plus de 512 trames : agrégation reportée en 1.5 (note
+  sur #23).
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues: []
+deviations:
+  - id: "CURVE-MAX"
+    description: "Forme intermédiaire : maximum de la famille douce et de la famille franche de largeur w, plutôt que le lerp des Dev Notes."
+    verdict: PASS
+    rationale: "Grille de 201 courbes × 2 001 positions : 0 violation de monotonie en x et en c ; 6.10 exact ; perceptible dès c ≈ 0,03. Le lerp descend à 0,6898 au centre (non monotone, contraire à la spec 5.2)."
+  - id: "METERS-512"
+    description: "Mesures remises à zéro à chaque mix : un rendu de plus de 512 trames ne publie que le dernier bloc."
+    verdict: PASS
+    rationale: "CA8 respecté au niveau du mixeur ; affichage seulement, son intact ; agrégation dans ScratchEngine en 1.5 (note sur #23)."
+checks:
+  - item: "Coupure momentanée (D-06)"
+    result: "fader × (coupure ? 1 : courbe) ; 1 ms à l'ouverture et à la fermeture ; fader à 0 : voie muette ; voie à 1 inchangée ; A vise A malgré le hamster."
+  - item: "VU avant le crossfader (D-26)"
+    result: "crête × fader lissé, sans le facteur de crossfader ; voie fermée au crossfader, fader 50 % → VU 0,4."
+  - item: "Hamster P1 (D-02, D-19)"
+    result: "Implémenté et testé : bascule en ≤ 5 ms sans marche."
+  - item: "Aucune allocation"
+    result: "Champs de struct et variables locales scalaires ; sinus et log10 une fois par bloc ; pas de dénormaux."
+  - item: "Limiteur −0,1 dBFS (D-13)"
+    result: "Plafond 0,9885531 ; 2 × 0 dBFS → −0,100 dBFS, réduction 6,12 dB, pas d'écrêtage ; son seul : −0,1 dB."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Entrées non finies ignorées ; sortie bornée au plafond."
+  performance:
+    status: PASS
+    notes: "Travail constant par échantillon ; fonctions transcendantes une fois par bloc."
+  reliability:
+    status: PASS
+    notes: "Limiteur sans écrêtage, lissages exacts ; agrégation des mesures sur un rendu en 1.5."
+  maintainability:
+    status: PASS
+    notes: "Choix de la courbe justifié et protégé par des tests de propriétés ; composants séparés et documentés."
+evidence:
+  linux_tests: "scripts/linux-test.sh sur b54aaf7 : 193/193 ; après fusion locale de c1c5a1b : 211/211"
+  ci: "Rapport CI e1e0841 (fusion dans 19cbb67) : Linux ✅, macOS ✅"
+  independent_checks: "Réimplémentation Python de CrossfaderCurve.gains : monotonie sur une grille de 201 × 2 001, tableau 6.10, comparaison avec le lerp"
+recommendations:
+  immediate: []
+  future:
+    - action: "1.5 : publier le maximum des mesures sur tous les blocs d'un rendu (note sur #23)."
+    - action: "Recette 6.3 : écouter le scénario 6.8 (deux sons à 0 dBFS, ouverture brusque d'une voie) ; attaque du limiteur sans anticipation."
