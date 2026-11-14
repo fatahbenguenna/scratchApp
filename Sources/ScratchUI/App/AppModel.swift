@@ -67,6 +67,20 @@ public final class AppModel {
     @ObservationIgnored private var hasLaunched = false
     @ObservationIgnored private var demoClipTask: Task<AudioClip, Never>?
 
+    /// Durées du moteur et rattrapage de la feutrine affichés par l'écran Réglages (3.4) : valeur
+    /// commandée tant que l'instantané ne la confirme pas (#57).
+    public private(set) var motorTimings = MotorTimings.defaults
+    /// Écran Réglages présenté (iOS : feuille ; Mac : fenêtre Réglages ouverte par la vue).
+    public var isSettingsPresented = false
+    @ObservationIgnored var commandedTimings = CommandedValue<MotorTimings>()
+    @ObservationIgnored var preferencesTracker = PreferencesTracker()
+    @ObservationIgnored var pendingPreferences: AppPreferences?
+    @ObservationIgnored var preferencesSaveTask: Task<Void, Never>?
+    /// Délai de regroupement des écritures de préférences (0,5 s ; réduit par les tests).
+    @ObservationIgnored var preferencesSaveDelay = 0.5
+    /// Horloge monotone, en secondes (injectable par les tests).
+    @ObservationIgnored var clock: () -> Double = { ProcessInfo.processInfo.systemUptime }
+
     /// - Parameters:
     ///   - indexRecovery: issue de la lecture de l'index au lancement (D-49). `ScratchAppMain` la lit
     ///     sur `LibraryStore` ; les doubles de test la fournissent directement.
@@ -114,18 +128,23 @@ public final class AppModel {
         deckA.apply(snapshot.decks.a)
         deckB.apply(snapshot.decks.b)
         mixer.apply(snapshot.mixer)
+        let timings = commandedTimings.resolve(snapshot.motorTimings, at: clock())
+        if motorTimings != timings { motorTimings = timings }
+        trackPreferences(in: snapshot)
         engine.drainReleasedClips()
         if let host, outputStatus != host.status { outputStatus = host.status }
     }
 
     // MARK: - Lancement (CA 5, CA 10)
 
-    /// Au premier appel : purge des copies de dépôts interrompus (5.2), lecture de l'index,
-    /// réconciliation (D-11), liste à jour et bandeau unique.
-    /// Un index illisible ou partiellement illisible prime sur les entrées retirées (D-49).
+    /// Au premier appel : préférences appliquées au moteur, sans lecture (3.4, RM-10), purge des
+    /// copies de dépôts interrompus (5.2), lecture de l'index, réconciliation (D-11), liste à jour et
+    /// bandeau unique. Un index illisible ou partiellement illisible prime sur les entrées retirées
+    /// (D-49).
     public func launch() async {
         guard !hasLaunched else { return }
         hasLaunched = true
+        applyPreferences()
         DroppedFileLoader.purgeStaging()
         let recovery = await indexRecovery()
         let removed = await library.reconcile()
@@ -400,8 +419,10 @@ extension AppModel: DeckIntents {
         Task { await self.refreshLibrary() }
     }
 
-    /// Réglages : story 3.4.
-    public func openSettings() {}
+    /// Ouvre les réglages (3.4) : feuille sur iOS, fenêtre Réglages sur Mac (⌘,).
+    public func openSettings() {
+        isSettingsPresented = true
+    }
 
     /// Mac : ouvre `Documents/Banque de sons` dans le Finder (menu Fichier ; 3.5). Sans effet sur iOS.
     public func revealLibraryInFinder() {
