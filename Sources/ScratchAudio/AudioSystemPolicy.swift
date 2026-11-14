@@ -37,14 +37,22 @@ public struct AudioHostContext: Equatable, Sendable {
     public var isSuspended: Bool
     /// macOS, `configurationChanged` : le périphérique utilisé est toujours connecté (D-04).
     public var usedDeviceStillPresent: Bool
+    /// iOS, entre `interruptionBegan` et `interruptionEnded` : l'horloge de secours rend et la sortie
+    /// ne redémarre qu'à la fin de l'interruption (#96).
+    public var isInterrupted: Bool
 
     public init(platform: AudioPlatform, isOutputUnavailable: Bool = false, isSuspended: Bool = false,
-                usedDeviceStillPresent: Bool = true) {
+                usedDeviceStillPresent: Bool = true, isInterrupted: Bool = false) {
         self.platform = platform
         self.isOutputUnavailable = isOutputUnavailable
         self.isSuspended = isSuspended
         self.usedDeviceStillPresent = usedDeviceStillPresent
+        self.isInterrupted = isInterrupted
     }
+
+    /// L'horloge de secours rend le moteur (sortie indisponible ou interrompue) : aucun `pump()`
+    /// n'est permis (un seul fil de rendu, architecture §3.3).
+    public var isFallbackRendering: Bool { isOutputUnavailable || isInterrupted }
 }
 
 /// Action de l'hôte. `AudioSystemPolicy` les renvoie dans l'ordre d'exécution.
@@ -62,8 +70,8 @@ public enum AudioHostAction: Equatable, Sendable {
     case resetSession
     /// Reconstruit le graphe sur la sortie courante du système et envoie `outputSampleRate`.
     case rebuildGraph
-    /// Démarre la sortie, horloge de secours arrêtée d'abord ; l'issue est passée à
-    /// `AudioSystemPolicy.actionsAfterStart`.
+    /// Démarre la sortie : horloge de secours arrêtée d'abord, ancienne sortie arrêtée avant la
+    /// nouvelle ; l'issue est passée à `AudioSystemPolicy.actionsAfterStart`.
     case startOutput
     /// Republie le nom de la sortie (CA 7).
     case refreshOutputName
@@ -77,14 +85,18 @@ public enum AudioHostAction: Equatable, Sendable {
 /// Règle unique : un choix volontaire de sortie garde l'état des moteurs ; la perte de la sortie
 /// utilisée, une interruption, la réinitialisation des services média ou la veille les mettent à STOP ;
 /// la reprise est toujours manuelle (RM-10). Quand la sortie est indisponible, chaque changement de
-/// route ou de configuration et chaque tic de la minuterie (2 s) relancent un essai (SF-82).
+/// route ou de configuration et chaque tic de la minuterie (2 s) relancent un essai (SF-82). Pendant
+/// une interruption iOS, rien ne relance la sortie avant `interruptionEnded`, et aucun `pump()` n'est
+/// demandé tant que l'horloge de secours rend (#96).
 public enum AudioSystemPolicy {
     /// Intervalle du nouvel essai tant que la sortie est indisponible (SF-82, D-35).
     public static let retryInterval: Double = 2
 
     /// Actions à exécuter, dans l'ordre, pour `event`.
     public static func actions(for event: AudioSystemEvent, context: AudioHostContext) -> [AudioHostAction] {
-        let actions = unsuspendedActions(for: event, context: context)
+        let actions = context.isInterrupted
+            ? interruptedActions(for: event)
+            : unsuspendedActions(for: event, context: context)
         // Suspended (iOS background): only the motor safety survives; `resume()` restarts the output.
         return context.isSuspended ? actions.filter { $0 == .stopAllMotors } : actions
     }
@@ -92,7 +104,7 @@ public enum AudioSystemPolicy {
     /// Actions après une tentative de démarrage de la sortie.
     public static func actionsAfterStart(succeeded: Bool, outputName: String,
                                          context: AudioHostContext) -> [AudioHostAction] {
-        guard !context.isSuspended else { return [] }
+        guard !context.isSuspended, !context.isInterrupted else { return [] }
         if succeeded {
             return context.isOutputUnavailable
                 ? [.refreshOutputName, .notify(.outputAvailable(name: outputName))]
@@ -104,7 +116,7 @@ public enum AudioSystemPolicy {
 
     /// Actions à chaque tic de la minuterie de nouvel essai.
     public static func actionsOnRetryTick(context: AudioHostContext) -> [AudioHostAction] {
-        context.isOutputUnavailable && !context.isSuspended ? [.startOutput] : []
+        context.isOutputUnavailable && !context.isSuspended && !context.isInterrupted ? [.startOutput] : []
     }
 
     // MARK: Interne
@@ -113,9 +125,34 @@ public enum AudioSystemPolicy {
     /// haut-parleur). Sortie active : on l'arrête, puis on applique STOP avec `pump()`. Sortie
     /// indisponible : l'horloge de secours rend déjà, en silence, et appliquera STOP.
     private static func stopBeforeNextOutput(_ context: AudioHostContext) -> [AudioHostAction] {
-        context.isOutputUnavailable
+        context.isFallbackRendering
             ? [.stopAllMotors]
             : [.stopOutput, .stopAllMotors, .applyPendingCommands]
+    }
+
+    /// Pendant une interruption iOS (#96) : l'horloge de secours rend, donc ni `pump()` ni redémarrage.
+    /// Les pertes de sortie et les réinitialisations arrêtent encore les moteurs. La session et le graphe
+    /// sont reconstruits sans démarrer. La fin de l'interruption reconstruit le graphe sur la route
+    /// courante (elle a pu changer pendant l'appel) et relance la sortie, jamais les moteurs.
+    private static func interruptedActions(for event: AudioSystemEvent) -> [AudioHostAction] {
+        switch event {
+        case .interruptionBegan:
+            return [.stopAllMotors]
+        case .interruptionEnded:
+            return [.rebuildGraph, .startOutput]
+        case .routeChanged(previousDeviceUnavailable: true):
+            return [.stopAllMotors, .notify(.outputDisconnected)]
+        case .routeChanged(previousDeviceUnavailable: false):
+            return [.refreshOutputName]
+        case .configurationChanged:
+            return []
+        case .mediaServicesReset:
+            return [.stopAllMotors, .resetSession, .rebuildGraph]
+        case .systemWillSleep:
+            return [.stopAllMotors]
+        case .systemDidWake:
+            return []
+        }
     }
 
     private static func unsuspendedActions(for event: AudioSystemEvent, context: AudioHostContext) -> [AudioHostAction] {

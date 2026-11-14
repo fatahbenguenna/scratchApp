@@ -9,11 +9,13 @@ import ScratchCore
 /// Traduit en `AudioSystemEvent`, sur le fil principal :
 /// - un changement du périphérique de sortie par défaut ou de la liste des périphériques (branchement,
 ///   retrait d'une interface USB) → `configurationChanged`. Les notifications d'une même rafale sont
-///   regroupées en un seul événement (`coalescingDelay`). L'hôte demande alors à
+///   regroupées en un seul événement : il part `coalescingDelay` après la **dernière** notification
+///   (délai relancé à chaque notification). L'hôte demande alors à
 ///   `isDeviceInUseStillPresent` si le périphérique qu'il utilisait existe encore (contexte de
 ///   `AudioSystemPolicy`) ;
 /// - la mise en veille et le réveil (`NSWorkspace.shared.notificationCenter`) → `systemWillSleep`,
-///   `systemDidWake`.
+///   `systemDidWake`, transmis **de façon synchrone** pendant la notification : STOP précède la mise en
+///   veille.
 ///
 /// Le nom, le type de transport et le tampon du périphérique relèvent de `OutputDevice` (story 2.1).
 /// `start()` et `stop()` : fil principal ; `stop()` doit être appelé avant de libérer le moniteur.
@@ -33,7 +35,7 @@ public final class OutputDeviceMonitor {
 
     private var listener: AudioObjectPropertyListenerBlock?
     private var workspaceObservers: [NSObjectProtocol] = []
-    private var configurationChangePending = false
+    private var configurationChangeGeneration = 0
 
     public init() {}
 
@@ -62,7 +64,8 @@ public final class OutputDeviceMonitor {
         ]
         workspaceObservers = pairs.map { name, event in
             center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor in self?.onEvent?(event) }
+                // Delivered on the main queue: forward synchronously, before the system sleeps.
+                MainActor.assumeIsolated { self?.onEvent?(event) }
             }
         }
     }
@@ -82,14 +85,14 @@ public final class OutputDeviceMonitor {
         workspaceObservers = []
     }
 
-    /// Notification Core Audio (ou simulée par les tests) : un seul `configurationChanged` par rafale.
+    /// Notification Core Audio (ou simulée par les tests) : un seul `configurationChanged` par rafale,
+    /// `coalescingDelay` après la dernière notification.
     func deviceConfigurationDidChange() {
-        guard !configurationChangePending else { return }
-        configurationChangePending = true
+        configurationChangeGeneration += 1
+        let generation = configurationChangeGeneration
         Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: Self.coalescingDelay)
-            guard let self else { return }
-            self.configurationChangePending = false
+            guard let self, generation == self.configurationChangeGeneration else { return }
             self.defaultOutputDevice = Self.currentDefaultOutputDevice()
             self.onEvent?(.configurationChanged)
         }

@@ -25,7 +25,9 @@ final class AudioSystemPolicyTests: XCTestCase {
     func testInterruptionStopsMotorsAndEndRestartsOutputOnly_SF18() {
         XCTAssertEqual(actions(.interruptionBegan, iOS),
                        [.stopAllMotors, .stopOutput, .startFallbackClock, .notify(.interrupted)])
-        XCTAssertEqual(actions(.interruptionEnded, iOS), [.startOutput])
+        var interrupted = iOS
+        interrupted.isInterrupted = true
+        XCTAssertEqual(actions(.interruptionEnded, interrupted), [.rebuildGraph, .startOutput], "the output only, never the motors")
     }
 
     /// CA2, CA3 — D-04 (6.5 « Débrancher le casque », « Perdre le périphérique audio ») : la sortie
@@ -107,6 +109,33 @@ final class AudioSystemPolicyTests: XCTestCase {
         XCTAssertEqual(AudioSystemPolicy.actionsAfterStart(succeeded: true, outputName: "x", context: suspended), [])
         for event in allEvents {
             XCTAssertTrue(actions(event, suspended).allSatisfy { $0 == .stopAllMotors }, "\(event)")
+        }
+    }
+
+    /// #96 : pendant une interruption iOS, l'horloge de secours rend : aucun `pump()` ; aucun
+    /// redémarrage de la sortie ni nouvel essai avant `interruptionEnded` ; STOP sur une perte de
+    /// sortie ou une réinitialisation ; aucun avis « indisponible » pendant l'appel.
+    func testEventsDuringAnInterruption_96() {
+        for unavailable in [false, true] {
+            var interrupted = iOS
+            interrupted.isInterrupted = true
+            interrupted.isOutputUnavailable = unavailable
+            XCTAssertTrue(interrupted.isFallbackRendering)
+            for event in allEvents {
+                let result = actions(event, interrupted)
+                XCTAssertFalse(result.contains(.applyPendingCommands), "\(event): never pump while the fallback clock renders")
+                XCTAssertEqual(result.contains(.startOutput), event == .interruptionEnded, "\(event): output restarts only at the end")
+                XCTAssertFalse(result.contains(.notify(.outputUnavailable)), "\(event)")
+                XCTAssertFalse(result.contains(.stopOutput), "\(event): the output is already stopped")
+            }
+            XCTAssertEqual(actions(.routeChanged(previousDeviceUnavailable: true), interrupted),
+                           [.stopAllMotors, .notify(.outputDisconnected)], "headphones unplugged during a call")
+            XCTAssertEqual(actions(.mediaServicesReset, interrupted), [.stopAllMotors, .resetSession, .rebuildGraph])
+            XCTAssertEqual(actions(.configurationChanged, interrupted), [])
+            XCTAssertEqual(actions(.interruptionEnded, interrupted), [.rebuildGraph, .startOutput],
+                           "rebuilt on the current route (it may have changed during the call)")
+            XCTAssertEqual(AudioSystemPolicy.actionsOnRetryTick(context: interrupted), [], "no retry during a call")
+            XCTAssertEqual(AudioSystemPolicy.actionsAfterStart(succeeded: false, outputName: "", context: interrupted), [])
         }
     }
 

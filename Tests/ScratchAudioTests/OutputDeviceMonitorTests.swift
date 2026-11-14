@@ -39,6 +39,20 @@ final class OutputDeviceMonitorTests: XCTestCase {
         XCTAssertEqual(monitor.defaultOutputDevice, OutputDeviceMonitor.currentDefaultOutputDevice())
     }
 
+    /// Recommandation de la gate (#88) : une rafale plus longue que le délai de regroupement (trois
+    /// notifications espacées de 30 ms) donne encore un seul événement (délai relancé).
+    func testLongBurstGivesASingleEvent() async {
+        let monitor = OutputDeviceMonitor()
+        var events: [AudioSystemEvent] = []
+        monitor.onEvent = { events.append($0) }
+        for _ in 0..<3 {
+            monitor.deviceConfigurationDidChange()
+            try? await Task.sleep(nanoseconds: 30_000_000)
+        }
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        XCTAssertEqual(events, [.configurationChanged])
+    }
+
     /// CA3 — D-04 : présence du périphérique utilisé (contexte de la politique) ; un identifiant
     /// inconnu n'est pas présent ; sans périphérique utilisé, rien n'est perdu.
     func testDevicePresence_D04() {
