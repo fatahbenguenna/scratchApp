@@ -54,9 +54,10 @@ struct ChannelFader: View {
             .accessibilityElement()
             .accessibilityLabel("Fader de voie \(id.rawValue)")
             .accessibilityValue(mixer.lineFaderText(id))
-            .accessibilityAdjustableAction { direction in
-                mixer.setLineFader(id, mixer.lineFaders[id] + (direction == .increment ? 0.05 : -0.05))
-            }
+            .accessibilityAdjustableAction { mixer.nudgeLineFader(id, steps: $0 == .increment ? 1 : -1) }
             .accessibilityIdentifier("mixer.channelFader.\(id.rawValue.lowercased())")
+            .keyboardAdjustable(id: "mixer.channelFader.\(id.rawValue.lowercased())") {
+                mixer.nudgeLineFader(id, steps: $0)
+            }
     }
 }

@@ -75,6 +75,7 @@ struct StartStopButton: View {
         .accessibilityInputLabels([model.startStopTitle])
         .accessibilityAction { model.toggleMotor() }
         .accessibilityIdentifier("deck.\(model.deck.rawValue.lowercased()).startStop")
+        .keyboardActivatable { model.toggleMotor() }
     }
 }
 

@@ -13,21 +13,28 @@ struct DeckView: View {
         let spacings = metrics.rowSpacings
         VStack(alignment: .leading, spacing: 0) {
             DeckHeaderView(model: model, intents: intents, width: metrics.columnWidth, height: metrics.headerHeight)
+                .accessibilitySortPriority(DeckReadingOrder.header)
             ZoomedWaveformView(model: model, width: metrics.columnWidth, height: metrics.waveformHeight)
                 .padding(.top, spacings[0])
             WaveformOverviewView(model: model, width: metrics.columnWidth, height: metrics.overviewVisualHeight)
                 .frame(height: metrics.overviewHeight)
                 .padding(.top, spacings[1])
+                .accessibilitySortPriority(DeckReadingOrder.overview)
             HStack(spacing: metrics.platterSpacing) {
                 TurntableView(model: model, intents: intents, platter: metrics.platter)
+                    .accessibilitySortPriority(DeckReadingOrder.disc)
                 PitchFader(model: model, height: metrics.platter, showsLabel: metrics.idiom != .phoneLandscape)
+                    .accessibilitySortPriority(DeckReadingOrder.pitch)
             }
             .frame(maxWidth: .infinity)
             .padding(.top, spacings[2])
             TransportControls(model: model, metrics: metrics).padding(.top, spacings[3])
+                .accessibilitySortPriority(DeckReadingOrder.transport)
             ResistanceSlider(model: model, isCompact: metrics.idiom == .phoneLandscape).padding(.top, spacings[4])
+                .accessibilitySortPriority(DeckReadingOrder.resistance)
         }
         .frame(width: metrics.columnWidth)
+        .macFocusSection()  // Tab: deck A, then the mixer, then deck B (UX §6.4)
         .deckDropZone(model: model, intents: intents)  // 5.2 (Hugo): drop target over the whole deck
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Platine \(model.deck.rawValue)")
