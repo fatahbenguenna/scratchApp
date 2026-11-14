@@ -20,9 +20,19 @@ public struct RootView: View {
         _session = State(initialValue: RootSession(model: model, intents: intents))
     }
 
+    #if os(macOS)
+    /// Mac : le contrôleur clavier est partagé avec les menus (`ScratchCommands`, attachés en 6.2).
+    public init(model: AppModel, intents: any DeckIntents, keyboard: KeyboardController) {
+        _session = State(initialValue: RootSession(model: model, intents: intents, keyboard: keyboard))
+    }
+    #endif
+
     public var body: some View {
         MainLayoutView(model: session.model, intents: session.intents)
             .background(DisplayLinkHost(driver: session.driver).accessibilityHidden(true))
+            #if os(macOS)
+            .background(KeyboardHost(controller: session.keyboard).accessibilityHidden(true))
+            #endif
     }
 }
 
@@ -32,10 +42,28 @@ final class RootSession {
     let model: AppModel
     let intents: any DeckIntents
     let driver: DisplayLinkDriver
+    #if os(macOS)
+    /// Clavier de la fenêtre principale (story 5.1).
+    let keyboard: KeyboardController
+    #endif
 
+    #if os(macOS)
+    init(model: AppModel, intents: any DeckIntents, keyboard: KeyboardController? = nil) {
+        self.model = model
+        self.intents = intents
+        self.keyboard = keyboard ?? KeyboardController(model: model)
+        driver = Self.makeDriver(for: model)
+    }
+    #else
     init(model: AppModel, intents: any DeckIntents) {
         self.model = model
         self.intents = intents
+        driver = Self.makeDriver(for: model)
+    }
+    #endif
+
+    /// Horloge d'affichage : `tick()` à chaque image, suspendue au repos si le moteur la réveille.
+    private static func makeDriver(for model: AppModel) -> DisplayLinkDriver {
         let driver = DisplayLinkDriver { [weak model] in
             guard let model else { return true }
             model.tick()
@@ -43,11 +71,11 @@ final class RootSession {
                                         mixer: model.mixer.frame)
             return frames.isIdle
         }
-        self.driver = driver
         if let waking = model.engine as? DisplayWakingEngine {
             waking.onCommand = { [weak driver] in MainActor.assumeIsolated { driver?.wake() } }
             driver.allowsSuspension = true
         }
+        return driver
     }
 }
 
