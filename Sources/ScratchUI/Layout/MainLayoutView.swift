@@ -4,14 +4,19 @@ import SwiftUI
 /// Disposition côte à côte A | table de mixage | B (spec 3.4 ; UX §4.5 iPad paysage, §4.6 Mac ;
 /// D-38, D-39). Les dispositions iPhone et iPad portrait arrivent en 4.4.
 ///
-/// La table de mixage est un emplacement réservé jusqu'à la story 4.2.
+/// La table de mixage (4.2) a la hauteur des colonnes de platine ; son crossfader est aligné sur la
+/// rangée de transport.
 public struct MainLayoutView: View {
     let model: AppModel
     let intents: any DeckIntents
+    /// Statut de sortie affiché par le badge ; `AppModel.outputStatus` par défaut (statut injecté
+    /// dans les aperçus jusqu'à la 6.2).
+    let outputStatus: AudioOutputStatus?
 
-    public init(model: AppModel, intents: any DeckIntents) {
+    public init(model: AppModel, intents: any DeckIntents, outputStatus: AudioOutputStatus? = nil) {
         self.model = model
         self.intents = intents
+        self.outputStatus = outputStatus
     }
 
     public var body: some View {
@@ -19,7 +24,13 @@ public struct MainLayoutView: View {
             let metrics = MainLayoutMetrics(width: proxy.size.width, height: proxy.size.height, idiom: Self.idiom)
             HStack(spacing: metrics.gap) {
                 column(DeckView(model: model.deckA, intents: intents, metrics: metrics))
-                column(MixerPlaceholder()).frame(width: metrics.mixerWidth)
+                column(
+                    MixerView(mixer: model.mixer, deckA: model.deckA, deckB: model.deckB, intents: intents,
+                              outputStatus: outputStatus ?? model.outputStatus, metrics: metrics)
+                        .padding(.bottom, metrics.crossfaderBottomInset)
+                        .frame(height: metrics.columnContentHeight)
+                )
+                .frame(width: metrics.mixerWidth)
                 column(DeckView(model: model.deckB, intents: intents, metrics: metrics))
             }
             .padding(metrics.gutter)
@@ -50,19 +61,6 @@ public struct MainLayoutView: View {
         #else
         return .tablet
         #endif
-    }
-}
-
-/// Emplacement de la table de mixage (story 4.2).
-private struct MixerPlaceholder: View {
-    var body: some View {
-        VStack(spacing: 4) {
-            Text("Table de mixage").font(Theme.caption.weight(.bold)).textCase(.uppercase)
-            Text("A ↔ B").font(Theme.caption)
-        }
-        .foregroundStyle(Theme.textSecondary)
-        .frame(maxWidth: .infinity)
-        .accessibilityHidden(true)
     }
 }
 

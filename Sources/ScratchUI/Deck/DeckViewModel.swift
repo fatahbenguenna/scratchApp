@@ -52,6 +52,9 @@ public final class DeckViewModel {
     public private(set) var discAccessibilityValue = "vide"
     /// Valeur VoiceOver de l'en-tête (UX §5.10), à la même cadence que `positionText`.
     public private(set) var headerAccessibilityValue = "aucun son"
+    /// VU-mètre de la voie (niveau après le fader de voie, avant le crossfader ; SF-65, D-26),
+    /// mis à jour à chaque image. Lu seulement par les VU-mètres de la table de mixage.
+    public private(set) var channelMeter = VUMeterBallistics()
     /// Incrémenté à chaque START sur une platine vide : la vue met alors en avant « Importer » et
     /// « Charger la démo » et VoiceOver l'annonce (PO-01, UX §5.2).
     public private(set) var emptyDeckHighlightCount = 0
@@ -127,6 +130,9 @@ public final class DeckViewModel {
         if isLoaded != snapshot.isLoaded { isLoaded = snapshot.isLoaded }
         // A commanded value stays shown until a snapshot confirms it (#57).
         let now = clock()
+        var meter = channelMeter
+        meter.update(peak: snapshot.peakLevel, at: now)
+        if channelMeter != meter { channelMeter = meter }
         let shownMotor = commandedMotor.resolve(snapshot.motorOn, at: now)
         if motorOn != shownMotor { motorOn = shownMotor }
         let shownSpeed = commandedSpeed.resolve(snapshot.speed, at: now)
