@@ -51,12 +51,15 @@ final class MemoryFootprintTests: XCTestCase {
         await model.importAndLoad(second, on: .b)
         await settle(model, renderer)
         XCTAssertNil(model.alert)
-        let clipA = try XCTUnwrap(model.deckA.loadedClip)
-        let clipB = try XCTUnwrap(model.deckB.loadedClip)
-        XCTAssertNotEqual(clipA.id, clipB.id, "two distinct sounds")
-        XCTAssertEqual(clipA.sampleRate, 48_000)
+        let clipBytes: Int64
+        do { // no strong reference to the clips outside this scope: they must be freed once replaced
+            let clipA = try XCTUnwrap(model.deckA.loadedClip)
+            let clipB = try XCTUnwrap(model.deckB.loadedClip)
+            XCTAssertNotEqual(clipA.id, clipB.id, "two distinct sounds")
+            XCTAssertEqual(clipA.sampleRate, 48_000)
+            clipBytes = Int64(clipA.frameCount) * 2 * Int64(MemoryLayout<Float>.size)
+        }
         XCTAssertTrue(engine.latestSnapshot()[.a].isLoaded && engine.latestSnapshot()[.b].isLoaded)
-        let clipBytes = Int64(clipA.frameCount) * 2 * Int64(MemoryLayout<Float>.size)
         let loaded = MemoryFootprint.current()
         let loadedDelta = MemoryFootprint.megabytes(Int64(loaded) - Int64(baseline))
 
@@ -64,9 +67,11 @@ final class MemoryFootprintTests: XCTestCase {
         let entries = model.libraryEntries.filter { $0.id != LibraryEntry.demoID }
         XCTAssertEqual(entries.count, 2)
         var decodePeakRatio = 0.0
+        var replacedClips: [WeakClip] = []
         for round in 0 ..< 20 {
             let deck: DeckID = round.isMultiple(of: 2) ? .a : .b
             let entry = try XCTUnwrap(entries.first { $0.id != model.deck(deck).loadedEntry?.id })
+            replacedClips.append(WeakClip(model.deck(deck).loadedClip))
             if round == 0 {
                 let before = MemoryFootprint.current()
                 let (_, peak) = await MemoryFootprint.peak { await model.load(entry, on: deck) }
@@ -78,6 +83,8 @@ final class MemoryFootprintTests: XCTestCase {
             await settle(model, renderer)
         }
         XCTAssertNil(model.alert)
+        XCTAssertEqual(replacedClips.count, 20)
+        XCTAssertEqual(replacedClips.filter { $0.clip != nil }.count, 0, "NFR4: every replaced clip is freed")
         let replaced = MemoryFootprint.current()
         let drift = MemoryFootprint.megabytes(Int64(replaced) - Int64(loaded))
 
@@ -108,6 +115,15 @@ final class MemoryFootprintTests: XCTestCase {
             model.tick()
             try? await Task.sleep(nanoseconds: 10_000_000)
         }
+    }
+}
+
+/// Référence faible vers un clip remplacé : nulle une fois le clip libéré.
+private final class WeakClip {
+    weak var clip: AudioClip?
+
+    init(_ clip: AudioClip?) {
+        self.clip = clip
     }
 }
 
