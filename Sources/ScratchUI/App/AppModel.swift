@@ -69,7 +69,7 @@ public final class AppModel {
 
     /// Durées du moteur et rattrapage de la feutrine affichés par l'écran Réglages (3.4) : valeur
     /// commandée tant que l'instantané ne la confirme pas (#57).
-    public private(set) var motorTimings = MotorTimings.defaults
+    public internal(set) var motorTimings = MotorTimings.defaults
     /// Écran Réglages présenté (iOS : feuille ; Mac : fenêtre Réglages ouverte par la vue).
     public var isSettingsPresented = false
     @ObservationIgnored var commandedTimings = CommandedValue<MotorTimings>()
