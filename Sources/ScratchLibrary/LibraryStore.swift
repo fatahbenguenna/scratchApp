@@ -40,9 +40,8 @@ public actor LibraryStore: LibraryStoring {
     private var imported: [LibraryEntry]?
     /// Copie mise de côté du dernier index illisible lu par ce magasin (diagnostic ; 6.1, D-49).
     private(set) var setAsideIndexURL: URL?
-    /// La lecture de l'index au premier accès a ignoré des entrées, et l'index a été réécrit
-    /// nettoyé (diagnostic ; 6.1, D-49).
-    private(set) var indexWasPartiallyReadable = false
+    // Outcome of the index read at the first access (D-49).
+    private var recovery = LibraryIndexRecovery.none
 
     /// Espace exigé en plus de la taille du fichier : 10 Mio, ou 5 % de la taille si c'est plus.
     static let storageMargin: Int64 = 10 * 1_048_576
@@ -69,6 +68,15 @@ public actor LibraryStore: LibraryStoring {
     /// égale : par titre, puis par identifiant).
     public var entries: [LibraryEntry] {
         [Self.demoEntry] + Self.displayOrder(loadedEntries())
+    }
+
+    /// Issue de la lecture de l'index (D-49, story 6.1 CA 10) : `.reset` si un index illisible a été
+    /// mis de côté, `.partial` si des entrées ont été ignorées, `.none` sinon. L'index est lu au
+    /// premier accès ; grâce au correctif #51, un même document n'est signalé qu'à un seul lancement.
+    /// Hors du contrat `LibraryStoring` : `ScratchAppMain` la transmet à l'`AppModel`.
+    public var indexRecovery: LibraryIndexRecovery {
+        _ = loadedEntries()
+        return recovery
     }
 
     public func reconcile() async -> [LibraryEntry] {
@@ -162,9 +170,9 @@ public actor LibraryStore: LibraryStoring {
         let result = index.load()
         imported = result.entries
         if let url = result.setAsideURL { setAsideIndexURL = url }
-        if result.isPartial {
+        recovery = result.recovery
+        if result.recovery == .partial {
             // The original is already set aside: rewrite the cleaned index so that it is set aside once (#51).
-            indexWasPartiallyReadable = true
             try? index.save(result.entries)
         }
         return result.entries
