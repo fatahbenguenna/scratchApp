@@ -69,6 +69,9 @@ struct DeckPhysics {
     private(set) var gripOffset: Double = 0
     /// La tête est bloquée sur une butée par le mouvement du disque (amorce ou sillon fermé).
     private(set) var isPinnedAtBound = false
+    /// Position de la tête avant le premier saut (CUE, needle drop) appliqué depuis le dernier bloc :
+    /// la voix fond l'ancienne position dans la nouvelle (SF-13, SF-71 ; story 1.3).
+    private(set) var pendingJumpOrigin: Double?
 
     private var follower = CriticallyDampedFollower()
     /// Décélération de la roue libre (rad/s²), fixée au relâchement moteur arrêté.
@@ -173,6 +176,7 @@ struct DeckPhysics {
         gripOffset = 0
         follower.reset(angle: 0, velocity: 0)
         isPinnedAtBound = false
+        pendingJumpOrigin = nil
         cueSeconds = nil
         motorOn = false
         finger.cancel()
@@ -214,8 +218,17 @@ struct DeckPhysics {
         jump(to: seconds)
     }
 
+    /// Fil audio uniquement. Rend et efface l'origine du saut en attente (une fois par bloc, avant
+    /// `process`).
+    mutating func takeJumpOrigin() -> Double? {
+        defer { pendingJumpOrigin = nil }
+        return pendingJumpOrigin
+    }
+
     private mutating func jump(to seconds: Double) {
         guard seconds.isFinite else { return }
+        // Several jumps between two blocks: the sound to fade out is the one before the first jump.
+        if pendingJumpOrigin == nil { pendingJumpOrigin = positionSeconds }
         positionSeconds = seconds.clamped(to: -TurntableConstants.leadInSeconds...max(0, durationSeconds), fallback: 0)
         isPinnedAtBound = false
         realignDisc()
