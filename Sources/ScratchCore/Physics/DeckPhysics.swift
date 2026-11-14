@@ -1,25 +1,50 @@
+import Foundation
+
 /// Physique d'une platine : moteur, plateau, feutrine, disque tenu, tête de lecture, CUE et repère
-/// (spec 5.1 ; architecture §6.3). Fil audio uniquement, aucune allocation.
+/// (spec v2.1 §5.1 et §5.4 ; architecture §6.3 ; story 1.1). Intégrée **à chaque échantillon** dans
+/// `process` (ADR-06). Fil audio uniquement pour `process` ; les autres méthodes sont appelées par
+/// le fil audio entre deux blocs (application des commandes). Aucune allocation, aucun verrou.
 ///
-/// **Squelette (story 1.1, James).** Les réglages et les états discrets sont tenus et bornés, les
-/// sauts de position recalent le disque et le repère (IC-09), mais rien ne tourne : `process` renvoie
-/// une position constante et une vitesse nulle. À implémenter (PRD 1.1, 1.3 critère 1, 1.5) :
-/// 1. Plateau : `ωp` → `ωt = 2π × RPM/60 × (1 + pitch)` moteur actif, → 0 sinon, pentes
-///    `ωt / startDuration` et `ωt / brakeDuration` (SF-04, SF-05, 6.2 : START pendant le freinage
-///    repart de la vitesse courante).
-/// 2. Disque libre : rejoint `ωp` au 1er ordre, τ = slipmatCatchUp / 3 (95 % en T, arbitrage IC-03) ;
-///    T = 0 → alignement immédiat. Moteur arrêté : décélération linéaire jusqu'à 0 en
-///    `freeSpinStopDuration` au plus (SF-10).
-/// 3. Disque tenu : `θd` suit `θf + gripOffset` par un filtre du 2ᵉ ordre à amortissement critique,
-///    τ de 2 ms (résistance 0) à 35 ms (résistance 1) ; `θf` vient de `FingerTrajectory`. Le
-///    changement de résistance ne crée aucun saut (SF-23). `gripOffset` est fixé à la prise.
-/// 4. Tête : `p += ωd / (2π) × 1,8 s × dt` à chaque échantillon, bornée à [−2 s ; durée] ; en butée
-///    le disque continue de tourner et un mouvement inverse revient immédiatement dans le son (RM-55) ;
-///    à la sortie de butée, `realignDisc()` (IC-09).
-/// 5. Vitesse de lecture `ωd / ωref` bornée à ±16 (SF-77).
-/// 6. Recalage disque tenu : décaler `gripOffset` de la même correction que `discAngle`, pour que le
-///    disque reste sous le doigt sans saut de son (UX §5.1, Q13) ; CUE disque tenu ré-ancre le geste.
+/// Modèle :
+/// 1. **Plateau** : `ωp` → `ωt = 2π × RPM/60 × (1 + pitch)` moteur actif, → 0 sinon, par rampes
+///    linéaires de pentes `ωt / startDuration` (accélération) et `ωt / brakeDuration`
+///    (décélération), recalculées à chaque bloc : un changement de RPM, de pitch ou de durée, comme
+///    START pendant le freinage, repart de la vitesse courante, sans discontinuité (SF-04, SF-05,
+///    SF-11, SF-68). `platterAngle` intègre `ωp`.
+/// 2. **Disque libre entraîné** (`coupled`) : la feutrine entraîne le disque vers `ωp` par une
+///    réponse du premier ordre de constante τ = T/3 (T = `slipmatCatchUp`) : l'écart de vitesse est
+///    réduit à 5 % de sa valeur initiale en T (e⁻³ ≈ 4,98 %, D-03) ; T = 0 aligne `ωd` sur `ωp` dès
+///    l'échantillon suivant. Discrétisation exacte `α = 1 − e^(−h/τ)`. Le disque libre suit aussi le
+///    plateau qui freine après STOP (6.2 « Arrêter la platine »).
+/// 3. **Disque libre en roue libre** (`coasting`) : un disque relâché moteur arrêté ralentit par
+///    friction constante jusqu'à 0, sans reprise motorisée (SF-10, RM-07, D-03). Choix documenté :
+///    la décélération est fixée au relâchement à `|ωd| / freeSpinStopDuration`, si bien que l'arrêt
+///    survient **exactement** 150 ms après le relâchement quelle que soit la vitesse (jusqu'à 16 ×
+///    ωref). START remet le disque sous l'entraînement de la feutrine.
+/// 4. **Disque tenu** (`held`) : `θd` suit `θf + gripOffset` par `CriticallyDampedFollower`,
+///    τ = lerp(2 ms, 35 ms, résistance). À la saisie, le filtre part de l'angle et de la vitesse
+///    courants et `gripOffset = θd − θf` (aucun saut, SF-06). Le relâchement prend effet quand
+///    `FingerTrajectory` a rejoué la fin du geste. La vitesse du disque est bornée à ±16 × ωref
+///    (au-delà, le disque glisse sous le doigt, SF-77).
+/// 5. **Tête** : `p += Δθd × 1,8 / 2π` à chaque échantillon (`Δθd` est l'angle parcouru pendant
+///    l'échantillon : `p` et `discAngle` restent solidaires, RM-13), bornée à [−2 s ; durée]. En
+///    butée, le disque continue de tourner ; dès que le mouvement repart vers l'intérieur, la tête
+///    revient dans le son sans « dérouler » les tours accumulés et `realignDisc()` recale l'angle du
+///    disque (RM-55, IC-09, D-10).
+/// 6. **Vitesse de lecture** : `ωd / ωref`, bornée à ±16 (RM-50, SF-77).
+/// 7. **Résistance** : n'agit que sur le disque tenu, jamais sur le plateau, les durées moteur ni
+///    le rattrapage (RM-11, RM-54).
 struct DeckPhysics {
+    /// État du disque vis-à-vis du plateau et du doigt.
+    enum DiscMode: Equatable, Sendable {
+        /// Libre, entraîné par la feutrine vers la vitesse du plateau.
+        case coupled
+        /// Libre, relâché moteur arrêté : décélération linéaire jusqu'à l'arrêt.
+        case coasting
+        /// Tenu : suit le doigt.
+        case held
+    }
+
     private(set) var sampleRate: Double
     private(set) var motorTimings = MotorTimings.defaults
 
@@ -35,11 +60,27 @@ struct DeckPhysics {
     private(set) var platterAngle: Double = 0
     private(set) var cueSeconds: Double?
 
+    /// Vitesse angulaire du plateau `ωp` (rad/s).
+    private(set) var platterVelocity: Double = 0
+    /// Vitesse angulaire du disque `ωd` (rad/s).
+    private(set) var discVelocity: Double = 0
+    private(set) var discMode = DiscMode.coasting
+    /// Décalage entre l'angle du disque et celui du doigt, fixé à la saisie, corrigé au recalage.
+    private(set) var gripOffset: Double = 0
+    /// La tête est bloquée sur une butée par le mouvement du disque (amorce ou sillon fermé).
+    private(set) var isPinnedAtBound = false
+
+    private var follower = CriticallyDampedFollower()
+    /// Décélération de la roue libre (rad/s²), fixée au relâchement moteur arrêté.
+    private var coastDeceleration: Double = 0
     private var finger: FingerTrajectory
 
-    init(sampleRate: Double) {
-        self.sampleRate = sampleRate
-        self.finger = FingerTrajectory(sampleRate: sampleRate)
+    /// - Parameter fingerConfiguration: réglages du rejeu du doigt (les tests fixent un retard
+    ///   constant pour mesurer la cinématique exacte).
+    init(sampleRate: Double, fingerConfiguration: FingerTrajectory.Configuration = FingerTrajectory.Configuration()) {
+        let rate = sampleRate.isFinite && sampleRate > 0 ? sampleRate : 48_000
+        self.sampleRate = rate
+        self.finger = FingerTrajectory(sampleRate: rate, configuration: fingerConfiguration)
     }
 
     var isHeld: Bool { finger.isActive }
@@ -51,6 +92,23 @@ struct DeckPhysics {
     var isAtEnd: Bool { durationSeconds > 0 && positionSeconds >= durationSeconds }
     var isInLeadIn: Bool { positionSeconds < 0 }
 
+    /// Vitesse cible du moteur `ωt = 2π × RPM / 60 × (1 + pitch)` (rad/s), moteur actif ou non.
+    var nominalPlatterVelocity: Double {
+        2 * Double.pi * speed.rpm / 60 * (1 + pitch)
+    }
+
+    /// Constante de temps du disque tenu : lerp(2 ms, 35 ms, résistance) (5.1 point 3).
+    var holdTimeConstant: Double {
+        let range = TurntableConstants.resistanceTimeConstantRange
+        return range.lowerBound + (range.upperBound - range.lowerBound) * resistance
+    }
+
+    /// Dernière cible du doigt (angle cumulé, rad).
+    var fingerAngle: Double { finger.output }
+
+    /// Écart de suivi du disque tenu `θd − (θf + gripOffset)` (diagnostic, tests).
+    var holdTrackingError: Double { discAngle - (finger.output + gripOffset) }
+
     // MARK: Réglages
 
     mutating func setSampleRate(_ rate: Double) {
@@ -59,8 +117,23 @@ struct DeckPhysics {
         finger.setSampleRate(rate)
     }
 
-    mutating func setMotorTimings(_ timings: MotorTimings) { motorTimings = timings.clamped() }
-    mutating func setMotor(_ on: Bool) { motorOn = on }
+    /// SF-68 : chaque durée est ramenée dans sa plage ; une valeur non finie est ignorée (la valeur
+    /// courante est conservée).
+    mutating func setMotorTimings(_ timings: MotorTimings) {
+        var next = motorTimings
+        if timings.startDuration.isFinite { next.startDuration = timings.startDuration }
+        if timings.brakeDuration.isFinite { next.brakeDuration = timings.brakeDuration }
+        if timings.slipmatCatchUp.isFinite { next.slipmatCatchUp = timings.slipmatCatchUp }
+        motorTimings = next.clamped()
+    }
+
+    /// START / STOP. RM-53 : indépendant de la tenue du disque. START remet un disque en roue libre
+    /// sous l'entraînement de la feutrine.
+    mutating func setMotor(_ on: Bool) {
+        motorOn = on
+        if on, discMode == .coasting { discMode = .coupled }
+    }
+
     mutating func setSpeed(_ newSpeed: TurntableSpeed) { speed = newSpeed }
 
     mutating func setPitch(_ value: Double) {
@@ -73,20 +146,33 @@ struct DeckPhysics {
         resistance = value.clamped(to: 0...1, fallback: TurntableConstants.defaultResistance)
     }
 
-    /// RM-56 : STOP immédiat, sans rampe (le disque tenu reste tenu).
+    /// RM-56 : STOP immédiat, sans rampe : plateau arrêté, disque libre arrêté ; le disque tenu
+    /// reste tenu, sans saut.
     mutating func stopMotorImmediately() {
         motorOn = false
-        playbackRate = isHeld ? playbackRate : 0
+        platterVelocity = 0
+        guard discMode != .held else { return }
+        discVelocity = 0
+        discMode = .coasting
+        coastDeceleration = 0
+        playbackRate = 0
     }
 
     // MARK: Chargement
 
-    /// Nouveau son (ou platine vidée si `duration` vaut 0) : état initial SF-03.
+    /// Nouveau son (ou platine vidée si `duration` vaut 0) : état initial SF-03. Le moteur passe à
+    /// STOP (le plateau freine), le disque est immobile, le doigt est annulé.
     mutating func reset(duration: Double) {
-        durationSeconds = max(0, duration)
+        durationSeconds = duration.isFinite ? max(0, duration) : 0
         positionSeconds = 0
         playbackRate = 0
         discAngle = 0
+        discVelocity = 0
+        discMode = .coasting
+        coastDeceleration = 0
+        gripOffset = 0
+        follower.reset(angle: 0, velocity: 0)
+        isPinnedAtBound = false
         cueSeconds = nil
         motorOn = false
         finger.cancel()
@@ -128,11 +214,14 @@ struct DeckPhysics {
     private mutating func jump(to seconds: Double) {
         guard seconds.isFinite else { return }
         positionSeconds = seconds.clamped(to: -TurntableConstants.leadInSeconds...max(0, durationSeconds), fallback: 0)
+        isPinnedAtBound = false
         realignDisc()
     }
 
     /// IC-09 : ramène `discAngle` à `2π × position / 1,8 (mod 2π)` par la plus petite correction
-    /// (au plus ±π), après un saut de position ou à la sortie d'une butée.
+    /// (au plus ±π), après un saut de position ou à la sortie d'une butée. Disque tenu, la même
+    /// correction est reportée sur le filtre et sur `gripOffset` : l'écart de suivi, la vitesse et
+    /// la position audio ne changent pas (aucun saut sous le doigt ni dans le son, D-10).
     mutating func realignDisc() {
         let twoPi = 2 * Double.pi
         let expected = twoPi * positionSeconds / TurntableConstants.secondsPerRevolution
@@ -140,18 +229,115 @@ struct DeckPhysics {
         if correction > Double.pi { correction -= twoPi }
         if correction <= -Double.pi { correction += twoPi }
         discAngle += correction
+        if discMode == .held {
+            follower.shift(by: correction)
+            gripOffset += correction
+        }
     }
 
     // MARK: Rendu
 
-    /// Avance de `frameCount` échantillons et écrit, pour chacun, la position de la tête (s) et la
-    /// vitesse de lecture signée.
+    /// Fil audio uniquement. Avance de `frameCount` échantillons et écrit, pour chacun, la position
+    /// de la tête (s) et la vitesse de lecture signée, après intégration de l'échantillon.
     mutating func process(frameCount: Int, positions: UnsafeMutablePointer<Double>, rates: UnsafeMutablePointer<Double>) {
         finger.prepareBlock()
+        guard frameCount > 0 else { return }
+
+        // Per-block coefficients: settings only change between blocks.
+        let dt = 1 / sampleRate
+        let nominal = nominalPlatterVelocity
+        let platterTarget = motorOn ? nominal : 0
+        let accelerationStep = nominal / motorTimings.startDuration * dt
+        let brakeStep = nominal / motorTimings.brakeDuration * dt
+        let catchUpTimeConstant = motorTimings.slipmatCatchUp / 3
+        let catchUpGain = catchUpTimeConstant > 0 ? -expm1(-dt / catchUpTimeConstant) : 1
+        let holdCoefficients = CriticallyDampedFollower.Coefficients(timeConstant: holdTimeConstant, dt: dt)
+        var coastStep = coastDeceleration * dt
+        let referenceVelocity = TurntableConstants.referenceAngularVelocity
+        let maximumRate = TurntableConstants.maximumPlaybackRate
+        let maximumVelocity = maximumRate * referenceVelocity
+        let secondsPerRadian = TurntableConstants.secondsPerRevolution / (2 * Double.pi)
+        let lowerBound = -TurntableConstants.leadInSeconds
+        let upperBound = max(0, durationSeconds)
+
         for index in 0..<frameCount {
-            if finger.isActive { _ = finger.nextTarget() }
+            // 1. Platter: linear ramps toward the motor target (RM-53: independent of the disc).
+            let previousPlatterVelocity = platterVelocity
+            if platterVelocity < platterTarget {
+                platterVelocity = min(platterTarget, platterVelocity + accelerationStep)
+            } else if platterVelocity > platterTarget {
+                platterVelocity = max(platterTarget, platterVelocity - brakeStep)
+            }
+            platterAngle += 0.5 * (previousPlatterVelocity + platterVelocity) * dt
+
+            // 2. Disc.
+            let previousDiscAngle = discAngle
+            if finger.isActive {
+                let target = finger.nextTarget()
+                if discMode != .held { grab(fingerAngle: target) }
+                follower.step(target: target + gripOffset, coefficients: holdCoefficients)
+                follower.limitVelocity(to: maximumVelocity, previousAngle: previousDiscAngle, dt: dt)
+                discAngle = follower.angle
+                discVelocity = follower.velocity
+                if !finger.isActive {
+                    release()
+                    coastStep = coastDeceleration * dt
+                }
+            } else {
+                if discMode == .held {
+                    // Gesture cancelled outside `reset` (defensive): release where the disc is.
+                    release()
+                    coastStep = coastDeceleration * dt
+                }
+                let previousDiscVelocity = discVelocity
+                if discMode == .coupled {
+                    let gap = platterVelocity - discVelocity
+                    discVelocity = abs(gap) < 1e-12 ? platterVelocity : discVelocity + catchUpGain * gap
+                } else {
+                    let magnitude = abs(discVelocity) - coastStep
+                    discVelocity = magnitude > 0.5 * coastStep ? (discVelocity > 0 ? magnitude : -magnitude) : 0
+                }
+                discAngle += 0.5 * (previousDiscVelocity + discVelocity) * dt
+            }
+
+            // 3. Head: follows the disc, pinned at the lead-in and end stops (RM-55).
+            let next = positionSeconds + (discAngle - previousDiscAngle) * secondsPerRadian
+            if next > upperBound {
+                positionSeconds = upperBound
+                isPinnedAtBound = true
+            } else if next < lowerBound {
+                positionSeconds = lowerBound
+                isPinnedAtBound = true
+            } else {
+                let leavesBound = isPinnedAtBound && next != positionSeconds
+                positionSeconds = next
+                if leavesBound {
+                    isPinnedAtBound = false
+                    realignDisc()
+                }
+            }
+
             positions[index] = positionSeconds
-            rates[index] = 0
+            rates[index] = min(maximumRate, max(-maximumRate, discVelocity / referenceVelocity))
+        }
+        playbackRate = rates[frameCount - 1]
+    }
+
+    /// Saisie : le filtre part de l'angle et de la vitesse courants du disque (SF-06, ADR-08).
+    private mutating func grab(fingerAngle: Double) {
+        follower.reset(angle: discAngle, velocity: discVelocity)
+        gripOffset = discAngle - fingerAngle
+        discMode = .held
+    }
+
+    /// Relâchement : feutrine si le moteur tourne, roue libre sinon (SF-10, RM-07).
+    private mutating func release() {
+        if motorOn {
+            discMode = .coupled
+            coastDeceleration = 0
+        } else {
+            discMode = .coasting
+            coastDeceleration = abs(discVelocity) / TurntableConstants.freeSpinStopDuration
         }
     }
 }
