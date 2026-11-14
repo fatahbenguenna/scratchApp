@@ -65,15 +65,12 @@ struct LibraryRow: View {
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             if let onDelete {
-                Button("Supprimer", action: onDelete).tint(Self.danger)
+                Button("Supprimer", action: onDelete).tint(Theme.danger)
             }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(row.identifier)
     }
-
-    /// Couleur `danger` de l'UX (§9.2).
-    static let danger = Color(hex: 0xFF6369)
 
     @ViewBuilder
     private var actions: some View {
