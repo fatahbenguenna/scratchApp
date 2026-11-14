@@ -1,0 +1,55 @@
+schema: 1
+story: "5.3"
+story_title: "Accessibilité"
+pr: 100
+issue: 41
+reviewed_sha: "50e9989"
+gate: PASS
+status_reason: >-
+  Seul le commit propre à la 5.3 a été relu (pile #87/#95 déjà relue). Textes parlés centralisés et
+  annonces de l'UX §8.6 ; pas d'ajustement communs aux actions d'accessibilité et aux flèches ; sur Mac,
+  commandes réglables focalisables, flèches à la commande focalisée avant les raccourcis, Échap rendant
+  les flèches au crossfader (D-07) ; jetons de l'UX §9.2 testés WCAG AA (recalcul QA concordant) et
+  contraste augmenté ; écrans de Hugo audités sans écart. Ordre de tabulation dans une platine à
+  vérifier en recette et à trancher par le PO (#106). Rebase après #95 (simulé sans conflit).
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues:
+  - id: "TAB-ORDER-IN-DECK"
+    severity: low
+    finding: "SwiftUI ordonne le focus par la géométrie : le pitch, à droite du disque, passera vraisemblablement avant la rangée de transport, contrairement à l'UX §6.4 et au CA 3 ; l'ordre A → table → B (spec 6.16) est tenu."
+    suggested_action: "Relever l'ordre en recette ; décision PO : amender l'UX ou imposer l'ordre (#106)."
+checks:
+  - item: "D-07 (flèches)"
+    result: "AdjustableFocus interrogé par le moniteur de la 5.1 avant les raccourcis ; toutes les flèches à la commande focalisée, ⇧ ×10, butées et centre pour le crossfader ; Échap ; lettres actives ; testArrowsGoToFocusedControlThenCrossfaderAfterEscape_D07."
+  - item: "WCAG AA"
+    result: "Palette = UX §9.2 ; libellés ≥ 4,5:1, contours ≥ 3:1, variantes de contraste augmenté plus fortes ; recalcul QA : text.secondary 6,88 sur raised, stroke.strong 3,75 et 3,27, danger 5,29, étiquettes 5,69 et 5,54."
+  - item: "Écrans de Hugo"
+    result: "Bibliothèque (libellé, valeur, actions Charger sur A/B et Supprimer), zone de dépôt (annonces, calque masqué), Réglages (unités dites, pas) : sans écart."
+  - item: "CA 1 et CA 2"
+    result: "AccessibilityText source unique ; annonces « chargé », « vidée », SET CUE, START à vide ; pitch 0,1 %, résistance, faders et crossfader 5 %, courbe 10 %, aperçu 5 %."
+  - item: "Disque hors de la tabulation"
+    result: "Vue AppKit sans premier répondeur ; interaction directe conservée (4.3)."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Sans objet."
+  performance:
+    status: PASS
+    notes: "Annonces sur changement de compteur seulement."
+  reliability:
+    status: PASS
+    notes: "Un seul gestionnaire des flèches ; focus retiré à la disparition d'une commande."
+  maintainability:
+    status: PASS
+    notes: "AccessibilityText et Palette purs et testés ; routeur de focus séparé."
+evidence:
+  ci: "wait-ci sur 50e9989 : Linux ✅, macOS ✅ (rapport 6bb30b8) ; AccessibilityTextTests, ThemeContrastTests, KeyboardControllerTests"
+  linux_tests: "scripts/linux-test.sh sur la pile rebasée simulée (833fa3c, fdf6361, 1eac185, 50e9989 sur 593732c) : 241/241"
+  merge_check: "Conflit avec main jusqu'au rebase de #95 puis de #100 ; rebase simulé sans conflit ; sans conflit avec #88 et #99"
+recommendations:
+  immediate:
+    - action: "Fusionner après #95, puis le rebase --onto."
+  future:
+    - action: "#106 : ordre de tabulation dans une platine, décision PO après la recette."
+    - action: "Recette (#44) : tabulation et anneau de focus, Espace et Retour, ordre VoiceOver (§11.3), annonces, contraste augmenté, VoiceOver sur appareil."
