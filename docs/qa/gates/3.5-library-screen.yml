@@ -1,0 +1,54 @@
+schema: 1
+story: "3.5"
+story_title: "Écran Bibliothèque"
+pr: 78
+issue: 32
+reviewed_sha: "d83407c"
+gate: PASS
+status_reason: >-
+  Les 7 critères d'acceptation sont implémentés et testés (8 tests macOS) ; CI Linux et macOS verte
+  sur 22bf91e. Suppression d'un son chargé (moteurs arrêtés, platines vidées, puis copie supprimée),
+  démo protégée, RM-49 et D-40 vérifiés. Un rebase est nécessaire : depuis la fusion de #72, conflit
+  trivial sur Theme.swift (même jeton danger, même valeur). Il faut garder la version de main, ce qui
+  fait disparaître la ligne transverse, puis laisser la CI repasser au vert.
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues:
+  - id: "MERGE-001"
+    severity: low
+    finding: "Conflit de fusion sur Sources/ScratchUI/Layout/Theme.swift : Theme.danger déjà ajouté par la 4.2 (#72)."
+    suggested_owner: dev
+    suggested_action: "Rebaser en gardant la version de main (seul fichier en conflit, vérifié par une fusion simulée), puis CI verte."
+checks:
+  - item: "Ligne transverse dans Theme.swift (Léa)"
+    result: "Jeton conforme à l'UX §9.2, déjà présent sur main : la ligne disparaît au rebase."
+  - item: "Suppression d'un son chargé (6.13)"
+    result: "motor(off) puis unload pour chaque platine qui porte le son, puis library.delete ; confirmation qui nomme les platines ; ordre vérifié par le test ; notFound ignoré, autre échec → « Suppression impossible »."
+  - item: "Démo non supprimable"
+    result: "Aucune action proposée ; requestDelete refuse les entrées non supprimables ; demoCannotBeDeleted en dernier recours."
+  - item: "RM-49"
+    result: "Seule la copie de Banque de sons est supprimée ; octets du fichier d'origine inchangés (test)."
+  - item: "D-40 depuis la bibliothèque"
+    result: "loadFromLibrary passe par requestLoad de la 6.1 ; feuille fermée après le chargement, ouverte après un refus ou une erreur."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Suppression limitée aux copies ; démo protégée à trois niveaux."
+  performance:
+    status: PASS
+    notes: "Liste en logique pure, relue seulement à l'ouverture et après chaque changement."
+  reliability:
+    status: PASS
+    notes: "Platines arrêtées et vidées avant la suppression ; échecs signalés."
+  maintainability:
+    status: PASS
+    notes: "Modèle de liste pur et testé ; alertes regroupées ; intentions pour les autres stories."
+evidence:
+  ci: "Rapport CI d5e4803 (fusion dans 22bf91e) : Linux ✅, macOS ✅"
+  linux_tests: "scripts/linux-test.sh : 212/212 (cœur inchangé)"
+  merge_check: "Fusion simulée avec origin/main (après #72) : un seul conflit, Theme.swift, résolu en gardant main"
+recommendations:
+  immediate:
+    - action: "Rebaser sur main (garder Theme.swift de main), puis CI verte avant la fusion."
+  future:
+    - action: "1.5 : coupure nette au déchargement d'un son en lecture (note sur #23)."
