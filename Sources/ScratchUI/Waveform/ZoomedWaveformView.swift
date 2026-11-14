@@ -33,11 +33,13 @@ struct ZoomedWaveformView: View {
             } else {
                 Rectangle().fill(Theme.textDisabled).frame(height: 1).offset(y: height / 2)
             }
-            if model.isLoaded, let cue = model.cueSeconds {
-                CueFlag(height: height, flash: model.setCueCount)
-                    .offset(x: CGFloat(geometry.x(of: cue, position: position)) - CueFlag.width / 2)
+            if model.isLoaded {
+                if let cue = model.cueSeconds {
+                    CueFlag(height: height, flash: model.setCueCount)
+                        .offset(x: CGFloat(geometry.x(of: cue, position: position)) - CueFlag.width / 2)
+                }
+                Rectangle().fill(Color.white).frame(width: 2, height: height).offset(x: width / 2 - 1)
             }
-            Rectangle().fill(Color.white).frame(width: 2, height: height).offset(x: width / 2 - 1)
         }
         .frame(width: width, height: height)
         .clipShape(RoundedRectangle(cornerRadius: 4))
