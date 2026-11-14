@@ -59,6 +59,12 @@ jobs:
           set -o pipefail
           mkdir -p ci-output
           swift test --parallel 2>&1 | tee ci-output/macos-swift-test.log
+      - name: Mesures temps réel en release (allocations, charge NFR2 et NFR3)
+        run: |
+          set -o pipefail
+          mkdir -p ci-output
+          swift test -c release -Xswiftc -enable-testing --filter 'RenderLoadTests|RealTimeAllocationTests' 2>&1 \
+            | tee ci-output/macos-release-tests.log
       - name: Générer le projet Xcode
         run: |
           brew install xcodegen
@@ -160,6 +166,11 @@ jobs:
             body += `| macOS (tests, app macOS, app iOS, self-test, lancement) | ${icon(process.env.MACOS_RESULT)} ${process.env.MACOS_RESULT} |\n\n`;
             const pr = context.payload.pull_request.number;
             body += `Capture d'écran macOS : branche \`ci-shots/pr-${pr}\`.\n\n`;
+            const metrics = 'artifacts/macos-logs/render-metrics.log';
+            if (fs.existsSync(metrics)) {
+              const lines = fs.readFileSync(metrics, 'utf8').split('\n').filter(l => l.trim()).slice(0, 12);
+              body += `**Mesures temps réel (macOS, NFR2 et NFR3)**\n\n${lines.map(l => '- ' + l).join('\n')}\n\n`;
+            }
             const tail = 'artifacts/macos-report/report-tail.md';
             if (fs.existsSync(tail)) {
               body += `<details><summary>Extraits des journaux macOS</summary>\n\n${fs.readFileSync(tail, 'utf8').slice(0, 50000)}\n</details>\n`;

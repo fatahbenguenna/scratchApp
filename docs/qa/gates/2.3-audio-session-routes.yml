@@ -1,0 +1,62 @@
+schema: 1
+story: "2.3"
+story_title: "Session audio et routes"
+scope: "Partie 1 (PR #88) : politique pure AudioSystemPolicy et OutputDeviceMonitor (macOS) ; CA 7 et intégration dans l'hôte en partie 2"
+pr: 88
+issue: 26
+reviewed_sha: "07a7d38"
+gate: CONCERNS
+status_reason: >-
+  Gate partielle. Table de politique conforme à l'architecture §7.3, IC-04 et D-04 ; aucune action
+  ne démarre un moteur (garanti par le type) ; bandeaux identiques à l'UX §8.5, avis « indisponible »
+  à la transition seulement ; rafales Core Audio regroupées. CONCERNS : le contexte ignore l'état
+  « interrompu », si bien qu'un routeChanged(true) ou un mediaServicesReset pendant une interruption iOS
+  demande un pump() alors que l'horloge de secours rend (deux fils de rendu), et que la sortie peut
+  redémarrer en plein appel (#96). Défaut latent, rien n'exécute encore la politique : fusion possible,
+  correction exigée avant la partie 2.
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues:
+  - id: "POLICY-INTERRUPTED"
+    severity: medium
+    finding: "Événements reçus pendant une interruption : applyPendingCommands avec l'horloge de secours en marche (routeChanged(true), mediaServicesReset) et startOutput avant interruptionEnded (ces deux-là et configurationChanged)."
+    suggested_action: "isInterrupted (ou isFallbackRendering) dans AudioHostContext ; [.stopAllMotors] seul quand l'horloge rend ; aucun startOutput ni nouvel essai avant interruptionEnded ; test sur allEvents (#96)."
+  - id: "COALESCING-WINDOW"
+    severity: low
+    finding: "Regroupement par fenêtre fixe de 50 ms à partir de la première notification : une rafale plus longue donne deux configurationChanged."
+    suggested_action: "Délai relancé à chaque notification, fusionné avec AVAudioEngineConfigurationChange en partie 2."
+checks:
+  - item: "Table de politique (§7.3, IC-04, D-04)"
+    result: "Conforme pour chaque ligne ; STOP appliqué (stopOutput, stopAllMotors, pump) avant la nouvelle route ; changement volontaire sur Mac sans STOP, périphérique disparu avec STOP ; suspendu : STOP seulement."
+  - item: "Aucun démarrage de moteur"
+    result: "AudioHostAction sans cas de démarrage ; testStopRuleIsConsistentAcrossPlatforms."
+  - item: "Un seul fil de rendu"
+    result: "pump jamais avec isOutputUnavailable (testé) ; lacune pendant une interruption (sonde QA sous Linux, #96)."
+  - item: "Bandeaux (UX §8.5)"
+    result: "Quatre textes identiques ; pas de répétition à chaque essai manqué ; « retrouvée » avec le nom."
+  - item: "Regroupement Core Audio"
+    result: "Un seul configurationChanged par rafale rapprochée ; présence du périphérique relue dans l'état courant du HAL."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Sans objet."
+  performance:
+    status: PASS
+    notes: "Logique pure ; rafales regroupées."
+  reliability:
+    status: CONCERNS
+    notes: "Fil de rendu unique non garanti pour les événements pendant une interruption (#96)."
+  maintainability:
+    status: PASS
+    notes: "Politique pure, sans #if, exhaustive et testée pour les deux plateformes ; moniteur testable par événements simulés."
+evidence:
+  ci: "Rapport CI efee4e1 (07a7d38 fusionné dans d51f147) : Linux ✅, macOS ✅ ; 10 + 4 tests"
+  linux_tests: "scripts/linux-test.sh sur la fusion avec main (f2a9e25) : 234/234"
+  merge_check: "git merge-tree avec origin/main, #84, #82 et #89 : sans conflit"
+  policy_probe: "Politique rejouée sous Linux, iOS interrompu : routeChanged(true) → stopOutput, stopAllMotors, applyPendingCommands, notify, startOutput"
+recommendations:
+  immediate:
+    - action: "Corriger #96 dans cette PR si possible, sinon avant le branchement de la partie 2 (exigé)."
+  future:
+    - action: "Partie 2 : fusionner OutputDeviceMonitor et AVAudioEngineConfigurationChange ; fixer deviceInUse à chaque démarrage (test d'intégration) ; documenter l'arrêt de l'ancienne sortie avant startOutput ; veille traitée de façon synchrone ; unifier la lecture du périphérique par défaut avec OutputDevice."
+    - action: "Recette (#44) : casque débranché pendant la lecture (aucun son sur le haut-parleur), retrait d'une interface USB, veille et réveil."
