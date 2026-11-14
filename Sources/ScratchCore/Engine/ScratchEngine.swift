@@ -249,6 +249,8 @@ struct DeckChannel {
     }
 
     mutating func render(frameCount: Int, scratch: RenderScratch.Deck) {
+        // A jump (CUE, needle drop) is applied between blocks: the voice fades the old position out.
+        if let origin = physics.takeJumpOrigin() { renderer.beginJumpCrossfade(from: origin) }
         physics.process(frameCount: frameCount, positions: scratch.positions, rates: scratch.rates)
         if let clip {
             clip._withUnsafeGuaranteedRef { audioClip in
