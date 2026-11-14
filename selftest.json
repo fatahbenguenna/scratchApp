@@ -1,0 +1,12 @@
+{
+  "checks" : {
+    "audible" : true,
+    "noNaN" : true,
+    "rendered" : true
+  },
+  "details" : {
+    "frames" : 48000,
+    "rms" : 0.3535533898524662
+  },
+  "passed" : true
+}
