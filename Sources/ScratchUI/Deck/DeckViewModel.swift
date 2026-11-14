@@ -55,6 +55,10 @@ public final class DeckViewModel {
     /// VU-mètre de la voie (niveau après le fader de voie, avant le crossfader ; SF-65, D-26),
     /// mis à jour à chaque image. Lu seulement par les VU-mètres de la table de mixage.
     public private(set) var channelMeter = VUMeterBallistics()
+    /// Incrémenté à chaque SET CUE accepté : éclat de 150 ms du marqueur et annonce VoiceOver (4.5).
+    public private(set) var setCueCount = 0
+    /// Annonce du dernier SET CUE : « Point CUE mémorisé à 12,3 secondes » (UX §5.6).
+    public private(set) var setCueAnnouncement = ""
     /// Incrémenté à chaque START sur une platine vide : la vue met alors en avant « Importer » et
     /// « Charger la démo » et VoiceOver l'annonce (PO-01, UX §5.2).
     public private(set) var emptyDeckHighlightCount = 0
@@ -266,11 +270,37 @@ public final class DeckViewModel {
         commandedResistance.command(clamped, at: clock())
     }
 
-    /// SET CUE (SF-13).
-    public func setCue() { engine.send(.setCue(deck)) }
+    /// SET CUE (SF-13) : mémorise la position de la tête, y compris disque tenu (6.6). Sans effet sur
+    /// une platine vide.
+    public func setCue() {
+        guard isLoaded, engine.send(.setCue(deck)) else { return }
+        let tenths = DeckFormatting.tenths(frame.positionSeconds)
+        setCueAnnouncement = "Point CUE mémorisé à " + DeckFormatting.spokenTime(tenths: tenths)
+        setCueCount &+= 1
+    }
 
-    /// CUE (SF-13).
-    public func recallCue() { engine.send(.recallCue(deck)) }
+    /// CUE (SF-13) : ramène la tête au CUE, ou à 0 s sans CUE, sans changer le moteur, y compris
+    /// disque tenu (6.6). Sans effet sur une platine vide.
+    public func recallCue() {
+        guard isLoaded else { return }
+        engine.send(.recallCue(deck))
+    }
+
+    // MARK: Textes du pitch, du CUE et de la résistance (story 4.5)
+
+    /// Pitch toujours signé : « +5,3 % », « −2,0 % », « 0,0 % » (UX §5.4, §8.1).
+    public var pitchText: String { DeckFormatting.pitchText(pitch) }
+    /// Témoin « 0 » : pitch exactement à 0 %.
+    public var isPitchZero: Bool { abs(pitch) < 1e-9 }
+    /// Résistance : « 50 % ».
+    public var resistanceText: String { "\(Int((resistance * 100).rounded()))\u{00A0}%" }
+    /// Un CUE est défini : témoin du bouton CUE allumé.
+    public var hasCue: Bool { cueSeconds != nil }
+    /// Valeur VoiceOver du bouton CUE : « CUE à 12,3 secondes » ou « aucun CUE, retour au début ».
+    public var cueAccessibilityValue: String {
+        guard let cueSeconds else { return "aucun CUE, retour au début" }
+        return "CUE à " + DeckFormatting.spokenTime(tenths: DeckFormatting.tenths(cueSeconds))
+    }
 
     /// Needle drop sur l'aperçu complet : `fraction` 0…1 de la durée (SF-71). Ignoré disque tenu.
     public func needleDrop(fraction: Double) {

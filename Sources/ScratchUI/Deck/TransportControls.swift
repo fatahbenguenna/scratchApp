@@ -1,8 +1,8 @@
 import ScratchCore
 import SwiftUI
 
-/// Rangée de transport d'une platine (spec 3.1 ; UX §5.2, §5.3) : START/STOP, 33⅓ / 45, puis les
-/// emplacements de SET CUE et CUE (story 4.5).
+/// Rangée de transport d'une platine (spec 3.1 ; UX §5.2, §5.3, §5.6) : START/STOP, 33⅓ / 45, SET CUE
+/// et CUE (story 4.5).
 struct TransportControls: View {
     let model: DeckViewModel
     let metrics: MainLayoutMetrics
@@ -16,8 +16,8 @@ struct TransportControls: View {
                     StartStopButton(model: model).frame(width: 136, height: 56)
                     SpeedSelector(model: model, segmentWidth: 68).frame(height: 56)
                 }
-                // Slots reserved for SET CUE and CUE (story 4.5).
-                Color.clear.frame(width: 280, height: 56).accessibilityHidden(true)
+                CueButtons(model: model, setCueSize: CGSize(width: 136, height: 56),
+                           cueSize: CGSize(width: 136, height: 56))
             }
         } else {
             row
@@ -30,9 +30,9 @@ struct TransportControls: View {
                 .frame(width: metrics.startStopWidth, height: metrics.transportHeight)
             SpeedSelector(model: model, segmentWidth: metrics.speedSegmentWidth)
                 .frame(height: metrics.transportHeight)
-            // Slots reserved for SET CUE and CUE (story 4.5).
-            Color.clear.frame(width: metrics.setCueWidth + metrics.transportSpacing + metrics.cueWidth)
-                .accessibilityHidden(true)
+            CueButtons(model: model, setCueSize: CGSize(width: metrics.setCueWidth, height: metrics.transportHeight),
+                       cueSize: CGSize(width: metrics.cueWidth, height: metrics.transportHeight),
+                       spacing: metrics.transportSpacing, isCompact: metrics.idiom == .phoneLandscape)
         }
     }
 }

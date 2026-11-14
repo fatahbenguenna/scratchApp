@@ -24,6 +24,10 @@ targets:
     platform: iOS
     sources:
       - path: App/Shared
+        excludes:
+          - "*.xcprivacy"
+      - path: App/Shared/PrivacyInfo.xcprivacy
+        buildPhase: resources
       - path: App/iOS
     dependencies:
       - package: ScratchKit
@@ -44,6 +48,8 @@ targets:
         LSSupportsOpeningDocumentsInPlace: true
         UIRequiresFullScreen: false
         UIApplicationSupportsMultipleScenes: false
+        # Jusqu'à 120 Hz sur les iPhone ProMotion (horloge d'affichage, UX §10.1).
+        CADisableMinimumFrameDurationOnPhone: true
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
@@ -65,6 +71,10 @@ targets:
     platform: macOS
     sources:
       - path: App/Shared
+        excludes:
+          - "*.xcprivacy"
+      - path: App/Shared/PrivacyInfo.xcprivacy
+        buildPhase: resources
       - path: App/macOS
     dependencies:
       - package: ScratchKit
@@ -83,6 +93,7 @@ targets:
         LSApplicationCategoryType: public.app-category.music
         LSMinimumSystemVersion: "14.0"
         NSHumanReadableCopyright: "ScratchApp"
+    # Aucun droit réseau (SF-20, NFR6) : scripts/check-no-network.sh le vérifie.
     entitlements:
       path: App/macOS/ScratchApp.entitlements
       properties:

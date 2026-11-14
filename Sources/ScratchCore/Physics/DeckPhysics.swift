@@ -32,7 +32,8 @@ import Foundation
 ///    revient dans le son sans « dérouler » les tours accumulés et `realignDisc()` recale l'angle du
 ///    disque (RM-55, IC-09, D-10).
 /// 6. **Vitesse de lecture** : `ωd / ωref`, bornée à ±16 (RM-50, SF-77).
-/// 7. **Résistance** : n'agit que sur le disque tenu, jamais sur le plateau, les durées moteur ni
+/// 7. **Résistance** : un changement pendant la tenue est lissé (τ appliqué varie de 0,12 s/s au
+///    plus, #54) ; elle n'agit que sur le disque tenu, jamais sur le plateau, les durées moteur ni
 ///    le rattrapage (RM-11, RM-54).
 struct DeckPhysics {
     /// État du disque vis-à-vis du plateau et du doigt.
@@ -100,11 +101,28 @@ struct DeckPhysics {
         2 * Double.pi * speed.rpm / 60 * (1 + pitch)
     }
 
-    /// Constante de temps du disque tenu : lerp(2 ms, 35 ms, résistance) (5.1 point 3).
+    /// Constante de temps du disque tenu visée par la résistance : lerp(2 ms, 35 ms, résistance)
+    /// (5.1 point 3).
     var holdTimeConstant: Double {
         let range = TurntableConstants.resistanceTimeConstantRange
         return range.lowerBound + (range.upperBound - range.lowerBound) * resistance
     }
+
+    /// Vitesse maximale de variation de la constante de temps appliquée au disque tenu (s par s).
+    ///
+    /// Un changement brutal de résistance pendant la tenue ferait rattraper d'un coup le retard du
+    /// disque sur le doigt (2 τ v en rampe), jusqu'à 16× (« zip », #54). Une rampe linéaire de τ limite
+    /// cet excès au meilleur rapport durée / crête (simulation : 1,32 × la vitesse du geste à 0,12 s/s,
+    /// 1,67 × à 0,2 s/s). Toute la plage (35 → 2 ms) est parcourue en 275 ms, un pas de 1 % du curseur
+    /// (0,33 ms) en 2,75 ms. Paramètre de calibrage (D-46).
+    static let holdTimeConstantSlewRate = 0.12
+
+    /// Constante de temps appliquée au disque tenu : rejoint `holdTimeConstant` à
+    /// `holdTimeConstantSlewRate` au plus pendant la tenue ; vaut `holdTimeConstant` sinon (saisie).
+    private(set) var appliedHoldTimeConstant: Double = {
+        let range = TurntableConstants.resistanceTimeConstantRange
+        return range.lowerBound + (range.upperBound - range.lowerBound) * TurntableConstants.defaultResistance
+    }()
 
     /// Dernière cible du doigt (angle cumulé, rad).
     var fingerAngle: Double { finger.output }
@@ -175,6 +193,7 @@ struct DeckPhysics {
         coastDeceleration = 0
         gripOffset = 0
         follower.reset(angle: 0, velocity: 0)
+        appliedHoldTimeConstant = holdTimeConstant
         isPinnedAtBound = false
         pendingJumpOrigin = nil
         cueSeconds = nil
@@ -267,7 +286,9 @@ struct DeckPhysics {
         let brakeStep = nominal / motorTimings.brakeDuration * dt
         let catchUpTimeConstant = motorTimings.slipmatCatchUp / 3
         let catchUpGain = catchUpTimeConstant > 0 ? -expm1(-dt / catchUpTimeConstant) : 1
-        let holdCoefficients = CriticallyDampedFollower.Coefficients(timeConstant: holdTimeConstant, dt: dt)
+        let targetHoldTimeConstant = holdTimeConstant
+        let holdSlewStep = Self.holdTimeConstantSlewRate * dt
+        var holdCoefficients = CriticallyDampedFollower.Coefficients(timeConstant: appliedHoldTimeConstant, dt: dt)
         var coastStep = coastDeceleration * dt
         let referenceVelocity = TurntableConstants.referenceAngularVelocity
         let maximumRate = TurntableConstants.maximumPlaybackRate
@@ -290,7 +311,20 @@ struct DeckPhysics {
             let previousDiscAngle = discAngle
             if finger.isActive {
                 let target = finger.nextTarget()
-                if discMode != .held { grab(fingerAngle: target) }
+                if discMode != .held {
+                    grab(fingerAngle: target)
+                    if appliedHoldTimeConstant != targetHoldTimeConstant {
+                        appliedHoldTimeConstant = targetHoldTimeConstant
+                        holdCoefficients = CriticallyDampedFollower.Coefficients(timeConstant: appliedHoldTimeConstant, dt: dt)
+                    }
+                } else if appliedHoldTimeConstant != targetHoldTimeConstant {
+                    // Resistance changed while held: slew τ (no catch-up burst, #54).
+                    let gap = targetHoldTimeConstant - appliedHoldTimeConstant
+                    appliedHoldTimeConstant = abs(gap) <= holdSlewStep
+                        ? targetHoldTimeConstant
+                        : appliedHoldTimeConstant + (gap > 0 ? holdSlewStep : -holdSlewStep)
+                    holdCoefficients = CriticallyDampedFollower.Coefficients(timeConstant: appliedHoldTimeConstant, dt: dt)
+                }
                 follower.step(target: target + gripOffset, coefficients: holdCoefficients)
                 follower.limitVelocity(to: maximumVelocity, previousAngle: previousDiscAngle, dt: dt)
                 discAngle = follower.angle
