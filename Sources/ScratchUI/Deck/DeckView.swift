@@ -27,6 +27,7 @@ struct DeckView: View {
             reserved(height: metrics.resistanceHeight).padding(.top, spacings[4])   // resistance (4.5)
         }
         .frame(width: metrics.columnWidth)
+        .deckDropZone(model: model, intents: intents)  // 5.2 (Hugo): drop target over the whole deck
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Platine \(model.deck.rawValue)")
     }
