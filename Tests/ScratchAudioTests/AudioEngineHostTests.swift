@@ -219,38 +219,61 @@ final class AudioEngineHostTests: XCTestCase {
         XCTAssertGreaterThan(left.reduce(Float(0)) { max($0, abs($1)) }, 0.1, "the scenario is audible")
     }
 
-    /// CA 11 — D-15, D-54, #92 : la sonde publie le premier geste et le régime appris (second geste,
-    /// après un geste d'échauffement), avec la réponse au premier échantillon qui franchit le seuil
-    /// et la latence de sortie annoncée. Le graphe en rendu manuel et le rendu direct donnent les
-    /// mêmes valeurs. Le régime appris suit la cadence d'affichage : plus lent à 60 Hz qu'à 120 Hz.
+    /// CA 11 — D-15, D-54, D-56, #92, #114 : la sonde publie le premier geste et le régime appris
+    /// (second geste, après un geste d'échauffement), avec la réponse au premier échantillon qui
+    /// franchit le seuil et la latence de sortie annoncée, sur 8 phases touches/affichage réparties sur
+    /// une image. La référence est la moyenne (D-56) ; le maximum est publié. Le graphe en rendu
+    /// manuel et le rendu direct donnent les mêmes valeurs. Le régime appris suit la cadence
+    /// d'affichage : plus lent à 60 Hz qu'à 120 Hz.
     /// Valeurs de référence sous Linux, en rendu direct, à 48 kHz et 256 trames, sans la latence du
     /// périphérique (partie moteur, puis avec un tampon) :
-    /// - 120 Hz : premier geste 15,2 ms (20,5 ms), régime appris 13,7 ms (19,0 ms) ;
-    /// - 60 Hz : premier geste 17,2 ms (22,5 ms), régime appris 22,0 ms (27,3 ms).
+    /// - 120 Hz : régime appris, moyenne 20,24 ms (25,57 ms), maximum 23,79 ms (29,12 ms) ;
+    ///   premier geste, moyenne 21,65 ms (26,98 ms) ;
+    /// - 60 Hz : régime appris, moyenne 28,87 ms (34,21 ms), maximum 35,83 ms (41,17 ms) ;
+    ///   premier geste, moyenne 23,31 ms (28,64 ms).
     func testGestureLatencyProbe_D15() throws {
         let measurement = try GestureLatencyProbe.measure(sampleRate: 48_000, bufferFrames: 256, displayRate: 120,
                                                           outputLatency: 0.004)
+        XCTAssertEqual(measurement.learned.values.count, 8)
+        XCTAssertEqual(measurement.firstGesture.values.count, 8)
         XCTAssertEqual(measurement.bufferDuration, 256.0 / 48_000, accuracy: 1e-12)
         XCTAssertEqual(measurement.outputLatency, 0.004)
-        XCTAssertEqual(measurement.total, measurement.engineDelay + measurement.bufferDuration + 0.004, accuracy: 1e-12)
+        XCTAssertEqual(measurement.engineDelay, measurement.learned.mean, accuracy: 1e-12, "D-56: the mean is the reference")
+        XCTAssertEqual(measurement.total, measurement.learned.mean + measurement.bufferDuration + 0.004, accuracy: 1e-12)
+        XCTAssertEqual(measurement.worstTotal, measurement.learned.maximum + measurement.bufferDuration + 0.004,
+                       accuracy: 1e-12)
         XCTAssertEqual(measurement.firstGestureTotal,
-                       measurement.firstGestureEngineDelay + measurement.bufferDuration + 0.004, accuracy: 1e-12)
-        for delay in [measurement.engineDelay, measurement.firstGestureEngineDelay] {
-            XCTAssertGreaterThan(delay, 0.005)
-            XCTAssertLessThan(delay, 0.06)
+                       measurement.firstGesture.mean + measurement.bufferDuration + 0.004, accuracy: 1e-12)
+        for spread in [measurement.learned, measurement.firstGesture] {
+            XCTAssertGreaterThan(spread.minimum, 0.005)
+            XCTAssertLessThan(spread.maximum, 0.06)
+            XCTAssertLessThanOrEqual(spread.minimum, spread.mean)
+            XCTAssertLessThanOrEqual(spread.mean, spread.maximum)
+        }
+        XCTAssertGreaterThan(measurement.learned.maximum - measurement.learned.minimum, 0.004,
+                             "the learned delay depends on the touch/display phase")
+
+        let direct = Self.directSpread(displayRate: 120, phases: 8)
+        XCTAssertEqual(measurement.learned.values.count, direct.learned.values.count)
+        for (graph, render) in zip(measurement.learned.values + measurement.firstGesture.values,
+                                   direct.learned.values + direct.firstGesture.values) {
+            XCTAssertEqual(graph, render, accuracy: 1e-12, "manual-rendering graph = direct render")
         }
 
-        let direct = try XCTUnwrap(Self.directEngineDelays(displayRate: 120, splitting: false).delays)
-        XCTAssertEqual(measurement.engineDelay, direct.learned, accuracy: 1e-12)
-        XCTAssertEqual(measurement.firstGestureEngineDelay, direct.firstGesture, accuracy: 1e-12)
+        // #114: the aligned phase is the best case; the mean no longer depends on the alignment.
+        let aligned = try XCTUnwrap(Self.directEngineDelays(displayRate: 120, splitting: false).delays)
+        XCTAssertGreaterThan(measurement.engineDelay, aligned.learned + 0.004, "aligned phase: best case")
+        let finer = Self.directSpread(displayRate: 120, phases: 16)
+        XCTAssertEqual(finer.learned.mean, measurement.engineDelay, accuracy: 0.000_2, "8 phases are enough for the mean")
 
         let slow = try GestureLatencyProbe.measure(sampleRate: 48_000, bufferFrames: 256, displayRate: 60)
         XCTAssertGreaterThan(slow.engineDelay, measurement.engineDelay + 0.004, "learned regime: 60 Hz is slower than 120 Hz")
         XCTAssertGreaterThan(slow.engineDelay, slow.firstGestureEngineDelay, "60 Hz: the learned delay exceeds the initial 14 ms")
 
         let hostMeasurement = try AudioEngineHost(engine: ScratchEngine()).measureGestureLatency()
-        XCTAssertEqual(hostMeasurement.engineDelay, measurement.engineDelay, accuracy: 1e-12, "48 kHz, 256 frames without output")
-        XCTAssertEqual(hostMeasurement.firstGestureEngineDelay, measurement.firstGestureEngineDelay, accuracy: 1e-12)
+        XCTAssertEqual(hostMeasurement.learned, measurement.learned, "48 kHz, 256 frames without output")
+        XCTAssertEqual(hostMeasurement.firstGesture, measurement.firstGesture)
+        XCTAssertEqual(hostMeasurement.outputLatency, 0)
     }
 
     /// D-54 : la réponse est lue échantillon par échantillon. C'est valable parce que le moteur rend
@@ -266,9 +289,24 @@ final class AudioEngineHostTests: XCTestCase {
         XCTAssertGreaterThan(whole.output.map(abs).max() ?? 0, 0.1, "the gestures are audible")
     }
 
+    /// Sonde en rendu direct du moteur, sur `phases` phases réparties sur une image.
+    private static func directSpread(displayRate: Double,
+                                     phases: Int) -> (learned: GestureLatencyProbe.PhaseSpread,
+                                                      firstGesture: GestureLatencyProbe.PhaseSpread) {
+        var learned: [Double] = []
+        var firstGesture: [Double] = []
+        for offset in GestureLatencyProbe.phaseOffsets(count: phases, displayRate: displayRate) {
+            guard let delays = directEngineDelays(displayRate: displayRate, splitting: false, phaseOffset: offset).delays
+            else { continue }
+            learned.append(delays.learned)
+            firstGesture.append(delays.firstGesture)
+        }
+        return (GestureLatencyProbe.PhaseSpread(values: learned), GestureLatencyProbe.PhaseSpread(values: firstGesture))
+    }
+
     /// Sonde en rendu direct du moteur ; `splitting` rend chaque demande échantillon par échantillon.
-    private static func directEngineDelays(displayRate: Double,
-                                           splitting: Bool) -> (delays: GestureLatencyProbe.EngineDelays?, output: [Float]) {
+    private static func directEngineDelays(displayRate: Double, splitting: Bool,
+                                           phaseOffset: Double = 0) -> (delays: GestureLatencyProbe.EngineDelays?, output: [Float]) {
         let engine = ScratchEngine()
         let left = UnsafeMutablePointer<Float>.allocate(capacity: 256)
         let right = UnsafeMutablePointer<Float>.allocate(capacity: 256)
@@ -278,7 +316,7 @@ final class AudioEngineHostTests: XCTestCase {
         }
         var output: [Float] = []
         let delays = GestureLatencyProbe.engineDelays(engine: engine, sampleRate: 48_000, bufferFrames: 256,
-                                                      displayRate: displayRate) { count in
+                                                      displayRate: displayRate, phaseOffset: phaseOffset) { count in
             if splitting {
                 for offset in 0 ..< count { engine.render(frameCount: 1, left: left + offset, right: right + offset) }
             } else {

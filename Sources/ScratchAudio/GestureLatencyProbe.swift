@@ -28,30 +28,62 @@ import ScratchCore
 /// Chaque geste reprend celui de `ScratchScenario` : disque à l'arrêt, doigt posé, puis mouvement à
 /// la vitesse nominale. Les touches sont horodatées à 240 Hz et livrées à chaque image d'affichage,
 /// comme en vrai. Une commande n'est vue que par le premier tampon qui commence après sa livraison.
+///
+/// **Phases** (#114). Sur un appareil, l'horloge des touches et les images d'affichage n'ont aucune
+/// relation de phase, et le retard appris par le rejeu en dépend. Sur une image, il décroît presque
+/// linéairement, du pire cas juste après une coïncidence jusqu'au meilleur juste avant. La phase
+/// alignée exacte, où une touche sur deux est livrée à l'instant même de son image, est un point
+/// singulier : c'est le meilleur cas, et sa probabilité est nulle sur un appareil. La mesure est donc
+/// répétée au milieu de `phases` intervalles égaux d'une image, `(k + ½) / (phases × displayRate)`,
+/// chacun avec un moteur neuf. Elle publie la **moyenne**, référence de D-56, exacte dès 8 phases,
+/// ainsi que le maximum, publié sans décider de la gate, et le minimum. Le maximum des phases mesurées
+/// approche par défaut la borne supérieure, d'environ 0,5 ms à 120 Hz.
 /// Pendant l'attente d'une réponse, chaque tampon est rendu échantillon par échantillon : aucune
 /// commande n'arrive au milieu d'un tampon, et le moteur calcule sa physique échantillon par
 /// échantillon, si bien que le rendu est le même qu'en un seul appel, et que l'instantané de chaque
 /// échantillon donne sa vitesse.
 public enum GestureLatencyProbe {
+    /// Valeurs d'une partie moteur sur les phases touches/affichage, en secondes.
+    public struct PhaseSpread: Equatable, Sendable {
+        /// Une valeur par phase, dans l'ordre des décalages.
+        public var values: [Double]
+
+        public init(values: [Double]) {
+            self.values = values
+        }
+
+        public var mean: Double { values.isEmpty ? 0 : values.reduce(0, +) / Double(values.count) }
+        public var maximum: Double { values.max() ?? 0 }
+        public var minimum: Double { values.min() ?? 0 }
+    }
+
     /// Latence geste→son décomposée, en secondes.
     public struct Measurement: Equatable, Sendable {
-        /// Partie moteur en régime appris (second geste) : la mesure de référence (D-54).
-        public var engineDelay: Double
-        /// Partie moteur du premier geste, au retard initial du rejeu.
-        public var firstGestureEngineDelay: Double
+        /// Partie moteur en régime appris (second geste), sur les phases.
+        public var learned: PhaseSpread
+        /// Partie moteur du premier geste, au retard initial du rejeu, sur les phases.
+        public var firstGesture: PhaseSpread
         public var bufferDuration: Double
         public var outputLatency: Double
 
-        public init(engineDelay: Double, firstGestureEngineDelay: Double, bufferDuration: Double, outputLatency: Double) {
-            self.engineDelay = engineDelay
-            self.firstGestureEngineDelay = firstGestureEngineDelay
+        public init(learned: PhaseSpread, firstGesture: PhaseSpread, bufferDuration: Double, outputLatency: Double) {
+            self.learned = learned
+            self.firstGesture = firstGesture
             self.bufferDuration = bufferDuration
             self.outputLatency = outputLatency
         }
 
-        /// Latence de référence (D-15, D-54) : régime appris, latence de sortie annoncée comprise.
+        /// Partie moteur de référence (D-54, D-56) : régime appris, moyenne sur au moins 8 phases.
+        public var engineDelay: Double { learned.mean }
+        /// Partie moteur du premier geste, moyenne sur la phase.
+        public var firstGestureEngineDelay: Double { firstGesture.mean }
+        /// Latence de référence (D-15, D-54, D-56) : régime appris, moyenne sur la phase, tampon et
+        /// latence de sortie annoncée compris.
         public var total: Double { engineDelay + bufferDuration + outputLatency }
-        /// Latence du premier geste, latence de sortie annoncée comprise.
+        /// Pire phase du régime appris, latence de sortie annoncée comprise : publiée, sans décider de
+        /// la gate (D-56).
+        public var worstTotal: Double { learned.maximum + bufferDuration + outputLatency }
+        /// Latence du premier geste, moyenne sur la phase, latence de sortie annoncée comprise.
         public var firstGestureTotal: Double { firstGestureEngineDelay + bufferDuration + outputLatency }
     }
 
@@ -74,12 +106,38 @@ public enum GestureLatencyProbe {
     static let touchRate = 240.0
     /// Délai au-delà duquel un geste est réputé sans réponse.
     static let responseTimeout = 1.0
+    /// Phases touches/affichage mesurées par défaut, réparties sur une image.
+    public static let defaultPhaseCount = 8
 
-    /// Mesure par le graphe AVAudioEngine en rendu manuel hors ligne.
+    /// Mesure par le graphe AVAudioEngine en rendu manuel hors ligne, sur `phases` décalages répartis
+    /// sur une image d'affichage (un moteur et un graphe neufs par phase).
     public static func measure(sampleRate: Double = 48_000,
                                bufferFrames: Int = TurntableConstants.preferredBufferFrames,
-                               displayRate: Double = 120, outputLatency: Double = 0) throws -> Measurement {
+                               displayRate: Double = 120, outputLatency: Double = 0,
+                               phases: Int = defaultPhaseCount) throws -> Measurement {
         let frames = max(1, bufferFrames)
+        var learned: [Double] = []
+        var firstGesture: [Double] = []
+        for offset in phaseOffsets(count: phases, displayRate: displayRate) {
+            let delays = try graphEngineDelays(sampleRate: sampleRate, bufferFrames: frames,
+                                               displayRate: displayRate, phaseOffset: offset)
+            learned.append(delays.learned)
+            firstGesture.append(delays.firstGesture)
+        }
+        return Measurement(learned: PhaseSpread(values: learned), firstGesture: PhaseSpread(values: firstGesture),
+                           bufferDuration: Double(frames) / sampleRate, outputLatency: outputLatency)
+    }
+
+    /// Décalages du début des gestes : `(k + base) / (count × displayRate)`, pour `k` de 0 à
+    /// `count − 1`. Par défaut, `base` vaut ½ : le milieu de chaque intervalle, sans la phase alignée.
+    static func phaseOffsets(count: Int, displayRate: Double, base: Double = 0.5) -> [Double] {
+        let phases = max(1, count)
+        return (0 ..< phases).map { (base + Double($0)) / (Double(phases) * displayRate) }
+    }
+
+    /// Une phase, par le graphe AVAudioEngine en rendu manuel.
+    private static func graphEngineDelays(sampleRate: Double, bufferFrames frames: Int, displayRate: Double,
+                                          phaseOffset: Double) throws -> EngineDelays {
         let engine = ScratchEngine(outputSampleRate: sampleRate)
         let graph = try ScratchAudioGraph.offline(engine: engine, sampleRate: sampleRate,
                                                   maximumFrameCount: AVAudioFrameCount(max(frames, ScratchEngine.maximumBlockFrames)))
@@ -89,20 +147,20 @@ public enum GestureLatencyProbe {
                                             frameCapacity: AVAudioFrameCount(frames))
         else { throw AudioOutputError.invalidFormat }
         let delays = try engineDelays(engine: engine, sampleRate: sampleRate, bufferFrames: frames,
-                                      displayRate: displayRate) { count in
+                                      displayRate: displayRate, phaseOffset: phaseOffset) { count in
             let status = try graph.avEngine.renderOffline(AVAudioFrameCount(count), to: buffer)
             if status != .success { throw AudioOutputError.noResponse }
         }
         guard let delays else { throw AudioOutputError.noResponse }
-        return Measurement(engineDelay: delays.learned, firstGestureEngineDelay: delays.firstGesture,
-                           bufferDuration: Double(frames) / sampleRate, outputLatency: outputLatency)
+        return delays
     }
 
-    /// Partie moteur des deux gestes. `render` rend le nombre de trames demandé, au plus
-    /// `bufferFrames` (graphe en rendu manuel, ou rendu direct). Renvoie `nil` si un geste reste sans
-    /// réponse pendant une seconde, ou si le disque n'est pas revenu au repos avant le second geste.
+    /// Partie moteur des deux gestes, dans une phase. `phaseOffset` décale le début des deux gestes
+    /// (secondes). `render` rend le nombre de trames demandé, au plus `bufferFrames` (graphe en rendu
+    /// manuel, ou rendu direct). Renvoie `nil` si un geste reste sans réponse pendant une seconde, ou
+    /// si le disque n'est pas revenu au repos avant le second geste.
     static func engineDelays(engine: ScratchEngine, sampleRate: Double, bufferFrames: Int, displayRate: Double,
-                             render: (Int) throws -> Void) rethrows -> EngineDelays? {
+                             phaseOffset: Double = 0, render: (Int) throws -> Void) rethrows -> EngineDelays? {
         let clip = AudioClip(title: "latence", sampleRate: sampleRate, frameCount: Int(sampleRate * 4)) { left, right in
             for index in 0 ..< left.count {
                 let value = Float(0.5 * sin(2 * Double.pi * 440 * Double(index) / sampleRate))
@@ -111,9 +169,9 @@ public enum GestureLatencyProbe {
             }
         }
         engine.send(.load(.a, clip))
-        let events = gesture(at: touchTime, duration: warmUpDuration, releases: true, displayRate: displayRate)
-            + gesture(at: learnedTouchTime, duration: responseTimeout, releases: false, displayRate: displayRate)
-        let starts = [touchTime, learnedTouchTime]
+        let starts = [touchTime + phaseOffset, learnedTouchTime + phaseOffset]
+        let events = gesture(at: starts[0], duration: warmUpDuration, releases: true, displayRate: displayRate)
+            + gesture(at: starts[1], duration: responseTimeout, releases: false, displayRate: displayRate)
         var responses: [Double] = []
         var begun = 0
         var next = 0
