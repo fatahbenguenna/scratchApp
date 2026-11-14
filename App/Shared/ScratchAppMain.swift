@@ -14,6 +14,10 @@ struct ScratchAppMain: App {
     #endif
 
     private let model: AppModel
+    #if os(macOS)
+    /// Noms des touches dans la disposition active, pour l'aide des raccourcis (5.1).
+    private let keyboardNames: KeyboardLayoutNames
+    #endif
 
     init() {
         // Mode auto-test hors ligne pour la CI : `ScratchApp --selftest` (sortie JSON, code de retour).
@@ -21,6 +25,9 @@ struct ScratchAppMain: App {
             Self.runSelfTestAndExit()
         }
         model = Self.makeModel()
+        #if os(macOS)
+        keyboardNames = KeyboardLayoutNames()
+        #endif
     }
 
     var body: some Scene {
@@ -29,6 +36,16 @@ struct ScratchAppMain: App {
         }
         #if os(macOS)
         .defaultSize(width: 1200, height: 760)
+        #endif
+
+        #if os(macOS)
+        // Réglages (⌘,), un seul panneau (3.4, UX §5.20).
+        Settings {
+            SettingsView(model: model)
+        }
+        // Aide des raccourcis clavier (5.1), ouverte depuis les Réglages ; les menus seront attachés
+        // par la 6.2 avec le contrôleur clavier partagé.
+        KeyboardHelpWindow(names: keyboardNames)
         #endif
     }
 

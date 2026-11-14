@@ -10,6 +10,9 @@ import SwiftUI
 /// - la réconciliation du lancement (`AppModel.launch()`).
 public struct AppRootView: View {
     @Bindable private var model: AppModel
+    #if os(macOS)
+    @Environment(\.openSettings) private var openSettings
+    #endif
 
     public init(model: AppModel) {
         self.model = model
@@ -24,6 +27,21 @@ public struct AppRootView: View {
             .sheet(isPresented: $model.isLibraryPresented) {
                 LibrarySheet(model: model)
             }
+            #if os(iOS)
+            .background {
+                // A second sheet presenter: Settings (3.4).
+                Color.clear.sheet(isPresented: $model.isSettingsPresented) {
+                    SettingsSheet(model: model)
+                }
+            }
+            #else
+            .onChange(of: model.isSettingsPresented) {
+                // Mac: the standard Settings window (⌘,) of the Settings scene.
+                guard model.isSettingsPresented else { return }
+                model.isSettingsPresented = false
+                openSettings()
+            }
+            #endif
             #if os(macOS)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
