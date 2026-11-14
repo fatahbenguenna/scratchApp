@@ -35,6 +35,7 @@ targets += [
     .target(name: "ScratchAudio", dependencies: ["ScratchCore", "ScratchLibrary"]),
     .target(name: "ScratchUI", dependencies: ["ScratchCore", "ScratchLibrary", "ScratchAudio"]),
     .testTarget(name: "ScratchAudioTests", dependencies: ["ScratchAudio"]),
+    .testTarget(name: "ScratchUITests", dependencies: ["ScratchUI"]),
 ]
 #endif
 
