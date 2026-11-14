@@ -1,0 +1,57 @@
+schema: 1
+story: "3.2"
+story_title: "Import"
+pr: 62
+issue: 29
+also_closes: [51]
+reviewed_sha: "c1f46d4"
+gate: PASS
+status_reason: >-
+  Les 9 critères d'acceptation sont implémentés et testés sous Linux (152/152 ; ScratchLibrary : 67
+  tests). CI Linux et macOS verte ; fusion sans conflit avec le main actuel. Correctif #51 vérifié :
+  un index partiellement lisible n'est mis de côté qu'une fois. Points relevés à la gate 3.1 traités :
+  noms assainis et importedAt tronqué à la seconde. Les trois choix du dev sont acceptables pour la V1.
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues: []
+deviations:
+  - id: "CHOICE-1"
+    description: "Copie et empreinte dans l'acteur : les autres appels attendent pendant la copie."
+    verdict: PASS
+    rationale: "Simple et sûr ; fil principal non bloqué (appels asynchrones) ; copie observable de la liste dans l'AppModel (ADR-10) ; à mesurer en recette, puis copie nonisolated si l'attente gêne."
+  - id: "CHOICE-2"
+    description: "Pas de NSFileCoordinator ; une source iCloud non téléchargée donne writeFailed."
+    verdict: PASS
+    rationale: "Facultatif d'après la story ; erreur typée, sans trace ; comportement réel à vérifier sur appareil (D-23) ; « Fichier inaccessible » reste un point ouvert de Winston."
+  - id: "CHOICE-3"
+    description: "Une entrée de même empreinte dont la copie a disparu est remplacée par le nouvel ajout."
+    verdict: PASS
+    rationale: "Conforme au piège de la story (la réconciliation retire, l'import ajoute) ; l'utilisateur réimporte ce son lui-même ; jamais d'écrasement."
+qa_requested_checks:
+  - check: "Assainissement des noms (gate 3.1)"
+    result: "Points en tête retirés ; suites de points réduites ; / \\ et caractères de contrôle remplacés par _ ; 255 octets UTF-8 au plus ; nom vide → « son » ; isSafeFileName revérifié avant le déplacement ; reconcile() ne retire plus ces copies."
+  - check: "importedAt à la seconde (gate 3.1)"
+    result: "wholeSecond arrondit vers le bas ; horloge de test à ,6 → entrée à la seconde inférieure ; entrée relue égale à l'entrée renvoyée."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Noms assainis puis revérifiés ; source lue seulement ; moveItem n'écrase jamais."
+  performance:
+    status: PASS
+    notes: "Copie et SHA-256 en un seul passage, par blocs de 1 Mio ; attente de l'acteur pendant la copie acceptée (à mesurer en recette)."
+  reliability:
+    status: PASS
+    notes: "Transaction complète, retour arrière si l'index ne s'écrit pas, purge des temporaires orphelins, ENOSPC traduit ; #51 corrigé."
+  maintainability:
+    status: PASS
+    notes: "Étapes documentées ; CopyNaming en logique pure ; points d'injection limités aux tests."
+evidence:
+  linux_tests: "scripts/linux-test.sh sur c1f46d4 : 152/152"
+  ci: "Rapport CI 0000a65 : Linux ✅, macOS ✅"
+  merge_check: "git merge-tree avec origin/main (après #49, #55 et #63) : sans conflit"
+recommendations:
+  immediate: []
+  future:
+    - action: "Recette 6.3 : attente de la bibliothèque pendant l'import d'un WAV de 10 min ; import iCloud non téléchargé sur iPhone ou iPad et sur Mac (note sur #44)."
+    - action: "Si l'attente gêne : sortir la copie et l'empreinte de l'acteur (fonction nonisolated)."
+    - action: "6.1 : exposer l'accesseur public de D-49 à partir de indexWasPartiallyReadable et setAsideIndexURL (T7)."

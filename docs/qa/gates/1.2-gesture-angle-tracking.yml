@@ -1,0 +1,68 @@
+schema: 1
+story: "1.2"
+story_title: "Suivi d'angle du geste"
+pr: 65
+issue: 20
+reviewed_sha: "de44895"
+gate: PASS
+status_reason: >-
+  Les 9 critères d'acceptation sont implémentés et testés sous Linux (152/152, dont 20 nouveaux) ;
+  CI Linux et macOS verte ; fusion sans conflit. Modification transverse de FingerTrajectory (reprise
+  rapide pendant le rejeu du relâchement) relue pour James et vérifiée par une sonde : reprises
+  enchaînées, aucun saut à l'échantillon près. Décision D-16 (touches prédites ignorées) fondée sur
+  des mesures conservées sur une branche d'expérience. Molette : convention de sens et datation du
+  premier cran acceptées. Le commit de correctif de main (da9d870) est hors périmètre.
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues: []
+cross_review:
+  owner: James
+  files: ["Sources/ScratchCore/Physics/FingerTrajectory.swift", "Sources/ScratchCore/Physics/DeckPhysics.swift"]
+  verdict: PASS
+  notes: >-
+    resume() conserve la tête de rejeu, la régulation et le retard ; angleOffset relie le nouveau
+    doigt au point de relâchement ; gripOffset reste valable (pas de nouvelle saisie). RM-60
+    préservée (un second doigt pendant un geste reste ignoré). Aucune allocation. Sonde QA : 3 gestes,
+    2 reprises dont une datée avant le dernier point, résultat exact, plus grande marche égale à celle
+    du geste. Recommandation : tests unitaires de resume dans FingerTrajectoryTests.
+deviations:
+  - id: "D16"
+    description: "Touches prédites ignorées par le moteur (CA6)."
+    verdict: PASS
+    rationale: "Cas prévu par le CA6 ; aucune variante ne gagne de retard sans famine ni dépassement (branche experiment/1.2-predicted-touches, e8d88f2) ; recalibration avec les prédictions UIKit si la latence dépasse D-15."
+  - id: "WHEEL-DIR"
+    description: "Molette : delta vers le bas ou vers la droite = sens horaire, indépendant de la position du pointeur."
+    verdict: PASS
+    rationale: "L'UX ne fixe que les 15° par cran ; convention documentée et testée ; conversion des deltas et sens perçu à confirmer en 4.3 et en recette."
+  - id: "WHEEL-T0"
+    description: "touchBegan daté 1/60 s avant le premier cran."
+    verdict: PASS
+    rationale: "Nécessaire (temps strictement croissants du rejeu) ; le premier cran devient une rotation de 16,7 ms au lieu d'un saut ; retard supplémentaire sans effet pour une molette ; paramètre de calibrage."
+  - id: "HOLD-GAP"
+    description: "Disque tenu entre deux contacts rapprochés, au lieu d'être libre."
+    verdict: PASS
+    rationale: "Durée ≤ un retard de rejeu (13 à 21 ms) ; écart inaudible."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Entrées non finies ignorées ; identifiants de contact entiers, sans référence UIKit."
+  performance:
+    status: PASS
+    notes: "Fil audio inchangé sauf resume (temps constant) ; gestes sur le fil principal."
+  reliability:
+    status: PASS
+    notes: "Reprise rapide sans perte du contact ; RM-60 préservée ; relâchement du trackpad sur horloge injectée."
+  maintainability:
+    status: PASS
+    notes: "Tracker, session et défilement séparés ; décision D-16 documentée ; modification transverse signalée."
+evidence:
+  linux_tests: "scripts/linux-test.sh sur da9d870 : 152/152"
+  ci: "Rapport CI 36c7379 (fusion dans 4961994) : Linux ✅, macOS ✅"
+  merge_check: "git merge-tree avec origin/main (dd7b89e) : sans conflit"
+  probe: "Sonde Linux non versionnée sur FingerTrajectory : reprises enchaînées, continuité à l'échantillon"
+recommendations:
+  immediate: []
+  future:
+    - action: "James : tests unitaires de resume dans FingerTrajectoryTests (continuité, reprises enchaînées, reprise datée avant le dernier point)."
+    - action: "Léa (4.3) : documenter la conversion des deltas d'une molette classique (défilement naturel, isDirectionInvertedFromDevice) ; vérifier le sens perçu à la souris."
+    - action: "4.3 et 6.3 : mesurer la latence (D-15) ; si elle dépasse l'objectif, recalibrer avec les vraies prédictions UIKit."
