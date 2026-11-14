@@ -32,7 +32,9 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p ci-output
-          scripts/check-no-network.sh 2>&1 | tee ci-output/no-network.log
+          # Self-test first: every forbidden pattern planted in a copy must be caught (#103).
+          scripts/check-no-network.sh --self-test 2>&1 | tee ci-output/no-network.log
+          scripts/check-no-network.sh 2>&1 | tee -a ci-output/no-network.log
       - name: swift build & test
         run: |
           set -o pipefail
