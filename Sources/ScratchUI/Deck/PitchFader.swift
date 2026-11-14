@@ -32,6 +32,7 @@ struct PitchFader: View {
                 .accessibilityAdjustableAction { model.nudgePitch(steps: $0 == .increment ? 1 : -1) }
                 .accessibilityAction(named: "Remettre à zéro") { model.resetPitch() }
                 .accessibilityIdentifier("\(id).pitch")
+                .keyboardAdjustable(id: "\(id).pitch") { model.nudgePitch(steps: $0) }
             Button { model.resetPitch() } label: {
                 Text(verbatim: "0")
                     .font(Theme.controlLabel)

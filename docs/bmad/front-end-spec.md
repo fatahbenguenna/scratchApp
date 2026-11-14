@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Document** | `docs/bmad/front-end-spec.md` (« UI/UX Specification » BMAD) |
-| **Version** | 1.1 |
+| **Version** | 1.2 |
 | **Date** | 14 novembre 2026 |
 | **Auteur** | 🎨 Sally, UX Expert BMAD |
 | **Statut** | Validée par 📝 Sarah (PO) le 14 novembre 2026 : questions de la section 14 tranchées dans [`po-validation.md`](po-validation.md) |
@@ -16,6 +16,7 @@
 |---|---|---|---|
 | 2026-11-14 | 1.0 | Première version : principes, architecture de l'information, parcours, dispositions iPhone/iPad/Mac, composants, gestes, états, textes, style, animation, accessibilité, questions pour le PO ; réponses aux points délégués par le brief (IC-05, IC-07, IC-08, IC-09) et le PRD (A10). | Sally |
 | 2026-11-14 | 1.1 | Validation PO : propositions de la section 14 retenues ; corrections ciblées de 5.10 (titre, D-12), 5.19 (durée de la démo, D-20), 7.3 (sortie indisponible, D-35 ; changement de périphérique, D-04), 8.3 et 8.5 (réconciliation de la bibliothèque, D-11) ; références vers la spec v2.1. | Sarah (PO) |
+| 2026-11-14 | 1.2 | Alignement sur les choix acceptés en développement (#58, D-52 ; gates QA des PR #49 et #72) : 5.1 et 11.6 (bouton « Importer » de la platine vide, `deck.x.emptyImport`), 5.10 et 11.6 (position lue dans la valeur de l'en-tête combiné, `deck.x.position` retiré), 5.17 (états « Démarrage de la sortie audio… » et « Sortie audio arrêtée »), 9.5 (fond des zones débordant de 6 pt, sans marge interne). | Sally |
 
 ## Sommaire
 
@@ -701,7 +702,7 @@ Split View, Slide Over et Stage Manager suivent la règle de 4.1 : en dessous de
 
 | État | Rendu |
 |---|---|
-| Vide, moteur arrêté | Plateau et feutrine immobiles ; boutons « Importer » et « Charger la démo » centrés ; sur iPad et Mac, « ou déposez un fichier ici » |
+| Vide, moteur arrêté | Plateau et feutrine immobiles ; boutons « Importer » et « Charger la démo » centrés ; sur iPad et Mac, « ou déposez un fichier ici ». Ce bouton « Importer » s'ajoute à celui de l'en-tête (5.10) : même action, même libellé VoiceOver, identifiant distinct `deck.x.emptyImport` (11.6) |
 | Vide, moteur en marche | Plateau et feutrine tournent ; mêmes boutons ; aucun son (PO-01) |
 | Chargement | Vinyle sans étiquette, indicateur d'activité au centre (après 150 ms seulement) |
 | Chargé à l'arrêt | Vinyle, étiquette, repère à 12 h (tête au CUE ou à 0 s) |
@@ -822,7 +823,7 @@ Split View, Slide Over et Stage Manager suivent la règle de 4.1 : en dessous de
 - **Position.** Intervalle [−2 s ; durée] : « −00:01,2 » dans l'amorce (signe moins U+2212), « 03:45,0 » en fin de son. Mise à jour à chaque image, le texte ne change que lorsque le dixième change.
 - **Pastilles d'état.** `Fin du son` (sillon fermé, `text.secondary` sur `bg.raised`) ; `Import de « nom »…` avec indicateur d'activité ; `Chargement…`.
 - **Vide.** Titre « Aucun son » (`text.secondary`), position « --:--,- ».
-- **VoiceOver.** Élément combiné : libellé `Platine A, « voix_funk.wav »`, valeur `position 12,3 secondes sur 3 minutes 45 secondes` (ou `aucun son`). Bouton : `Importer, platine A`.
+- **VoiceOver.** Élément combiné (lettre, titre, position, durée, pastilles) : libellé `Platine A, « voix_funk.wav »`, valeur `position 12,3 secondes sur 3 minutes 45 secondes` (ou `aucun son`), identifiant `deck.x.title`. La position n'est pas un élément distinct : elle se lit dans la valeur de cet élément, et le texte de position n'a pas d'identifiant propre (D-52). Bouton : `Importer, platine A`, hors de l'élément combiné.
 
 ### 5.11 Fader de voie
 
@@ -890,8 +891,11 @@ Split View, Slide Over et Stage Manager suivent la règle de 4.1 : en dessous de
 | USB | « <nom> (USB) » (ex. « MPC Sample (USB) ») | « <nom> (USB) » | `cable.connector` |
 | HDMI, AirPlay | « <nom> (HDMI) », « <nom> (AirPlay) » | Idem | `tv`, `airplayaudio` |
 | Indisponible | « Sortie audio indisponible » | Idem | `speaker.slash` |
+| Démarrage en cours (`.starting`) | « Démarrage de la sortie audio… » | Idem | `speaker.wave.2` |
+| Sortie arrêtée (`.stopped`) | « Sortie audio arrêtée » | Idem | `speaker.slash` |
 
 - **État indisponible.** Fond `danger.deep`, texte `text.primary` (9,2:1), icône `danger` ; en iPhone paysage, le libellé peut passer sur deux lignes (12 pt).
+- **États transitoires.** « Démarrage de la sortie audio… » (l'hôte audio démarre) et « Sortie audio arrêtée » (hôte non démarré ou arrêté, par exemple en arrière-plan ou avant l'intégration de la 6.2) gardent le fond `bg.raised` : seul l'état indisponible (SF-82) prend le fond `danger.deep`. Ce sont les quatre cas de `AudioOutputStatus` (gate QA de la PR #72).
 - **VoiceOver.** « Sortie audio », valeur = libellé ; changement annoncé par le bandeau (5.21).
 
 ### 5.18 Sélecteur de platine (iPhone portrait)
@@ -1276,7 +1280,7 @@ SF Pro (police système) pour les textes ; **SF Mono** (`.monospaced`) pour tous
 - Grille 4 pt ; espacements usuels 4, 8, 12, 16, 20, 24.
 - Rayons : boutons et capsules 8 ; panneaux 12 ; touches de clavier 4 ; badges en capsule.
 - Pas d'ombre portée sur l'écran principal (lisibilité, coût de rendu) ; séparation des zones par `bg.surface` sur `bg.app` et filets `stroke.subtle`.
-- Zones de platine : fond `bg.surface`, rayon 12, marge interne 12 (iPad, Mac) ou 0 (iPhone).
+- Zones de platine et de table (dispositions côte à côte : iPad paysage, Mac, iPhone paysage) : fond `bg.surface`, rayon 12, **sans marge interne** : le contenu occupe toute la largeur de colonne C, ce qui garde P = C − 52 (4.5, 4.6). Le fond **déborde de 6 pt** autour de la colonne, dans les gouttières et les intervalles de 16 pt (2 pt en iPhone paysage, où les intervalles font 8 pt) ; l'écart visible entre deux zones est donc de 4 pt (D-52). iPhone portrait : pas de fond de zone.
 
 ---
 
@@ -1382,7 +1386,7 @@ Le trait d'interaction directe permet de scratcher au doigt sans désactiver Voi
 
 | Élément | `accessibilityIdentifier` |
 |---|---|
-| Commandes de platine | `deck.a.disc`, `deck.a.import`, `deck.a.loadDemo`, `deck.a.title`, `deck.a.position`, `deck.a.overview`, `deck.a.startStop`, `deck.a.speed33`, `deck.a.speed45`, `deck.a.setCue`, `deck.a.cue`, `deck.a.pitch`, `deck.a.pitchReset`, `deck.a.resistance` (idem `deck.b.*`) |
+| Commandes de platine | `deck.a.disc`, `deck.a.import` (en-tête), `deck.a.emptyImport` (bouton « Importer » de la platine vide, 5.1), `deck.a.loadDemo`, `deck.a.title` (en-tête combiné, position comprise, 5.10), `deck.a.overview`, `deck.a.startStop`, `deck.a.speed33`, `deck.a.speed45`, `deck.a.setCue`, `deck.a.cue`, `deck.a.pitch`, `deck.a.pitchReset`, `deck.a.resistance` (idem `deck.b.*`) |
 | Table | `mixer.channelFader.a`, `mixer.channelFader.b`, `mixer.vu.a`, `mixer.vu.b`, `mixer.crossfader`, `mixer.curve`, `mixer.hamster`, `mixer.saturation`, `mixer.settingsButton` (iPhone) |
 | Global | `output.badge`, `deckSelector`, `deckSelector.a`, `deckSelector.b`, `library.open`, `settings.open`, `toast` |
 | Bibliothèque | `library.sheet`, `library.row.demo`, `library.row.<uuid>`, `library.row.<uuid>.loadA`, `library.row.<uuid>.loadB`, `library.done` |

@@ -1,0 +1,52 @@
+schema: 1
+story: "2.1-followup-92"
+story_title: "Sonde de latence en régime appris, réponse au premier échantillon (suivi #92 de la gate 2.1)"
+pr: 105
+issue: 92
+reviewed_sha: "ca09482"
+gate: CONCERNS
+status_reason: >-
+  La sonde mesure le régime appris (second geste après échauffement, départ du repos vérifié), lit la
+  réponse au premier échantillon (rendu par échantillon prouvé identique au bit près), corrige la
+  livraison des touches sur une image et publie les deux valeurs. CONCERNS : la valeur de référence
+  est mesurée dans une seule phase touches/affichage, alignée, qui est le meilleur cas ; en moyenne
+  sur 8 phases, le régime appris vaut 24,74 ms à 120 Hz et 33,28 ms à 60 Hz (avec un tampon, sans
+  périphérique) au lieu de 19,04 et 27,33 ms (#114, avant #91).
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues:
+  - id: "PROBE-PHASE"
+    severity: medium
+    finding: "Gestes commençant sur une image : la moitié des touches à 240 Hz est livrée avec une ancienneté nulle, d'où le retard appris minimal ; valeur publiée = minimum sur la phase (120 Hz : 19,04 ms contre 24,74 ms en moyenne et 28,60 ms au pire)."
+    suggested_action: "Mesurer sur N phases réparties sur une image, publier la moyenne et le maximum ; statistique de référence fixée par le PO avant #91 (#114)."
+checks:
+  - item: "Régime appris"
+    result: "Échauffement de 1,5 s, second geste 2 s plus tard depuis le repos (vérifié) ; 60 Hz plus lent que 120 Hz et que le premier geste (testé)."
+  - item: "Premier échantillon"
+    result: "Rendu par échantillon pendant l'attente ; testSampleBySampleRenderMatchesBufferRender_D54 : sortie identique au bit près, mêmes retards."
+  - item: "Livraison des touches"
+    result: "(t × rate − 1e-9).rounded(.up) : plus de glissement par arrondi ; l'artefact touchait aussi la sonde QA de la gate de #84."
+  - item: "Mesures (sonde QA, protocole de #105)"
+    result: "Phase alignée : 13,71 ms (120 Hz) et 22,00 ms (60 Hz), identique à la PR ; 8 phases : moyenne 19,41 et 27,95 ms, pire 23,27 et 34,79 ms (partie moteur)."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Sans objet."
+  performance:
+    status: CONCERNS
+    notes: "Référence au meilleur cas de phase (#114) ; D-15 dépassé en moyenne."
+  reliability:
+    status: PASS
+    notes: "Repos vérifié avant le second geste ; équivalence du rendu par échantillon prouvée."
+  maintainability:
+    status: PASS
+    notes: "Protocole documenté, deux valeurs publiées, tests d'équivalence."
+evidence:
+  ci: "wait-ci sur ca09482 : Linux ✅, macOS ✅"
+  merge_check: "Sans conflit avec main (45d06ad), #107, #108, #111"
+  phase_probe: "Sonde QA sous Linux, protocole de #105 avec début du geste décalé de k/8 d'image : 120 Hz 13,71 à 23,27 ms (moyenne 19,41) ; 60 Hz 22,00 à 34,79 ms (moyenne 27,95), partie moteur"
+recommendations:
+  immediate:
+    - action: "Fusionner (ferme #92)."
+  future:
+    - action: "#114 avant #91 : moyenne et maximum sur la phase ; statistique de référence de D-54 précisée par le PO."

@@ -1,5 +1,10 @@
 import ScratchCore
 import SwiftUI
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 /// Jetons de style de l'écran principal (UX §9.2 couleurs, §9.3 typographie, §9.5 formes).
 ///
@@ -7,41 +12,42 @@ import SwiftUI
 enum Theme {
     // MARK: Couleurs (UX §9.2)
 
-    static let bgApp = Color(hex: 0x0E0F12)
-    static let bgSurface = Color(hex: 0x17191E)
-    static let bgRaised = Color(hex: 0x22252C)
-    static let bgPressed = Color(hex: 0x2C3038)
-    static let bgInset = Color(hex: 0x0A0B0D)
-    static let strokeSubtle = Color(hex: 0x2E323A)
-    static let strokeStrong = Color(hex: 0x6E7480)
-    static let textPrimary = Color(hex: 0xF2F3F5)
-    static let textSecondary = Color(hex: 0xA8AEB9)
-    static let textDisabled = Color(hex: 0x6B717C)
-    static let textOnAccent = Color(hex: 0x0E0F12)
-    static let cue = Color(hex: 0xFFE14D)
-    static let stateOn = Color(hex: 0x3DD68C)
-    static let danger = Color(hex: 0xFF6369)
-    static let dangerDeep = Color(hex: 0x7A1F24)
-    static let warning = Color(hex: 0xFFB224)
-    static let vuLow = Color(hex: 0x30D158)
-    static let vuMid = Color(hex: 0xFFD60A)
-    static let vuHigh = Color(hex: 0xFF453A)
-    static let vuOff = Color(hex: 0x2A2D33)
-    static let knob = Color(hex: 0xD9DCE1)
-    static let vinyl = Color(hex: 0x111214)
-    static let groove = Color(hex: 0x1C1E22)
-    static let platter = Color(hex: 0x2A2D33)
-    static let strobe = Color(hex: 0x8A909B)
-    static let slipmat = Color(hex: 0x1A1B1F)
+    static let bgApp = Color(hex: Palette.bgApp)
+    static let bgSurface = Color(hex: Palette.bgSurface)
+    static let bgRaised = Color(hex: Palette.bgRaised)
+    static let bgPressed = Color(hex: Palette.bgPressed)
+    static let bgInset = Color(hex: Palette.bgInset)
+    /// Variantes « Augmenter le contraste » : `stroke.subtle`, `stroke.strong`, `text.secondary`.
+    static let strokeSubtle = Color(hex: Palette.strokeSubtle, increasedContrast: Palette.strokeSubtleIncreased)
+    static let strokeStrong = Color(hex: Palette.strokeStrong, increasedContrast: Palette.strokeStrongIncreased)
+    static let textPrimary = Color(hex: Palette.textPrimary)
+    static let textSecondary = Color(hex: Palette.textSecondary, increasedContrast: Palette.textSecondaryIncreased)
+    static let textDisabled = Color(hex: Palette.textDisabled)
+    static let textOnAccent = Color(hex: Palette.textOnAccent)
+    static let cue = Color(hex: Palette.cue)
+    static let stateOn = Color(hex: Palette.stateOn)
+    static let danger = Color(hex: Palette.danger)
+    static let dangerDeep = Color(hex: Palette.dangerDeep)
+    static let warning = Color(hex: Palette.warning)
+    static let vuLow = Color(hex: Palette.vuLow)
+    static let vuMid = Color(hex: Palette.vuMid)
+    static let vuHigh = Color(hex: Palette.vuHigh)
+    static let vuOff = Color(hex: Palette.vuOff)
+    static let knob = Color(hex: Palette.knob)
+    static let vinyl = Color(hex: Palette.vinyl)
+    static let groove = Color(hex: Palette.groove)
+    static let platter = Color(hex: Palette.platter)
+    static let strobe = Color(hex: Palette.strobe)
+    static let slipmat = Color(hex: Palette.slipmat)
 
     /// Couleur de la platine : bleu ciel (A), orange (B). Toujours accompagnée de la lettre.
     static func deckColor(_ deck: DeckID) -> Color {
-        deck == .a ? Color(hex: 0x4FB3F0) : Color(hex: 0xF5A524)
+        deck == .a ? Color(hex: Palette.deckA) : Color(hex: Palette.deckB)
     }
 
     /// Couleur de l'étiquette du disque.
     static func labelColor(_ deck: DeckID) -> Color {
-        deck == .a ? Color(hex: 0x1D6497) : Color(hex: 0x8A5600)
+        deck == .a ? Color(hex: Palette.deckALabel) : Color(hex: Palette.deckBLabel)
     }
 
     // MARK: Typographie (UX §9.3, tailles iPad et Mac)
@@ -72,5 +78,23 @@ extension Color {
             blue: Double(hex & 0xFF) / 255,
             opacity: 1
         )
+    }
+
+    /// Couleur qui passe à `increasedContrast` avec « Augmenter le contraste » (UX §9.2) : couleur
+    /// dynamique du système, résolue à chaque dessin sans que les vues aient à lire l'environnement.
+    init(hex: UInt32, increasedContrast: UInt32) {
+        #if os(macOS)
+        self.init(nsColor: NSColor(name: nil) { appearance in
+            let names: [NSAppearance.Name] = [.accessibilityHighContrastDarkAqua, .accessibilityHighContrastAqua,
+                                              .darkAqua, .aqua]
+            let match = appearance.bestMatch(from: names)
+            let increased = match == .accessibilityHighContrastDarkAqua || match == .accessibilityHighContrastAqua
+            return NSColor(Color(hex: increased ? increasedContrast : hex))
+        })
+        #else
+        self.init(uiColor: UIColor { traits in
+            UIColor(Color(hex: traits.accessibilityContrast == .high ? increasedContrast : hex))
+        })
+        #endif
     }
 }

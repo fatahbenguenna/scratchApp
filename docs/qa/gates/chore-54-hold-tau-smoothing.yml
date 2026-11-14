@@ -1,0 +1,49 @@
+schema: 1
+story: "1.1-followup-54"
+story_title: "Lissage de τ lors d'un saut de résistance pendant la tenue (suivi #54 de la gate 1.1)"
+pr: 93
+issue: 54
+reviewed_sha: "126ff04"
+gate: PASS
+status_reason: >-
+  Le τ appliqué au disque tenu rejoint la valeur visée par une rampe linéaire de 0,12 s/s, calculée
+  par échantillon, sans allocation : la crête d'un saut de 100 % à 0 % passe de 16× à 1,32× le geste
+  (0,81× au minimum dans l'autre sens, sans inversion). Le rapport ne dépend pas de la vitesse du geste
+  (sonde QA). Tests ajoutés : D-48 à 16 × ωref (12,5 τ) et sortie disque tenu indépendante du
+  découpage ; le test SF-23 borne désormais le pas avec le τ réellement appliqué.
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues: []
+checks:
+  - item: "Rampe linéaire à 0,12 s/s"
+    result: "Excès constant v(1 ± 2r) pendant la rampe, profil de crête minimale pour une durée donnée ; borne quasi statique 1,24×, mesure 1,32× ; 275 ms pour toute la plage, 2,75 ms par pas de 1 %."
+  - item: "Mesures (sonde QA, 2,8 et 8 × ωref)"
+    result: "100→0 % : 3,684 (1,316×) ; 100→50 % : 3,615 (1,291×) ; 55→50 % : 2,980 ; 0→100 % : minimum 2,258 (0,806×) ; mêmes rapports à 8 × ωref."
+  - item: "D-48 à 16 × ωref"
+    result: "|ωd| ≤ 1e-3 ωref au plus 12,5 τ à 0, 50 et 100 % ; seuil analytique à 12,3 τ."
+  - item: "Variante disque tenu"
+    result: "Deux changements de résistance pendant la tenue ; sortie identique au bit près pour des blocs de 1, 37, 256 et 512 trames."
+  - item: "Test SF-23 adapté"
+    result: "Borne calculée avec appliedHoldTimeConstant (τ du pas) : dynamique exacte, plus stricte quand la résistance baisse ; continuité inchangée."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Sans objet."
+  performance:
+    status: PASS
+    notes: "Coefficients recalculés pendant la rampe seulement ; test d'allocations vert."
+  reliability:
+    status: PASS
+    notes: "Crête bornée quelle que soit la vitesse du geste ; aucune inversion ; indépendance au découpage."
+  maintainability:
+    status: PASS
+    notes: "Constante documentée et calibrable (D-46)."
+evidence:
+  ci: "Rapport CI 9456184 : Linux ✅, macOS ✅"
+  linux_tests: "scripts/linux-test.sh sur la fusion avec main (f2a9e25) : 237/237"
+  merge_check: "git merge-tree avec origin/main et avec #82, #84, #87, #88, #89 : sans conflit"
+recommendations:
+  immediate:
+    - action: "Fusionner (ferme #54)."
+  future:
+    - action: "Calibrage (D-46) : valider 0,12 s/s sur appareil avec un turntablist."
