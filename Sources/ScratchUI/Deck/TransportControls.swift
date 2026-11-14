@@ -6,8 +6,25 @@ import SwiftUI
 struct TransportControls: View {
     let model: DeckViewModel
     let metrics: MainLayoutMetrics
+    /// Grille 2 × 2 de boutons 136 × 56 (bande de l'iPad portrait, UX §4.4).
+    var grid = false
 
     var body: some View {
+        if grid {
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    StartStopButton(model: model).frame(width: 136, height: 56)
+                    SpeedSelector(model: model, segmentWidth: 68).frame(height: 56)
+                }
+                // Slots reserved for SET CUE and CUE (story 4.5).
+                Color.clear.frame(width: 280, height: 56).accessibilityHidden(true)
+            }
+        } else {
+            row
+        }
+    }
+
+    private var row: some View {
         HStack(spacing: metrics.transportSpacing) {
             StartStopButton(model: model)
                 .frame(width: metrics.startStopWidth, height: metrics.transportHeight)
