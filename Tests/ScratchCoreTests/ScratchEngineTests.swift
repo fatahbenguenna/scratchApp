@@ -278,12 +278,17 @@ final class ScratchEngineTests: XCTestCase {
         engine.send(.motor(.a, on: true))
         engine.send(.motor(.b, on: true))
         render(engine)
+        // One block of motor start-up (5.3 ms of a 0.7 s ramp) moves the head by about 2 µs.
+        let positionAtStop = engine.latestSnapshot()[.a].positionSeconds
+        XCTAssertEqual(positionAtStop, 7, accuracy: 1e-4)
         engine.send(.stopAllMotors)
+        render(engine)
         render(engine)
         let snapshot = engine.latestSnapshot()
         XCTAssertFalse(snapshot[.a].motorOn)
         XCTAssertFalse(snapshot[.b].motorOn)
-        XCTAssertEqual(snapshot[.a].positionSeconds, 7)
+        XCTAssertEqual(snapshot[.a].positionSeconds, positionAtStop, "positions are kept, without ramp")
+        XCTAssertEqual(snapshot[.a].playbackRate, 0)
     }
 
     /// `pump` applique les commandes sans rendre d'audio ni avancer le temps (hôte arrêté, SF-82).
