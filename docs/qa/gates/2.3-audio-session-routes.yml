@@ -1,10 +1,11 @@
 schema: 1
 story: "2.3"
 story_title: "Session audio et routes"
-scope: "Partie 1 (PR #88) : politique pure AudioSystemPolicy et OutputDeviceMonitor (macOS) ; CA 7 et intégration dans l'hôte en partie 2"
-pr: 88
+scope: "Partie 1 (PR #88, PASS) puis partie 2 (PR #113) : branchement dans AudioEngineHost, session iOS, nouvel essai, avis et bandeaux, CA 7"
+pr: 113
+previous_pr: 88
 issue: 26
-reviewed_sha: "01d8c67"
+reviewed_sha: "4b9197e"
 review_history:
   - sha: "07a7d38"
     gate: CONCERNS
@@ -15,9 +16,17 @@ review_history:
   - sha: "01d8c67"
     gate: PASS
     note: "Délai de regroupement injectable, test à 100 ms de marge avec saut mesuré ; CI verte."
-gate: PASS
+  - sha: "4b9197e"
+    gate: CONCERNS
+    note: "Partie 2 (#113) : critères de D-55 tenus et testés ; interruption « app suspendue » (iOS) sans fin prise pour une vraie interruption (#121)."
+gate: CONCERNS
 status_reason: >-
-  Gate partielle (partie 1). Table de politique conforme à l'architecture §7.3, IC-04 et D-04 ; aucune
+  Partie 2 (#113) : la politique est exécutée dans l'ordre par l'hôte (pump seulement quand rien ne rend,
+  horloge de secours arrêtée avant chaque démarrage), nouvel essai de 2 s hors interruption et arrière-plan,
+  avis et bandeaux dans l'AppModel, CA 7 ; critères de D-55 tenus (un seul configurationChanged,
+  deviceInUse à chaque démarrage, veille synchrone, utilitaire unique, ancienne sortie arrêtée, sortie de
+  l'état interrompu par mediaServicesReset et au premier plan). CONCERNS : une interruption « app
+  suspendue » (iOS, sans fin) est prise pour une vraie interruption (#121). Partie 1, conservée ci-dessous. Table de politique conforme à l'architecture §7.3, IC-04 et D-04 ; aucune
   action ne démarre un moteur ; bandeaux de l'UX §8.5. Correctif de #96 (D-55) : isInterrupted et
   isFallbackRendering dans AudioHostContext ; pendant une interruption, STOP appliqué par l'horloge de
   secours (jamais de pump), aucun startOutput, nouvel essai ni avis « indisponible » avant
@@ -26,7 +35,15 @@ status_reason: >-
   CI verte ; fusion possible selon D-55.
 reviewer: Quinn
 updated: "2026-11-14"
-top_issues: []
+top_issues:
+  - id: "IOS-APP-WAS-SUSPENDED"
+    severity: medium
+    finding: "AudioSessionEvents traduit tout début d'interruption en interruptionBegan : un début « appWasSuspended » (ou wasSuspended), envoyé avec retard et sans fin, laisserait l'hôte interrompu et muet après un retour au premier plan."
+    suggested_action: "Ignorer ce début d'interruption (AVAudioSessionInterruptionReasonKey, AVAudioSessionInterruptionWasSuspendedKey), avec un test pur (#121)."
+  - id: "ADR-15-NOTICE-TYPES"
+    severity: low
+    finding: "AudioHostNotice, PostedAudioNotice et AudioNoticePosting sont dans ScratchAudio alors que l'AppModel (Hugo) les utilise (ADR-15 : types partagés dans Contracts/)."
+    suggested_action: "Confirmation de Winston."
 checks:
   - item: "Table de politique (§7.3, IC-04, D-04)"
     result: "Conforme pour chaque ligne ; STOP appliqué (stopOutput, stopAllMotors, pump) avant la nouvelle route ; changement volontaire sur Mac sans STOP, périphérique disparu avec STOP ; suspendu : STOP seulement."
@@ -46,20 +63,20 @@ nfr_validation:
     status: PASS
     notes: "Logique pure ; rafales regroupées."
   reliability:
-    status: PASS
-    notes: "Fil de rendu unique garanti pendant une interruption (#96 corrigé et testé) ; regroupement relancé à chaque notification."
+    status: CONCERNS
+    notes: "Interruption « app suspendue » sans fin (#121) ; fil de rendu unique, nouvel essai et sortie de l'état interrompu tenus et testés."
   maintainability:
     status: PASS
     notes: "Politique pure, sans #if, exhaustive et testée pour les deux plateformes ; moniteur testable par événements simulés."
 evidence:
+  ci_part2: "wait-ci sur 4b9197e : Linux ✅, macOS ✅ (build iOS compris) ; 13 tests AudioEngineHostSystemEventTests et HostNoticeBannerTests"
   ci: "Rapport CI 31f704a (01d8c67) : Linux ✅, macOS ✅ ; 9af2634 : macOS ❌ (test dépendant du minutage), corrigé"
   linux_tests: "scripts/linux-test.sh sur la fusion de 9af2634 avec main (f87e589) : 237/237"
   merge_check: "git merge-tree de 01d8c67 avec origin/main (caa0046), #95, #99 et #100 : sans conflit"
   policy_probe: "Politique rejouée sous Linux, iOS interrompu : routeChanged(true) → stopOutput, stopAllMotors, applyPendingCommands, notify, startOutput"
 recommendations:
   immediate:
-    - action: "Fusionner (D-55) ; #96 close à la fusion, #26 reste ouverte pour la partie 2."
+    - action: "Corriger #121 dans #113 (quelques lignes et un test pur), puis nouvelle relecture du différentiel ; rebaser la seconde de #113 et #117 (conflit dans AudioEngineHost.swift)."
   future:
-    - action: "Partie 2 (critères D-55) : un seul configurationChanged pour les deux sources ; deviceInUse fixé à chaque démarrage avec test d'intégration ; STOP synchrone avant la veille ; ancienne sortie arrêtée avant la nouvelle ; utilitaire unique du périphérique par défaut."
-    - action: "Partie 2 : fin d'interruption non garantie par iOS ; sortir de l'état interrompu au retour au premier plan et après mediaServicesReset, retenter la sortie sans moteur, avec test d'intégration."
-    - action: "Recette (#44) : casque débranché pendant la lecture et pendant un appel, retrait d'une interface USB, veille et réveil."
+    - action: "Winston : confirmer l'emplacement des types d'avis (ADR-15)."
+    - action: "Recette (#44) : appel avec disque tenu ; casque débranché pendant la lecture et pendant un appel ; USB retirée et rebranchée ; changement de sortie sur Mac ; veille et réveil ; démarrage sans sortie puis branchement ; arrière-plan, retour, START (#121)."
