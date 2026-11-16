@@ -211,9 +211,12 @@ struct DeckPhysics {
     }
 
     mutating func touchMoved(angle: Double, time: Double, predicted: Bool) {
-        // D-16, calibrated in story 1.2: predicted touches bring no latency gain without overshoot
-        // at reversals, so the replay ignores them.
-        guard !predicted else { return }
+        // D-16, calibrated in story 1.2: predicted touches are ignored unless lever 3 of #91 is on
+        // (`ReplayLatencyOptions.predictedTouches`, off by default).
+        guard !predicted else {
+            finger.appendPredicted(angle: angle, time: time)
+            return
+        }
         finger.append(angle: angle, time: time)
     }
 

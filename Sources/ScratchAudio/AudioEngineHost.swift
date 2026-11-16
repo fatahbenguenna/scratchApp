@@ -9,10 +9,11 @@ import ScratchCore
 /// Hôte AVAudioEngine du moteur de ScratchApp (SF-01, SF-16, SF-18, SF-78, SF-81, SF-82 ; PRD 2.1,
 /// 2.3 ; architecture §3, §5.1, §7.3 ; ADR-02, ADR-13 ; D-04, D-35).
 ///
-/// - **Sortie matérielle** : `ScratchAudioGraph` à la fréquence matérielle, un tampon préféré de 256
-///   trames, et `send(.outputSampleRate(_))` avant chaque démarrage. L'état
-///   `.running(AudioOutputInfo)` publie le nom de la sortie, la fréquence, le tampon effectif et la
-///   latence annoncée ; il est republié à chaque changement de route ou de périphérique (2.3 CA 7).
+/// - **Sortie matérielle** : `ScratchAudioGraph` à la fréquence matérielle, un tampon préféré de 128
+///   trames, 256 en repli (`OutputBufferPolicy`, #91), et `send(.outputSampleRate(_))` avant chaque
+///   démarrage. L'état `.running(AudioOutputInfo)` publie le nom de la sortie, la fréquence, le
+///   tampon effectif et la latence annoncée ; il est republié à chaque changement de route ou de
+///   périphérique (2.3 CA 7).
 /// - **Sortie indisponible** (SF-82, D-35) : `.unavailable(reason:)`, et l'horloge de secours fait
 ///   tourner le moteur en silence. Disques, plateaux et VU-mètres restent vivants. Nouvel essai toutes
 ///   les 2 s et à chaque changement de route ou de configuration ; aucun moteur ne démarre.
@@ -338,7 +339,10 @@ final class AVAudioEngineOutput: AudioHardwareOutput {
         let device = OutputDevice.defaultOutput()
         self.device = device
         monitor.deviceInUse = nil
-        device?.requestBufferFrameSize(UInt32(TurntableConstants.preferredBufferFrames))
+        if let device {
+            // #91, D-54: 128 frames when the device grants them, 256 otherwise.
+            OutputBufferPolicy.negotiate { frames in device.requestBufferFrameSize(UInt32(frames)).map(Int.init) }
+        }
         #endif
         let hardware = avEngine.outputNode.outputFormat(forBus: 0)
         guard hardware.sampleRate > 0, hardware.channelCount > 0 else { throw AudioOutputError.noOutput }

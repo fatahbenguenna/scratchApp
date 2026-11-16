@@ -142,8 +142,10 @@ final class FingerTrajectoryTests: XCTestCase {
     /// Deux gestes à la vitesse nominale, touches à 240 Hz livrées à chaque image, vues au début de
     /// chaque tampon (protocole de la sonde de latence, #92, #114). Renvoie le retard du rejeu au
     /// second geste : du premier mouvement horodaté jusqu'à l'instant où la tête l'atteint.
-    private func secondGestureReplayDelay(displayRate: Double, phase: Double, blockFrames frames: Int) -> Double? {
-        enum Kind { case begin, move, end }
+    private func secondGestureReplayDelay(displayRate: Double, phase: Double, blockFrames frames: Int,
+                                          options: ReplayLatencyOptions = .standard,
+                                          predictedAhead: Int = 0) -> Double? {
+        enum Kind { case begin, move, predicted, end }
         let touchRate = 240.0
         let starts = [0.1 + phase, 2.1 + phase]
         func delivery(_ time: Double) -> Double { (time * displayRate - 1e-9).rounded(.up) / displayRate }
@@ -154,6 +156,13 @@ final class FingerTrajectoryTests: XCTestCase {
             for step in 1 ... count {
                 let time = start + Double(step) / touchRate
                 events.append((delivery(time), .move, time))
+                let lastOfDelivery = step == count || delivery(start + Double(step + 1) / touchRate) != delivery(time)
+                if lastOfDelivery, predictedAhead > 0 {
+                    // System-like predicted touches after the real ones, at the finger's constant speed.
+                    for ahead in 1 ... predictedAhead {
+                        events.append((delivery(time), .predicted, time + Double(ahead) / touchRate))
+                    }
+                }
             }
             if index == 0 {
                 let end = start + Double(count) / touchRate
@@ -162,7 +171,7 @@ final class FingerTrajectoryTests: XCTestCase {
         }
         let omega = TurntableConstants.referenceAngularVelocity
         let firstMove = starts[1] + 1 / touchRate
-        var trajectory = FingerTrajectory(sampleRate: sampleRate)
+        var trajectory = FingerTrajectory(sampleRate: sampleRate, configuration: .init(options: options))
         var next = 0
         var sample = 0
         var secondBegun = false
@@ -176,6 +185,7 @@ final class FingerTrajectoryTests: XCTestCase {
                     trajectory.begin(angle: 0, time: event.time)
                     secondBegun = event.time == starts[1]
                 case .move: trajectory.append(angle: omega * (event.time - start), time: event.time)
+                case .predicted: trajectory.appendPredicted(angle: omega * (event.time - start), time: event.time)
                 case .end: trajectory.end(time: event.time)
                 }
                 next += 1
@@ -232,6 +242,88 @@ final class FingerTrajectoryTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(whole.clock), 1.2345 + 37 * 256 / sampleRate, accuracy: 1e-12)
         whole.setSampleRate(44_100)
         XCTAssertEqual(try XCTUnwrap(whole.clock), 1.2345 + 37 * 256 / sampleRate, accuracy: 1e-12, "kept across a rate change")
+    }
+
+    /// #91 — leviers 2 et 3, désactivés par défaut : le réglage livré ignore les touches prédites et
+    /// garde la marge de 1,5 ms.
+    func testLatencyLeversAreOffByDefault_91() {
+        XCTAssertEqual(ReplayLatencyOptions.standard, ReplayLatencyOptions(reducedMargin: false, predictedTouches: false))
+        XCTAssertEqual(FingerTrajectory.Configuration(options: .standard), FingerTrajectory.Configuration())
+        XCTAssertEqual(FingerTrajectory.Configuration(options: ReplayLatencyOptions(reducedMargin: true)).targetMargin, 0.0005)
+        XCTAssertTrue(FingerTrajectory.Configuration(options: ReplayLatencyOptions(predictedTouches: true)).usesPredictedTouches)
+        for k in 0 ..< 4 {
+            let phase = (Double(k) + 0.5) / (4 * 120)
+            XCTAssertEqual(secondGestureReplayDelay(displayRate: 120, phase: phase, blockFrames: 128, predictedAhead: 2),
+                           secondGestureReplayDelay(displayRate: 120, phase: phase, blockFrames: 128),
+                           "predicted touches are ignored by default")
+        }
+    }
+
+    /// #91, levier 3 — avec des prédictions exactes (doigt à vitesse constante), le retard du rejeu
+    /// baisse d'environ l'avance des prédictions, sans famine : au moins 3 ms pour une touche d'avance
+    /// (4,2 ms), et au moins 5 ms pour deux (8,3 ms), à 60 et 120 Hz, en moyenne sur 8 phases.
+    func testPredictedTouchesShortenTheReplayDelay_91() throws {
+        for displayRate in [60.0, 120.0] {
+            func mean(_ options: ReplayLatencyOptions, ahead: Int) throws -> Double {
+                var total = 0.0
+                for k in 0 ..< 8 {
+                    let phase = (Double(k) + 0.5) / (8 * displayRate)
+                    total += try XCTUnwrap(secondGestureReplayDelay(displayRate: displayRate, phase: phase, blockFrames: 128,
+                                                                    options: options, predictedAhead: ahead))
+                }
+                return total / 8
+            }
+            let standard = try mean(.standard, ahead: 2)
+            let lever = ReplayLatencyOptions(predictedTouches: true)
+            XCTAssertLessThan(try mean(lever, ahead: 1), standard - 0.003, "\(displayRate) Hz, one touch ahead")
+            XCTAssertLessThan(try mean(lever, ahead: 2), standard - 0.005, "\(displayRate) Hz, two touches ahead")
+        }
+    }
+
+    /// #91, levier 3 — SF-78 : aux inversions d'un va-et-vient, les prédictions naïves du système
+    /// (extrapolation linéaire, deux touches d'avance) dépassent le point de retour ; le rejeu, lui, ne
+    /// le dépasse que d'une fraction négligeable. Va-et-vient de ±1 rad à 2 Hz, touches à 240 Hz,
+    /// affichage à 120 Hz : 8,2 mrad pour les prédictions, 0,23 mrad (0,013°) pour le rejeu.
+    func testPredictedTouchesDoNotOvershootReversals_91() {
+        let amplitude = 1.0
+        let frequency = 2.0
+        let finger = { (time: Double) in amplitude * sin(2 * Double.pi * frequency * (time - 0.1)) }
+        let touchRate = 240.0
+        let displayRate = 120.0
+        func delivery(_ time: Double) -> Double { (time * displayRate - 1e-9).rounded(.up) / displayRate }
+        var trajectory = FingerTrajectory(sampleRate: sampleRate, configuration: .init(options: ReplayLatencyOptions(predictedTouches: true)))
+        let touches = (0 ... Int(1.5 * touchRate)).map { 0.1 + Double($0) / touchRate }
+        var next = 0
+        var naiveOvershoot = 0.0
+        var replayOvershoot = 0.0
+        var sample = 0
+        while Double(sample) / sampleRate < 1.7 {
+            let now = Double(sample) / sampleRate
+            var delivered = false
+            while next < touches.count, delivery(touches[next]) <= now {
+                let time = touches[next]
+                if next == 0 { trajectory.begin(angle: finger(time), time: time) } else { trajectory.append(angle: finger(time), time: time) }
+                next += 1
+                delivered = true
+            }
+            if delivered, next >= 2 {
+                let (t1, t0) = (touches[next - 1], touches[next - 2])
+                let slope = (finger(t1) - finger(t0)) / (t1 - t0)
+                for ahead in 1 ... 2 {
+                    let predicted = finger(t1) + slope * Double(ahead) / touchRate
+                    naiveOvershoot = max(naiveOvershoot, abs(predicted) - amplitude)
+                    trajectory.appendPredicted(angle: predicted, time: t1 + Double(ahead) / touchRate)
+                }
+            }
+            trajectory.prepareBlock()
+            for _ in 0 ..< blockFrames where trajectory.isActive {
+                replayOvershoot = max(replayOvershoot, abs(trajectory.nextTarget()) - amplitude)
+            }
+            trajectory.advanceClock(frameCount: blockFrames)
+            sample += blockFrames
+        }
+        XCTAssertGreaterThan(naiveOvershoot, 0.001, "the naive predictions overshoot the reversals")
+        XCTAssertLessThan(replayOvershoot, 0.1 * naiveOvershoot, "the replay keeps at most a tenth of it")
     }
 
     /// Doigt immobilisé : la cible converge exactement vers l'angle final et la vitesse devient

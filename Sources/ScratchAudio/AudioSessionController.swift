@@ -7,7 +7,7 @@ import ScratchCore
 ///
 /// Story 2.1 :
 /// - catégorie `.playback`, sans mélange avec les autres apps ;
-/// - fréquence préférée de 48 kHz et tampon préféré de 256 trames (≈ 5,3 ms) ;
+/// - fréquence préférée de 48 kHz et tampon préféré de 128 trames (≈ 2,7 ms), 256 en repli (#91) ;
 /// - activation au démarrage de l'hôte ;
 /// - nom de la route de sortie (UX §5.17) et valeurs obtenues (tampon, fréquence, latence).
 ///
@@ -70,13 +70,18 @@ public final class AudioSessionController {
         if let event { onEvent?(event) }
     }
 
-    /// Configure et active la session : lecture, non mixable, 48 kHz et 256 trames préférés.
+    /// Configure et active la session : lecture, non mixable, 48 kHz et 128 trames préférés, 256 en
+    /// repli (`OutputBufferPolicy`, #91). Le tampon accordé n'est connu qu'une fois la session active.
     public func activate() throws {
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.playback, mode: .default, options: [])
         try? session.setPreferredSampleRate(48_000)
-        try? session.setPreferredIOBufferDuration(Double(TurntableConstants.preferredBufferFrames) / 48_000)
+        try? session.setPreferredIOBufferDuration(Double(OutputBufferPolicy.preferredFrames) / 48_000)
         try session.setActive(true)
+        OutputBufferPolicy.negotiate { [self] frames in
+            guard (try? session.setPreferredIOBufferDuration(Double(frames) / 48_000)) != nil else { return nil }
+            return bufferFrames
+        }
     }
 
     /// Désactive la session (passage en arrière-plan).
