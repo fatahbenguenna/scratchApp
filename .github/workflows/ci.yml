@@ -66,12 +66,12 @@ jobs:
           set -o pipefail
           mkdir -p ci-output
           swift test --parallel 2>&1 | tee ci-output/macos-swift-test.log
-      - name: Mesures en release (allocations, charge NFR2 et NFR3, analyse NFR4, décodage de 10 min 2.2 CA 7)
+      - name: Mesures en release (allocations, charge NFR2 et NFR3, analyse et mémoire NFR4, décodage de 10 min 2.2 CA 7)
         run: |
           set -o pipefail
           mkdir -p ci-output
           swift test -c release -Xswiftc -enable-testing \
-            --filter 'RenderLoadTests|RealTimeAllocationTests|WaveformTests/testAnalysisTime_NFR4|testTenMinute' 2>&1 \
+            --filter 'RenderLoadTests|RealTimeAllocationTests|WaveformTests/testAnalysisTime_NFR4|testTenMinute|MemoryFootprintTests' 2>&1 \
             | tee ci-output/macos-release-tests.log
       - name: Générer le projet Xcode
         run: |
@@ -116,6 +116,9 @@ jobs:
           sleep 6
           pgrep -x ScratchApp > /dev/null && echo "ScratchApp est en cours d'exécution" | tee ci-output/launch.txt
           pgrep -x ScratchApp > /dev/null
+          # Recette 6.3 CA 4 tool, checked on the demo scene (two 8 s clips, debug build).
+          set -o pipefail
+          scripts/measure-memory.sh --once 2>&1 | tee ci-output/app-footprint.log
           pkill -x ScratchApp || true
       - name: Publier la capture sur la branche ci-shots
         if: always()
