@@ -61,14 +61,15 @@
 |---|---|---|
 | 256 trames | 25,6 ms | 34,2 ms |
 | 128 trames, avant le correctif de #123 | 18,8 ms | 30,3 ms |
-| 128 trames, après le correctif de #123 (annoncé par James) | 17,0 ms | 25,0 ms |
+| 128 trames, après #125 (vérifié par la QA) | 17,0 ms (max 18,7 ms) | 25,0 ms (max 26,5 ms) |
 
+- **Dérive des horloges (#129)** : pour chaque sortie, relever la dérive entre l'horloge audio et l'horloge système, soit `kAudioDevicePropertyActualSampleRate` comparée à la fréquence nominale, soit l'écart entre `mSampleTime` et `mHostTime` sur quelques minutes. La sonde ne simule aucune dérive. Si la dérive dépasse environ 20 ppm, faire une pause de 2 min puis un scratch, et vérifier la latence et l'absence de trou de vitesse au début du geste.
 - **Facultatif** : mesure acoustique (micro sur le clic du trackpad et sur la sortie).
 
-| Sortie | Tampon demandé → effectif | Fréquence | Latence annoncée | Moyenne 120 Hz | Max 120 Hz | Moyenne 60 Hz | Max 60 Hz | Résultat |
-|---|---|---|---|---|---|---|---|---|
-| Intégrée (Mac de recette) | | | | | | | | ⏳ |
-| Interface USB | | | | | | | | ⏳ |
+| Sortie | Tampon demandé → effectif | Fréquence | Dérive (ppm) | Latence annoncée | Moyenne 120 Hz | Max 120 Hz | Moyenne 60 Hz | Max 60 Hz | Résultat |
+|---|---|---|---|---|---|---|---|---|---|
+| Intégrée (Mac de recette) | | | | | | | | | ⏳ |
+| Interface USB | | | | | | | | | ⏳ |
 
 ### 3.2 Mémoire et décodage (CA 4 ; NFR4, D-21, D-53)
 
