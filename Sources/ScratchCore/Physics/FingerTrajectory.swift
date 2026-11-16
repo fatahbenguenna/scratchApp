@@ -72,8 +72,11 @@ struct FingerTrajectory {
     /// Position de rejeu, sur l'horloge de l'appelant.
     private(set) var playhead: Double = 0
     /// Estimation de l'horloge de l'appelant au début du prochain bloc (`nil` avant le premier
-    /// événement). Elle ne dépasse jamais l'horloge réelle, à la dérive près.
-    private(set) var clock: Double?
+    /// événement). Elle ne dépasse jamais l'horloge réelle, à la dérive près. Elle est comptée en
+    /// échantillons entiers depuis son dernier recalage : le rendu ne dépend pas du découpage en blocs.
+    var clock: Double? { clockAnchor.map { $0 + Double(clockSamples) * samplePeriod } }
+    private var clockAnchor: Double?
+    private var clockSamples: Int64 = 0
     /// Retard appris entre l'horloge de l'appelant (estimée) et la tête de rejeu : la latence ajoutée.
     private(set) var delay: Double
     private var rate: Double = 1
@@ -98,6 +101,7 @@ struct FingerTrajectory {
 
     mutating func setSampleRate(_ sampleRate: Double) {
         guard sampleRate.isFinite, sampleRate > 0 else { return }
+        recalibrateClock(to: clock)
         samplePeriod = 1 / sampleRate
     }
 
@@ -152,16 +156,21 @@ struct FingerTrajectory {
     /// (dérive entre les horloges).
     private mutating func synchronizeClock(with time: Double) {
         guard let now = clock else {
-            clock = time
+            recalibrateClock(to: time)
             return
         }
-        clock = max(time, now - Self.clockDriftStep)
+        recalibrateClock(to: max(time, now - Self.clockDriftStep))
+    }
+
+    private mutating func recalibrateClock(to value: Double?) {
+        clockAnchor = value
+        clockSamples = 0
     }
 
     /// Avance l'estimation de l'horloge de `frameCount` échantillons. À appeler à la fin de chaque bloc,
     /// qu'un geste soit en cours ou non.
     mutating func advanceClock(frameCount: Int) {
-        if let now = clock { clock = now + Double(frameCount) * samplePeriod }
+        if clockAnchor != nil { clockSamples += Int64(max(0, frameCount)) }
     }
 
     /// Fin du geste : le relâchement prendra effet quand le rejeu atteindra `time`.

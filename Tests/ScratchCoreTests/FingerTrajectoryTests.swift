@@ -215,6 +215,25 @@ final class FingerTrajectoryTests: XCTestCase {
         }
     }
 
+    /// #123 — l'horloge estimée est comptée en échantillons entiers : la même durée rendue en un bloc ou
+    /// échantillon par échantillon donne exactement la même horloge, donc le même rendu (D-54 : la
+    /// sonde rend échantillon par échantillon pendant l'attente d'une réponse).
+    func testClockDoesNotDependOnBlockSplitting_123() throws {
+        var whole = FingerTrajectory(sampleRate: sampleRate)
+        var split = FingerTrajectory(sampleRate: sampleRate)
+        XCTAssertNil(whole.clock)
+        whole.begin(angle: 0, time: 1.2345)
+        split.begin(angle: 0, time: 1.2345)
+        for _ in 0 ..< 37 {
+            whole.advanceClock(frameCount: 256)
+            for _ in 0 ..< 256 { split.advanceClock(frameCount: 1) }
+        }
+        XCTAssertEqual(whole.clock?.bitPattern, split.clock?.bitPattern)
+        XCTAssertEqual(try XCTUnwrap(whole.clock), 1.2345 + 37 * 256 / sampleRate, accuracy: 1e-12)
+        whole.setSampleRate(44_100)
+        XCTAssertEqual(try XCTUnwrap(whole.clock), 1.2345 + 37 * 256 / sampleRate, accuracy: 1e-12, "kept across a rate change")
+    }
+
     /// Doigt immobilisé : la cible converge exactement vers l'angle final et la vitesse devient
     /// nulle (RM-12 : un doigt fixe immobilise le disque).
     func testFingerStopConvergesToFinalAngleWithZeroVelocity_RM12() {
