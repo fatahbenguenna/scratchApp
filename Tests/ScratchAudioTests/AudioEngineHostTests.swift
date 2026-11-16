@@ -219,19 +219,56 @@ final class AudioEngineHostTests: XCTestCase {
         XCTAssertGreaterThan(left.reduce(Float(0)) { max($0, abs($1)) }, 0.1, "the scenario is audible")
     }
 
-    /// CA 11 — D-15 : la sonde mesure la latence geste→son par le graphe en rendu manuel. Sa partie
-    /// moteur est la même qu'en rendu direct (CA 10). Valeur de référence sous Linux, en rendu
-    /// direct : 18,5 ms à 48 kHz et 256 trames (affichage à 120 Hz), soit 23,8 ms sans la latence du
-    /// périphérique.
+    /// CA 11 — D-15, D-54, #92 : la sonde publie le premier geste et le régime appris (second geste,
+    /// après un geste d'échauffement), avec la réponse au premier échantillon qui franchit le seuil
+    /// et la latence de sortie annoncée. Le graphe en rendu manuel et le rendu direct donnent les
+    /// mêmes valeurs. Le régime appris suit la cadence d'affichage : plus lent à 60 Hz qu'à 120 Hz.
+    /// Valeurs de référence sous Linux, en rendu direct, à 48 kHz et 256 trames, sans la latence du
+    /// périphérique (partie moteur, puis avec un tampon) :
+    /// - 120 Hz : premier geste 15,2 ms (20,5 ms), régime appris 13,7 ms (19,0 ms) ;
+    /// - 60 Hz : premier geste 17,2 ms (22,5 ms), régime appris 22,0 ms (27,3 ms).
     func testGestureLatencyProbe_D15() throws {
         let measurement = try GestureLatencyProbe.measure(sampleRate: 48_000, bufferFrames: 256, displayRate: 120,
                                                           outputLatency: 0.004)
         XCTAssertEqual(measurement.bufferDuration, 256.0 / 48_000, accuracy: 1e-12)
         XCTAssertEqual(measurement.outputLatency, 0.004)
         XCTAssertEqual(measurement.total, measurement.engineDelay + measurement.bufferDuration + 0.004, accuracy: 1e-12)
-        XCTAssertGreaterThan(measurement.engineDelay, 0.005)
-        XCTAssertLessThan(measurement.engineDelay, 0.06)
+        XCTAssertEqual(measurement.firstGestureTotal,
+                       measurement.firstGestureEngineDelay + measurement.bufferDuration + 0.004, accuracy: 1e-12)
+        for delay in [measurement.engineDelay, measurement.firstGestureEngineDelay] {
+            XCTAssertGreaterThan(delay, 0.005)
+            XCTAssertLessThan(delay, 0.06)
+        }
 
+        let direct = try XCTUnwrap(Self.directEngineDelays(displayRate: 120, splitting: false).delays)
+        XCTAssertEqual(measurement.engineDelay, direct.learned, accuracy: 1e-12)
+        XCTAssertEqual(measurement.firstGestureEngineDelay, direct.firstGesture, accuracy: 1e-12)
+
+        let slow = try GestureLatencyProbe.measure(sampleRate: 48_000, bufferFrames: 256, displayRate: 60)
+        XCTAssertGreaterThan(slow.engineDelay, measurement.engineDelay + 0.004, "learned regime: 60 Hz is slower than 120 Hz")
+        XCTAssertGreaterThan(slow.engineDelay, slow.firstGestureEngineDelay, "60 Hz: the learned delay exceeds the initial 14 ms")
+
+        let hostMeasurement = try AudioEngineHost(engine: ScratchEngine()).measureGestureLatency()
+        XCTAssertEqual(hostMeasurement.engineDelay, measurement.engineDelay, accuracy: 1e-12, "48 kHz, 256 frames without output")
+        XCTAssertEqual(hostMeasurement.firstGestureEngineDelay, measurement.firstGestureEngineDelay, accuracy: 1e-12)
+    }
+
+    /// D-54 : la réponse est lue échantillon par échantillon. C'est valable parce que le moteur rend
+    /// exactement la même chose en un appel ou échantillon par échantillon quand aucune commande
+    /// n'arrive au milieu d'un tampon : mêmes échantillons, mêmes retards.
+    func testSampleBySampleRenderMatchesBufferRender_D54() throws {
+        let whole = Self.directEngineDelays(displayRate: 120, splitting: false)
+        let split = Self.directEngineDelays(displayRate: 120, splitting: true)
+        XCTAssertNotNil(whole.delays)
+        XCTAssertEqual(whole.delays, split.delays)
+        XCTAssertEqual(whole.output.count, split.output.count)
+        XCTAssertTrue(whole.output.elementsEqual(split.output), "bit-exact output")
+        XCTAssertGreaterThan(whole.output.map(abs).max() ?? 0, 0.1, "the gestures are audible")
+    }
+
+    /// Sonde en rendu direct du moteur ; `splitting` rend chaque demande échantillon par échantillon.
+    private static func directEngineDelays(displayRate: Double,
+                                           splitting: Bool) -> (delays: GestureLatencyProbe.EngineDelays?, output: [Float]) {
         let engine = ScratchEngine()
         let left = UnsafeMutablePointer<Float>.allocate(capacity: 256)
         let right = UnsafeMutablePointer<Float>.allocate(capacity: 256)
@@ -239,12 +276,16 @@ final class AudioEngineHostTests: XCTestCase {
             left.deallocate()
             right.deallocate()
         }
-        let direct = GestureLatencyProbe.engineDelay(engine: engine, sampleRate: 48_000, bufferFrames: 256, displayRate: 120) {
-            engine.render(frameCount: 256, left: left, right: right)
+        var output: [Float] = []
+        let delays = GestureLatencyProbe.engineDelays(engine: engine, sampleRate: 48_000, bufferFrames: 256,
+                                                      displayRate: displayRate) { count in
+            if splitting {
+                for offset in 0 ..< count { engine.render(frameCount: 1, left: left + offset, right: right + offset) }
+            } else {
+                engine.render(frameCount: count, left: left, right: right)
+            }
+            output.append(contentsOf: UnsafeBufferPointer(start: left, count: count))
         }
-        XCTAssertEqual(measurement.engineDelay, try XCTUnwrap(direct), accuracy: 1e-12)
-
-        let hostMeasurement = try AudioEngineHost(engine: ScratchEngine()).measureGestureLatency()
-        XCTAssertEqual(hostMeasurement.engineDelay, measurement.engineDelay, accuracy: 1e-12, "48 kHz, 256 frames without output")
+        return (delays, output)
     }
 }

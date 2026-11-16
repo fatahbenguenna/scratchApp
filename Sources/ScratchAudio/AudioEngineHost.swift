@@ -81,6 +81,8 @@ public final class AudioEngineHost: AudioOutputHosting {
     /// Mesure de diagnostic de la latence geste→son (D-15, story 2.1 CA 11) à la fréquence et au
     /// tampon de la sortie courante (48 kHz et 256 trames sans sortie). La partie moteur est mesurée
     /// hors ligne par le graphe en rendu manuel ; la latence de sortie annoncée y est ajoutée.
+    /// `total` est la mesure de référence de D-54 (régime appris, second geste) ; le premier geste
+    /// est publié à côté (`firstGestureTotal`).
     public func measureGestureLatency(displayRate: Double = 120) throws -> GestureLatencyProbe.Measurement {
         let info = status.outputInfo
         return try GestureLatencyProbe.measure(sampleRate: info?.sampleRate ?? 48_000,
