@@ -39,8 +39,14 @@ public final class AudioSessionController {
         observers = [
             center.addObserver(forName: AVAudioSession.interruptionNotification, object: session,
                                queue: .main) { [weak self] notification in
-                let type = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
-                MainActor.assumeIsolated { self?.forward(AudioSessionEvents.event(interruptionType: type)) }
+                let info = notification.userInfo
+                let type = info?[AVAudioSessionInterruptionTypeKey] as? UInt
+                let reason = info?[AVAudioSessionInterruptionReasonKey] as? UInt
+                let wasSuspended = info?[AudioSessionEvents.wasSuspendedKey] as? Bool
+                MainActor.assumeIsolated {
+                    self?.forward(AudioSessionEvents.event(interruptionType: type, reason: reason,
+                                                           wasSuspended: wasSuspended))
+                }
             },
             center.addObserver(forName: AVAudioSession.routeChangeNotification, object: session,
                                queue: .main) { [weak self] notification in

@@ -299,6 +299,21 @@ final class AudioEngineHostSystemEventTests: XCTestCase {
         XCTAssertEqual(AudioSessionEvents.event(routeChangeReason: nil), .routeChanged(previousDeviceUnavailable: false))
     }
 
+    /// #121 — un début d'interruption « app suspendue » (motif `appWasSuspended` ou `wasSuspended`), envoyé
+    /// avec retard et sans fin, est ignoré ; un vrai début d'interruption ne l'est pas.
+    func testAppWasSuspendedInterruptionIsIgnored_121() {
+        XCTAssertNil(AudioSessionEvents.event(interruptionType: 1, reason: 1), "reason appWasSuspended (iOS 14.5+)")
+        XCTAssertNil(AudioSessionEvents.event(interruptionType: 1, wasSuspended: true), "wasSuspended key (before iOS 14.5)")
+        XCTAssertNil(AudioSessionEvents.event(interruptionType: 1, reason: 0, wasSuspended: true))
+        XCTAssertEqual(AudioSessionEvents.event(interruptionType: 1, reason: 0, wasSuspended: false), .interruptionBegan,
+                       "a real interruption (call, alarm)")
+        XCTAssertEqual(AudioSessionEvents.event(interruptionType: 1, reason: 2), .interruptionBegan, "built-in mic muted")
+        XCTAssertEqual(AudioSessionEvents.event(interruptionType: 1), .interruptionBegan, "no reason")
+        XCTAssertEqual(AudioSessionEvents.event(interruptionType: 0, reason: 1), .interruptionEnded)
+        XCTAssertEqual(AudioSessionEvents.appWasSuspended, 1)
+        XCTAssertEqual(AudioSessionEvents.wasSuspendedKey, "AVAudioSessionInterruptionWasSuspendedKey")
+    }
+
     // MARK: - T3 (macOS, sortie réelle)
 
     #if os(macOS)
