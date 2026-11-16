@@ -32,7 +32,9 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p ci-output
-          scripts/check-no-network.sh 2>&1 | tee ci-output/no-network.log
+          # Self-test first: every forbidden pattern planted in a copy must be caught (#103).
+          scripts/check-no-network.sh --self-test 2>&1 | tee ci-output/no-network.log
+          scripts/check-no-network.sh 2>&1 | tee -a ci-output/no-network.log
       - name: swift build & test
         run: |
           set -o pipefail
@@ -64,11 +66,12 @@ jobs:
           set -o pipefail
           mkdir -p ci-output
           swift test --parallel 2>&1 | tee ci-output/macos-swift-test.log
-      - name: Mesures temps réel en release (allocations, charge NFR2 et NFR3)
+      - name: Mesures en release (allocations, charge NFR2 et NFR3, analyse NFR4, décodage de 10 min 2.2 CA 7)
         run: |
           set -o pipefail
           mkdir -p ci-output
-          swift test -c release -Xswiftc -enable-testing --filter 'RenderLoadTests|RealTimeAllocationTests' 2>&1 \
+          swift test -c release -Xswiftc -enable-testing \
+            --filter 'RenderLoadTests|RealTimeAllocationTests|WaveformTests/testAnalysisTime_NFR4|testTenMinute' 2>&1 \
             | tee ci-output/macos-release-tests.log
       - name: Générer le projet Xcode
         run: |
@@ -185,7 +188,12 @@ jobs:
             const metrics = 'artifacts/macos-logs/render-metrics.log';
             if (fs.existsSync(metrics)) {
               const lines = fs.readFileSync(metrics, 'utf8').split('\n').filter(l => l.trim()).slice(0, 12);
-              body += `**Mesures temps réel (macOS, NFR2 et NFR3)**\n\n${lines.map(l => '- ' + l).join('\n')}\n\n`;
+              body += `**Mesures temps réel (macOS, NFR2, NFR3 et NFR4)**\n\n${lines.map(l => '- ' + l).join('\n')}\n\n`;
+            }
+            const decoding = 'artifacts/macos-logs/decode-metrics.log';
+            if (fs.existsSync(decoding)) {
+              const lines = fs.readFileSync(decoding, 'utf8').split('\n').filter(l => l.trim()).slice(0, 12);
+              body += `**Décodage (macOS, story 2.2 CA 7 : 3 s au plus en release)**\n\n${lines.map(l => '- ' + l).join('\n')}\n\n`;
             }
             const tail = 'artifacts/macos-report/report-tail.md';
             if (fs.existsSync(tail)) {

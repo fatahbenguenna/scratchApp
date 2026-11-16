@@ -130,9 +130,29 @@ final class WaveformTests: XCTestCase {
         let long = clip(duration: 600, sampleRate: 48_000) { Float(sin($0 * 40)) }
         let start = Date()
         let peaks = analyze(long)
+        let elapsed = Date().timeIntervalSince(start)
         XCTAssertNotNil(peaks)
-        XCTAssertLessThan(Date().timeIntervalSince(start), 1)
+        XCTAssertLessThan(elapsed, 1)
+        Self.logMetric(String(format: "NFR4 — forme d'onde : 10 min à 48 kHz analysées en %.3f s, %.2f Mo de pics "
+                              + "(build release)", elapsed, Double(peaks?.byteCount ?? 0) / 1_000_000))
         #endif
+    }
+
+    /// Mesure affichée par le rapport de la PR : sortie standard et `ci-output/render-metrics.log`
+    /// quand ce dossier existe (étape release de la CI, #102).
+    private static func logMetric(_ line: String) {
+        print(line)
+        let directory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("ci-output")
+        let file = directory.appendingPathComponent("render-metrics.log")
+        guard FileManager.default.fileExists(atPath: directory.path) else { return }
+        let data = Data((line + "\n").utf8)
+        if let handle = try? FileHandle(forWritingTo: file) {
+            handle.seekToEndOfFile()
+            handle.write(data)
+            try? handle.close()
+        } else {
+            try? data.write(to: file)
+        }
     }
 
     private struct AnalysisTimeout: Error {}

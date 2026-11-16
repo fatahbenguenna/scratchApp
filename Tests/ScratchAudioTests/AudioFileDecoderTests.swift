@@ -345,6 +345,39 @@ final class AudioFileDecoderTests: XCTestCase {
         XCTAssertEqual(clip.frameCount, 26_460_000)
         XCTAssertEqual(clip.left[clip.frameCount - 11], clip.right[clip.frameCount - 11])
         XCTAssertLessThan(elapsed, 15, "indicative bound in debug; target 3 s in release")
-        print("AudioFileDecoderTests: 10 min WAV decoded in \(elapsed) s")
+        DecodeMetricsLog.write(String(format: "2.2 CA 7 — WAV de 10 min (44,1 kHz, stéréo, 16 bits) décodé en %.2f s (build %@)",
+                                      elapsed, DecodeMetricsLog.configuration))
+    }
+
+    /// CA 7 — #61 : un vrai MP3 de 10 min, construit sans encodeur à partir de la fixture (méthode de
+    /// la QA) : ses 40 trames audio de 32 kbit/s en mono, sans la trame `Info`, répétées 574 fois
+    /// (599,8 s, sous la limite de SF-80). AudioToolbox le décode ; l'objectif est de 3 s en release
+    /// sur Mac Apple Silicon, et la borne de la CI est de 6 s. La durée figure dans le rapport CI.
+    func testTenMinuteMP3DecodeTime() async throws {
+        let frames = MP3Fixture.frames(of: MP3Fixture.data)
+        XCTAssertEqual(frames.count, 41, "Info frame, then 40 audio frames")
+        XCTAssertEqual(frames.map(\.count).reduce(0, +), MP3Fixture.data.count, "the whole fixture is parsed")
+        XCTAssertTrue(MP3Fixture.isInfoFrame(frames[0]))
+        XCTAssertFalse(frames.dropFirst().contains(where: MP3Fixture.isInfoFrame))
+
+        let file = url("ten-minutes.mp3")
+        try MP3Fixture.tenMinutes().write(to: file)
+        let expected = Double(MP3Fixture.tenMinuteRepetitions * 40 * MP3Fixture.samplesPerFrame) / MP3Fixture.sampleRate
+        let info = try await decoder.probe(url: file)
+        XCTAssertEqual(info.duration, expected, accuracy: 0.5)
+        XCTAssertLessThanOrEqual(info.duration, 600, "SF-80")
+
+        let start = Date()
+        let clip = try await decoder.decode(url: file, title: "dix minutes")
+        let elapsed = Date().timeIntervalSince(start)
+        XCTAssertEqual(clip.sampleRate, MP3Fixture.sampleRate)
+        XCTAssertEqual(Double(clip.frameCount) / clip.sampleRate, expected, accuracy: 0.5)
+        let middle = clip.frameCount / 2
+        XCTAssertEqual(clip.left[middle], clip.right[middle], "mono on both channels")
+        let peak = (middle ..< middle + 4_410).map { abs(clip.left[$0]) }.max() ?? 0
+        XCTAssertGreaterThan(peak, 0.3, "the sine is decoded all the way through")
+        XCTAssertLessThan(elapsed, 6, "CI bound; target 3 s in release (CA 7)")
+        DecodeMetricsLog.write(String(format: "2.2 CA 7 — MP3 de 10 min (%.1f s, 32 kbit/s, mono) décodé en %.2f s (build %@)",
+                                      Double(clip.frameCount) / clip.sampleRate, elapsed, DecodeMetricsLog.configuration))
     }
 }

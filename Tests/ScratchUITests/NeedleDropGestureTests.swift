@@ -89,6 +89,18 @@ final class NeedleDropGestureTests: XCTestCase {
         XCTAssertTrue(engine.sentCommands.isEmpty)
     }
 
+    // #102 — geste annulé par le système (rotation, appel…) : la vue appelle `reset()`, la tête
+    // fantôme et la bulle disparaissent, et rien n'est placé.
+    func testSystemCancellationHidesTheGhost_102() async {
+        var gesture = NeedleDropGesture()
+        gesture.begin(x: 128, y: 30, zoneHeight: zone, isHeld: false)
+        XCTAssertEqual(gesture.ghostX, 128)
+        gesture.reset()
+        XCTAssertFalse(gesture.isActive, "hover is shown again on Mac")
+        XCTAssertNil(gesture.ghostX, "no ghost playhead nor time bubble")
+        XCTAssertNil(gesture.end(x: 128, y: 30, zoneHeight: zone, isHeld: false), "a late end places nothing")
+    }
+
     // AC6 — SF-83 : « Aperçu du son, platine A », valeur parlée, ajustable par ±5 % de la durée.
     func testOverviewAccessibilityValue_SF83() async {
         let deck = loadedDeck(duration: 225, position: 12.34, cue: 4)
