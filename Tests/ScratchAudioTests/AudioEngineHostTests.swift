@@ -271,7 +271,7 @@ final class AudioEngineHostTests: XCTestCase {
         XCTAssertEqual(report.output.name, "Haut-parleurs MacBook Pro")
         XCTAssertTrue(report.output.available)
         XCTAssertEqual(report.output.sampleRate, 48_000)
-        XCTAssertEqual(report.output.requestedBufferFrames, 256)
+        XCTAssertEqual(report.output.requestedBufferFrames, 128, "#91: 128 frames requested, 256 as fallback")
         XCTAssertEqual(report.output.effectiveBufferFrames, 512)
         XCTAssertEqual(report.output.outputLatencyMilliseconds, 6, accuracy: 1e-9)
         XCTAssertEqual(report.output.actualSampleRate, 47_998.8)
@@ -303,7 +303,7 @@ final class AudioEngineHostTests: XCTestCase {
         unavailable.start()
         let fallback = try unavailable.latencyReport(displayRates: [120], phases: 1)
         XCTAssertEqual(fallback.output, LatencyReport.Output(name: nil, available: false, sampleRate: 48_000,
-                                                             requestedBufferFrames: 256, effectiveBufferFrames: 256,
+                                                             requestedBufferFrames: 128, effectiveBufferFrames: 256,
                                                              outputLatencyMilliseconds: 0, actualSampleRate: nil,
                                                              driftPartsPerMillion: nil))
         unavailable.stop()

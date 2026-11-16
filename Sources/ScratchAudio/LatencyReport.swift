@@ -4,9 +4,9 @@ import ScratchCore
 /// Rapport de latence geste→son de la recette (6.3 CA 3 ; SF-78, D-14, D-15, D-54, D-56), produit
 /// par `ScratchApp --latency-report` au format JSON.
 ///
-/// - **Sortie réelle** : nom, fréquence, tampon demandé et tampon effectif, latence de sortie annoncée,
-///   fréquence réelle mesurée par le système et dérive en ppm (#129 ; macOS seulement). Sans sortie,
-///   « indisponible », avec la mesure à 48 kHz et 256 trames.
+/// - **Sortie réelle** : nom, fréquence, tampon demandé (128 trames, 256 en repli : #91) et tampon
+///   effectif, latence de sortie annoncée, fréquence réelle mesurée par le système et dérive en ppm
+///   (#129 ; macOS seulement). Sans sortie, « indisponible », avec la mesure à 48 kHz et 256 trames.
 /// - **Mesure par cadence d'affichage** (120 Hz, puis 60 Hz) : régime appris sur 8 phases
 ///   touches/affichage. La **moyenne**, tampon et latence de sortie annoncée compris, est la
 ///   référence de D-56 et se compare à l'objectif de D-15 (20 ms au plus à 120 Hz, 30 ms au plus à
@@ -74,9 +74,11 @@ public struct LatencyReport: Codable, Equatable, Sendable {
     /// - Parameters:
     ///   - status: état de la sortie pendant la mesure.
     ///   - requestedBufferFrames: tampon demandé au système.
+    ///   - unavailableBufferFrames: tampon de la mesure sans sortie (horloge de secours).
     ///   - actualSampleRate: fréquence réelle mesurée par le système, si elle est connue.
     ///   - measurements: mesure de la sonde pour chaque cadence d'affichage, dans l'ordre.
-    public init(status: AudioOutputStatus, requestedBufferFrames: Int, actualSampleRate: Double? = nil,
+    public init(status: AudioOutputStatus, requestedBufferFrames: Int,
+                unavailableBufferFrames: Int = TurntableConstants.preferredBufferFrames, actualSampleRate: Double? = nil,
                 measurements: [(displayRate: Double, measurement: GestureLatencyProbe.Measurement)]) {
         let info = status.outputInfo
         let actual = info == nil ? nil : actualSampleRate
@@ -84,7 +86,7 @@ public struct LatencyReport: Codable, Equatable, Sendable {
         if let actual, let nominal = info?.sampleRate { drift = Self.drift(actual: actual, nominal: nominal) }
         output = Output(name: info?.name, available: info != nil, sampleRate: info?.sampleRate ?? 48_000,
                         requestedBufferFrames: requestedBufferFrames,
-                        effectiveBufferFrames: info?.bufferFrames ?? requestedBufferFrames,
+                        effectiveBufferFrames: info?.bufferFrames ?? unavailableBufferFrames,
                         outputLatencyMilliseconds: (info?.outputLatency ?? 0) * 1_000,
                         actualSampleRate: actual,
                         driftPartsPerMillion: drift)

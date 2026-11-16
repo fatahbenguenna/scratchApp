@@ -137,7 +137,8 @@ public final class AudioEngineHost: AudioOutputHosting, AudioNoticePosting {
         let measurements = try displayRates.map { rate in
             (displayRate: rate, measurement: try measureGestureLatency(displayRate: rate, phases: phases))
         }
-        return LatencyReport(status: status, requestedBufferFrames: TurntableConstants.preferredBufferFrames,
+        return LatencyReport(status: status, requestedBufferFrames: OutputBufferPolicy.preferredFrames,
+                             unavailableBufferFrames: TurntableConstants.preferredBufferFrames,
                              actualSampleRate: status.isRunning ? output.actualSampleRate : nil,
                              measurements: measurements)
     }
