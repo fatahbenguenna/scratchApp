@@ -9,11 +9,12 @@ status_reason: >-
   OutputBufferPolicy (128 trames d'abord, tampon accordé jusqu'à 256 gardé, sinon 256 ; tampon effectif
   publié) correct et testé ; NFR3 à 128 trames : 5,6 % en release. CONCERNS en attendant #114 : le
   calibrage n'est pas évalué selon D-56 (phase alignée au lieu de la moyenne sur 8 phases). Selon D-56
-  (sonde QA, sans périphérique) : 48 kHz 18,33 ms à 120 Hz et 29,31 ms à 60 Hz ; 44,1 kHz 19,19 et
-  31,10 ms ; reste pour le périphérique de 0,7 à 1,7 ms, et non 4,6 à 6,9 ms ; dépassé à 44,1 kHz et
-  60 Hz. Maximum à 256 trames et 120 Hz au-delà d'une période d'image (#123).
+  (sonde QA, milieux de 8 phases comme #122, un tampon compris, sans périphérique) : 48 kHz 18,79 ms à
+  120 Hz et 30,26 ms à 60 Hz ; 44,1 kHz 19,75 et 32,26 ms ; reste de 0,25 à 1,2 ms à 120 Hz, objectif
+  dépassé à 60 Hz. Maximum à 256 trames et 120 Hz au-delà d'une période d'image (#123, cause trouvée
+  par James : correctif du rejeu annoncé).
 reviewer: Quinn
-updated: "2026-11-14"
+updated: "2026-11-16"
 top_issues:
   - id: "CALIBRATION-NOT-D56"
     severity: medium
@@ -27,7 +28,7 @@ checks:
   - item: "Négociation du tampon"
     result: "testBufferNegotiation_D54 : 128 accordé, minimum à 192, refus puis 256, Bluetooth au-delà de 256, tout refusé."
   - item: "D-56 (sonde QA, 8 phases)"
-    result: "128 trames : 18,33 / 29,31 ms (48 kHz), 19,19 / 31,10 ms (44,1 kHz) à 120 / 60 Hz ; 256 trames : 24,74 / 33,28 et 25,72 / 35,42 ms ; un tampon compris, sans périphérique."
+    result: "Milieux de 8 phases (#122) : 128 trames 18,79 / 30,26 ms (48 kHz), 19,75 / 32,26 ms (44,1 kHz) à 120 / 60 Hz ; 256 trames 25,57 / 34,21 ms (48 kHz) ; un tampon compris, sans périphérique. Les valeurs k/8 publiées d'abord étaient basses de 0,5 à 1 ms."
 nfr_validation:
   security: {status: PASS, notes: "Sans objet."}
   performance: {status: CONCERNS, notes: "Gain réel (−6,4 ms à 120 Hz en moyenne) mais reste pour le périphérique d'environ 1 ms ; à réévaluer avec #114."}

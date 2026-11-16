@@ -5,7 +5,7 @@ scope: "Partie 1 (PR #88, PASS) puis partie 2 (PR #113) : branchement dans Audio
 pr: 113
 previous_pr: 88
 issue: 26
-reviewed_sha: "4b9197e"
+reviewed_sha: "fad6957"
 review_history:
   - sha: "07a7d38"
     gate: CONCERNS
@@ -19,9 +19,12 @@ review_history:
   - sha: "4b9197e"
     gate: CONCERNS
     note: "Partie 2 (#113) : critères de D-55 tenus et testés ; interruption « app suspendue » (iOS) sans fin prise pour une vraie interruption (#121)."
-gate: CONCERNS
+  - sha: "fad6957"
+    gate: PASS
+    note: "Correctif de #121 : début d'interruption appWasSuspended (1) ou wasSuspended ignoré, test pur ; commits précédents identiques après rebase ; CI verte."
+gate: PASS
 status_reason: >-
-  Partie 2 (#113) : la politique est exécutée dans l'ordre par l'hôte (pump seulement quand rien ne rend,
+  Partie 2 (#113), relue à fad6957 : #121 corrigé (début d'interruption « app suspendue » ignoré). : la politique est exécutée dans l'ordre par l'hôte (pump seulement quand rien ne rend,
   horloge de secours arrêtée avant chaque démarrage), nouvel essai de 2 s hors interruption et arrière-plan,
   avis et bandeaux dans l'AppModel, CA 7 ; critères de D-55 tenus (un seul configurationChanged,
   deviceInUse à chaque démarrage, veille synchrone, utilitaire unique, ancienne sortie arrêtée, sortie de
@@ -34,12 +37,8 @@ status_reason: >-
   transmise de façon synchrone, délai de regroupement relancé à chaque notification, test robuste.
   CI verte ; fusion possible selon D-55.
 reviewer: Quinn
-updated: "2026-11-14"
+updated: "2026-11-16"
 top_issues:
-  - id: "IOS-APP-WAS-SUSPENDED"
-    severity: medium
-    finding: "AudioSessionEvents traduit tout début d'interruption en interruptionBegan : un début « appWasSuspended » (ou wasSuspended), envoyé avec retard et sans fin, laisserait l'hôte interrompu et muet après un retour au premier plan."
-    suggested_action: "Ignorer ce début d'interruption (AVAudioSessionInterruptionReasonKey, AVAudioSessionInterruptionWasSuspendedKey), avec un test pur (#121)."
   - id: "ADR-15-NOTICE-TYPES"
     severity: low
     finding: "AudioHostNotice, PostedAudioNotice et AudioNoticePosting sont dans ScratchAudio alors que l'AppModel (Hugo) les utilise (ADR-15 : types partagés dans Contracts/)."
@@ -63,8 +62,8 @@ nfr_validation:
     status: PASS
     notes: "Logique pure ; rafales regroupées."
   reliability:
-    status: CONCERNS
-    notes: "Interruption « app suspendue » sans fin (#121) ; fil de rendu unique, nouvel essai et sortie de l'état interrompu tenus et testés."
+    status: PASS
+    notes: "Fil de rendu unique, nouvel essai, sortie de l'état interrompu et interruption « app suspendue » ignorée (#121), tenus et testés."
   maintainability:
     status: PASS
     notes: "Politique pure, sans #if, exhaustive et testée pour les deux plateformes ; moniteur testable par événements simulés."
@@ -76,7 +75,7 @@ evidence:
   policy_probe: "Politique rejouée sous Linux, iOS interrompu : routeChanged(true) → stopOutput, stopAllMotors, applyPendingCommands, notify, startOutput"
 recommendations:
   immediate:
-    - action: "Corriger #121 dans #113 (quelques lignes et un test pur), puis nouvelle relecture du différentiel ; rebaser la seconde de #113 et #117 (conflit dans AudioEngineHost.swift)."
+    - action: "Fusionner (ferme #26 et #121) ; rebaser la seconde de #113 et #117 (conflit dans AudioEngineHost.swift)."
   future:
     - action: "Winston : confirmer l'emplacement des types d'avis (ADR-15)."
     - action: "Recette (#44) : appel avec disque tenu ; casque débranché pendant la lecture et pendant un appel ; USB retirée et rebranchée ; changement de sortie sur Mac ; veille et réveil ; démarrage sans sortie puis branchement ; arrière-plan, retour, START (#121)."

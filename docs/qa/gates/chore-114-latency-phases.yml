@@ -1,0 +1,37 @@
+schema: 1
+story: "2.1-followup-114"
+story_title: "Sonde de latence sur 8 phases touches/affichage, moyenne de référence (suivi #114, D-56)"
+pr: 122
+issue: 114
+reviewed_sha: "b38f964"
+gate: PASS
+status_reason: >-
+  measure(…, phases: 8) répète la mesure de D-54 au milieu de 8 intervalles d'une image, moteur et graphe
+  neufs par phase ; moyenne publiée comme référence (engineDelay, total), maximum (worstTotal) et premier
+  geste publiés ; l'hôte publie le tout. Milieux vérifiés par la QA : moyenne identique à N = 8, 16 et 64,
+  alors que k/N est biaisé vers le bas par la phase alignée (les chiffres QA de D-56 étaient bas de 0,8 à
+  0,9 ms). Valeurs reproduites au centième de milliseconde.
+reviewer: Quinn
+updated: "2026-11-16"
+top_issues: []
+checks:
+  - item: "Phases (D-56)"
+    result: "(k + ½) / (N × cadence), N = 8 ; moteur et graphe neufs par phase."
+  - item: "Mesures (un tampon compris, sans périphérique, 48 kHz)"
+    result: "256 trames : 25,57 ms (120 Hz) et 34,21 ms (60 Hz) de moyenne ; maximum 29,12 et 41,17 ms ; 128 trames : 18,79 et 30,26 ms."
+  - item: "Tests"
+    result: "Moyenne entre minimum et maximum, écart entre phases > 4 ms, graphe = rendu direct par phase, moyenne au-dessus de la phase alignée, N = 8 égal à N = 16 à 0,2 ms près."
+nfr_validation:
+  security: {status: PASS, notes: "Sans objet."}
+  performance: {status: PASS, notes: "La sonde mesure désormais selon D-56 ; les objectifs relèvent de #91."}
+  reliability: {status: PASS, notes: "Moyenne non biaisée et stable."}
+  maintainability: {status: PASS, notes: "PhaseSpread publié ; protocole documenté."}
+evidence:
+  ci: "wait-ci sur b38f964 : Linux ✅, macOS ✅"
+  merge_check: "Sans conflit avec main, #113, #117, #118"
+  probe: "Sonde QA (protocole de #105, milieux et k/N, N = 8, 16, 64), rendu direct sous Linux"
+recommendations:
+  immediate:
+    - action: "Fusionner après #105 (rebase --onto ca09482) ; ferme #114."
+  future:
+    - action: "PO : corriger les chiffres de D-56 (25,6 ms à 120 Hz et 34,2 ms à 60 Hz à 256 trames)."
