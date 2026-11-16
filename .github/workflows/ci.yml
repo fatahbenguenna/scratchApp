@@ -28,6 +28,13 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
+      - name: Aucune API réseau (SF-20, NFR6)
+        run: |
+          set -o pipefail
+          mkdir -p ci-output
+          # Self-test first: every forbidden pattern planted in a copy must be caught (#103).
+          scripts/check-no-network.sh --self-test 2>&1 | tee ci-output/no-network.log
+          scripts/check-no-network.sh 2>&1 | tee -a ci-output/no-network.log
       - name: swift build & test
         run: |
           set -o pipefail
@@ -59,11 +66,12 @@ jobs:
           set -o pipefail
           mkdir -p ci-output
           swift test --parallel 2>&1 | tee ci-output/macos-swift-test.log
-      - name: Mesures temps réel en release (allocations, charge NFR2 et NFR3)
+      - name: Mesures en release (allocations, charge NFR2 et NFR3, analyse NFR4, décodage de 10 min 2.2 CA 7)
         run: |
           set -o pipefail
           mkdir -p ci-output
-          swift test -c release -Xswiftc -enable-testing --filter 'RenderLoadTests|RealTimeAllocationTests' 2>&1 \
+          swift test -c release -Xswiftc -enable-testing \
+            --filter 'RenderLoadTests|RealTimeAllocationTests|WaveformTests/testAnalysisTime_NFR4|testTenMinute' 2>&1 \
             | tee ci-output/macos-release-tests.log
       - name: Générer le projet Xcode
         run: |
@@ -84,6 +92,14 @@ jobs:
             CODE_SIGNING_ALLOWED=NO build 2>&1 \
             | tee ci-output/xcodebuild-ios.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
           grep -q "BUILD SUCCEEDED" ci-output/xcodebuild-ios.log
+      - name: Manifeste de confidentialité dans les apps
+        run: |
+          set -o pipefail
+          for manifest in build/Build/Products/Debug/ScratchApp.app/Contents/Resources/PrivacyInfo.xcprivacy \
+                          build/Build/Products/Debug-iphonesimulator/ScratchApp.app/PrivacyInfo.xcprivacy; do
+            plutil -lint "$manifest"
+            test "$(plutil -extract NSPrivacyTracking raw "$manifest")" = "false"
+          done 2>&1 | tee ci-output/privacy-manifest.log
       - name: Self-test audio de l'app macOS
         run: |
           set -o pipefail
@@ -92,10 +108,13 @@ jobs:
       - name: Lancement de l'app et capture d'écran
         run: |
           APP="build/Build/Products/Debug/ScratchApp.app"
-          open "$APP"
-          sleep 10
-          pgrep -x ScratchApp > /dev/null && echo "ScratchApp est en cours d'exécution" | tee ci-output/launch.txt
+          # Scène de la CI (builds Debug seulement) : démo sur A et B, B en lecture (son de 8 s).
+          open "$APP" --args --demo-scene
+          sleep 6
           screencapture -x ci-output/screenshot.png || true
+          # L'app reste lancée : sortie virtuelle du runner, ou horloge de secours sans sortie (D-35).
+          sleep 6
+          pgrep -x ScratchApp > /dev/null && echo "ScratchApp est en cours d'exécution" | tee ci-output/launch.txt
           pgrep -x ScratchApp > /dev/null
           pkill -x ScratchApp || true
       - name: Publier la capture sur la branche ci-shots
@@ -162,14 +181,19 @@ jobs:
             const icon = r => r === 'success' ? '✅' : (r === 'skipped' ? '⏭️' : '❌');
             let body = `${marker}\n## Rapport CI — ${context.sha.substring(0, 7)}\n\n`;
             body += `| Job | Résultat |\n|---|---|\n`;
-            body += `| Linux (ScratchCore, ScratchLibrary) | ${icon(process.env.LINUX_RESULT)} ${process.env.LINUX_RESULT} |\n`;
-            body += `| macOS (tests, app macOS, app iOS, self-test, lancement) | ${icon(process.env.MACOS_RESULT)} ${process.env.MACOS_RESULT} |\n\n`;
+            body += `| Linux (aucune API réseau, ScratchCore, ScratchLibrary) | ${icon(process.env.LINUX_RESULT)} ${process.env.LINUX_RESULT} |\n`;
+            body += `| macOS (tests, app macOS, app iOS, manifeste de confidentialité, self-test, lancement) | ${icon(process.env.MACOS_RESULT)} ${process.env.MACOS_RESULT} |\n\n`;
             const pr = context.payload.pull_request.number;
             body += `Capture d'écran macOS : branche \`ci-shots/pr-${pr}\`.\n\n`;
             const metrics = 'artifacts/macos-logs/render-metrics.log';
             if (fs.existsSync(metrics)) {
               const lines = fs.readFileSync(metrics, 'utf8').split('\n').filter(l => l.trim()).slice(0, 12);
-              body += `**Mesures temps réel (macOS, NFR2 et NFR3)**\n\n${lines.map(l => '- ' + l).join('\n')}\n\n`;
+              body += `**Mesures temps réel (macOS, NFR2, NFR3 et NFR4)**\n\n${lines.map(l => '- ' + l).join('\n')}\n\n`;
+            }
+            const decoding = 'artifacts/macos-logs/decode-metrics.log';
+            if (fs.existsSync(decoding)) {
+              const lines = fs.readFileSync(decoding, 'utf8').split('\n').filter(l => l.trim()).slice(0, 12);
+              body += `**Décodage (macOS, story 2.2 CA 7 : 3 s au plus en release)**\n\n${lines.map(l => '- ' + l).join('\n')}\n\n`;
             }
             const tail = 'artifacts/macos-report/report-tail.md';
             if (fs.existsSync(tail)) {

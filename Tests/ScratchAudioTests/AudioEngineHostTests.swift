@@ -71,8 +71,7 @@ final class AudioEngineHostTests: XCTestCase {
         XCTAssertFalse(host.isRenderingAudio)
         XCTAssertFalse(host.isFallbackRunning)
         XCTAssertEqual(output.deactivateCount, 1)
-        engine.pump()
-        XCTAssertFalse(engine.latestSnapshot()[.a].motorOn, "suspend() stops every motor (RM-56)")
+        XCTAssertFalse(engine.latestSnapshot()[.a].motorOn, "suspend() stops every motor at once (RM-56, D-54)")
         let frozen = engine.latestSnapshot().sampleTime
         try await Task.sleep(nanoseconds: 50_000_000)
         XCTAssertEqual(engine.latestSnapshot().sampleTime, frozen, "no render while suspended")

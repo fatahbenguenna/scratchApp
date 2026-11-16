@@ -59,8 +59,9 @@ public struct ScratchCommands: Commands {
             shortcutButton("START / STOP", .toggleMotor(id))
             Toggle("33⅓ tours", isOn: Binding(get: { deck.speed == .rpm33 }, set: { if $0 { deck.setSpeed(.rpm33) } }))
             Toggle("45 tours", isOn: Binding(get: { deck.speed == .rpm45 }, set: { if $0 { deck.setSpeed(.rpm45) } }))
-            shortcutButton("SET CUE", .setCue(id))
-            shortcutButton("CUE", .recallCue(id))
+            // Like the buttons, inactive on an empty deck (#94).
+            shortcutButton("SET CUE", .setCue(id)).disabled(!deck.isLoaded)
+            shortcutButton("CUE", .recallCue(id)).disabled(!deck.isLoaded)
             shortcutButton("Pitch \u{2212}0,1\u{00A0}%", .pitchDown(id))
             shortcutButton("Pitch +0,1\u{00A0}%", .pitchUp(id))
             Button("Pitch à 0\u{00A0}%") { deck.resetPitch() }

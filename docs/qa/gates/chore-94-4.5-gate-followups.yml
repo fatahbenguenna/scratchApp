@@ -1,0 +1,41 @@
+schema: 1
+story: "4.5-followups"
+story_title: "Retouches de la gate 4.5 (pitch, CUE et résistance)"
+pr: 95
+issue: 94
+reviewed_sha: "fdf6361"
+gate: PASS
+status_reason: >-
+  Les trois points de #94 sont traités et testés : SET CUE et CUE du menu désactivés sur une platine
+  vide ; annonce de SET CUE avec le CUE confirmé par l'instantané (ou après 100 ms, règle de #57),
+  éclat toujours immédiat ; test de valeur maintenue pour la résistance. CI verte (1eac185).
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues: []
+checks:
+  - item: "Menu sur une platine vide"
+    result: "ScratchCommands : .disabled(!deck.isLoaded) sur SET CUE et CUE."
+  - item: "Annonce de SET CUE"
+    result: "Annonce au premier instantané montrant un nouveau CUE, sinon après 100 ms ; compteur propre (setCueAnnouncementCount) ; testSetCueAnnouncesTheConfirmedCue_94 ; la suspension de la boucle d'affichage (grâce de 0,1 s depuis la première image) ne peut pas la précéder."
+  - item: "CA 5 de la 4.5"
+    result: "Résistance ajoutée à testSettingsAndMixerHoldCommandedValues."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Sans objet."
+  performance:
+    status: PASS
+    notes: "Une comparaison par instantané tant qu'une annonce est en attente."
+  reliability:
+    status: PASS
+    notes: "Annonce cohérente avec la valeur du bouton CUE."
+  maintainability:
+    status: PASS
+    notes: "Mécanisme aligné sur CommandedValue (#57)."
+evidence:
+  ci: "wait-ci sur 1eac185 : Linux ✅, macOS ✅"
+  merge_check: "1eac185 sans conflit avec main ; rebase --onto après #87 comme la 4.6"
+recommendations:
+  immediate:
+    - action: "Fusionner avec #95 ; #94 close à la fusion."
+  future: []

@@ -14,12 +14,15 @@ struct DeckBandView: View {
             if model.deck == .b { panel }
             HStack(spacing: metrics.platterSpacing) {
                 TurntableView(model: model, intents: intents, platter: metrics.platter)
+                    .accessibilitySortPriority(DeckReadingOrder.disc)
                 PitchFader(model: model, height: metrics.platter)
+                    .accessibilitySortPriority(DeckReadingOrder.pitch)
             }
             if model.deck == .a { panel }
         }
         .frame(maxWidth: .infinity)
         .deckDropZone(model: model, intents: intents)  // 5.2: drop target over the whole band (UX §5.9)
+        .macFocusSection()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Platine \(model.deck.rawValue)")
     }
@@ -27,15 +30,15 @@ struct DeckBandView: View {
     private var panel: some View {
         VStack(alignment: .leading, spacing: 12) {
             DeckHeaderView(model: model, intents: intents, width: LayoutMetrics.bandPanelWidth)
-            reserved(height: 56)                                                    // waveform (4.6)
-            reserved(height: 32)                                                    // overview (4.6)
+                .accessibilitySortPriority(DeckReadingOrder.header)
+            ZoomedWaveformView(model: model, width: LayoutMetrics.bandPanelWidth, height: 56)
+            WaveformOverviewView(model: model, width: LayoutMetrics.bandPanelWidth, height: 32)
+                .accessibilitySortPriority(DeckReadingOrder.overview)
             TransportControls(model: model, metrics: metrics, grid: true)
+                .accessibilitySortPriority(DeckReadingOrder.transport)
             ResistanceSlider(model: model)
+                .accessibilitySortPriority(DeckReadingOrder.resistance)
         }
         .frame(width: LayoutMetrics.bandPanelWidth)
-    }
-
-    private func reserved(height: CGFloat) -> some View {
-        Color.clear.frame(height: height).accessibilityHidden(true)
     }
 }

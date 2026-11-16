@@ -80,6 +80,7 @@ private struct RaisedButtonBody: View {
     let accent: Color
     let compact: Bool
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         configuration.label
@@ -90,6 +91,11 @@ private struct RaisedButtonBody: View {
             .background(
                 RoundedRectangle(cornerRadius: Theme.buttonRadius)
                     .fill(configuration.isPressed ? Theme.bgPressed : Theme.bgRaised)
+            )
+            // Increased contrast: 1.5 pt button outlines (UX §9.2).
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.buttonRadius)
+                    .strokeBorder(Theme.strokeStrong, lineWidth: contrast == .increased ? 1.5 : 0)
             )
             .frame(minHeight: 44, alignment: compact ? .top : .center)
             .contentShape(Rectangle())

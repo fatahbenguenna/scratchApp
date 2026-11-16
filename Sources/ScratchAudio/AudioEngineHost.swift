@@ -61,12 +61,15 @@ public final class AudioEngineHost: AudioOutputHosting {
         status = .stopped
     }
 
-    /// Arrière-plan iOS (SF-81, RM-56) : tous les moteurs s'arrêtent, puis plus aucun rendu.
+    /// Arrière-plan iOS (SF-81, RM-56) : tous les moteurs s'arrêtent, puis plus aucun rendu. Le STOP
+    /// est appliqué tout de suite, sur le fil principal, une fois le rendu arrêté (D-54) : l'instantané
+    /// le montre dès le retour, sans attendre une image ni la reprise.
     public func suspend() {
         engine.send(.stopAllMotors)
         isSuspended = true
         stop()
         output.deactivate()
+        engine.pump()
     }
 
     /// Retour au premier plan : la sortie (ou l'horloge de secours) repart, jamais les moteurs (RM-10).

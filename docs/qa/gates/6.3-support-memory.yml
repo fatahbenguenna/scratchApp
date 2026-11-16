@@ -1,0 +1,34 @@
+schema: 1
+story: "6.3-support"
+story_title: "Appui à la recette 6.3 : mémoire NFR4 mesurée en release, outil d'empreinte"
+pr: 118
+issue: 44
+reviewed_sha: "bc62f26"
+gate: PASS
+status_reason: >-
+  Test réel (AppModel, LibraryStore, AudioFileDecoder, ScratchEngine) en release : deux sons distincts
+  de 10 min à 48 kHz en stéréo, +467 Mo (budget 650 Mo) ; après 20 remplacements −3 Mo et les 20
+  clips remplacés libérés (références faibles nulles) ; pic de décodage 1,00 × le clip. La dérive de
+  +459 Mo du premier passage valait exactement deux clips (2 × 230,0 Mo) retenus par le test lui-même
+  (let de fonction), et non par l'app. Outil measure-memory.sh vérifié en CI.
+reviewer: Quinn
+updated: "2026-11-16"
+top_issues: []
+checks:
+  - item: "Dérive de 459 Mo"
+    result: "599 × 48 000 × 2 × 4 = 230,0 Mo par clip ; deux clips = 460,0 Mo ; références fortes du test limitées à un bloc ; 20 références faibles nulles à la fin."
+  - item: "Mesures"
+    result: "+467 Mo chargés, −3 Mo après 20 remplacements, pic de décodage 1,00 ×, outil 41,3 Mo sur la scène de démo."
+nfr_validation:
+  security: {status: PASS, notes: "Sans objet."}
+  performance: {status: PASS, notes: "NFR4 et D-21 tenus dans le processus de test ; empreinte totale de l'app à relever en recette."}
+  reliability: {status: PASS, notes: "Libération des sons remplacés prouvée sans dépendre de l'allocateur."}
+  maintainability: {status: PASS, notes: "Outil de recette documenté dans son en-tête."}
+evidence:
+  ci: "wait-ci sur bc62f26 : Linux ✅, macOS ✅ ; ligne NFR4 mémoire au rapport (37b5087)"
+  merge_check: "Sans conflit avec main ; conflit à trois avec #111 et #115 sur le filtre release de ci.yml (filtre commun à réunir)"
+recommendations:
+  immediate:
+    - action: "Fusionner après résolution du filtre release commun à #111, #115 et #118."
+  future:
+    - action: "Recette (#44) : empreinte totale de l'app en release avec scripts/measure-memory.sh."

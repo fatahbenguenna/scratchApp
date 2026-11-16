@@ -14,8 +14,8 @@ import SwiftUI
 ///   texte ou au dialogue, et les menus à touche simple sont désactivés (`context.isActive`).
 /// - Coupures `F` / `J` refermées à la perte du focus, au passage en arrière-plan ou à l'ouverture
 ///   d'une feuille.
-/// - Échap retire le focus d'une commande (D-07). Les flèches vont au crossfader ; leur envoi à la
-///   commande réglable qui a le focus est complété en 5.3.
+/// - Flèches (D-07, 5.3) : à la commande réglable qui a le focus clavier (`AdjustableFocus`), sinon
+///   au crossfader. Échap retire le focus d'une commande et rend les flèches au crossfader.
 @MainActor
 public final class KeyboardController {
     public let context = KeyboardContext()
@@ -29,6 +29,8 @@ public final class KeyboardController {
     weak var window: NSWindow?
     /// Contexte imposé par les tests unitaires (aucune fenêtre).
     var activeOverride: Bool?
+    /// Commande réglable focalisée (5.3) ; un routeur propre aux tests unitaires.
+    var adjustableFocus = AdjustableFocus.shared
 
     /// - Parameter names: libellés des touches ; `nil` pour la disposition active du système.
     public init(model: AppModel, names: KeyboardLayoutNames? = nil) {
@@ -76,6 +78,7 @@ public final class KeyboardController {
         refreshContext()
         switch event.type {
         case .keyDown:
+            if context.isActive, routeArrowToFocusedControl(event) { return nil }
             if event.keyCode == KeyboardShortcutMap.KeyCode.escape, context.isActive, clearFocus() { return nil }
             let result = dispatcher.keyDown(keyCode: event.keyCode, modifiers: Self.modifiers(event.modifierFlags),
                                             isRepeat: event.isARepeat, isActive: context.isActive)
@@ -118,8 +121,32 @@ public final class KeyboardController {
         return !(window.firstResponder is NSText)
     }
 
+    /// Flèche, seule ou avec ⇧, vers la commande réglable qui a le focus ; `false` sans commande
+    /// focalisée (la flèche va alors au crossfader par les raccourcis de la 5.1).
+    private func routeArrowToFocusedControl(_ event: NSEvent) -> Bool {
+        guard let arrow = Self.arrow(for: event.keyCode) else { return false }
+        let modifiers = Self.modifiers(event.modifierFlags)
+        guard modifiers.isSubset(of: .shift) else { return false }
+        return adjustableFocus.handle(arrow, shift: modifiers.contains(.shift))
+    }
+
+    static func arrow(for keyCode: UInt16) -> ArrowKey? {
+        switch keyCode {
+        case KeyboardShortcutMap.KeyCode.leftArrow: return .left
+        case KeyboardShortcutMap.KeyCode.rightArrow: return .right
+        case KeyboardShortcutMap.KeyCode.downArrow: return .down
+        case KeyboardShortcutMap.KeyCode.upArrow: return .up
+        default: return nil
+        }
+    }
+
     /// Échap : retire le focus d'une commande ; renvoie `true` s'il y en avait un.
     private func clearFocus() -> Bool {
+        if adjustableFocus.target != nil {
+            adjustableFocus.clear()
+            window?.makeFirstResponder(nil)
+            return true
+        }
         guard let window, let responder = window.firstResponder, responder !== window,
               responder !== window.contentView else { return false }
         return window.makeFirstResponder(nil)

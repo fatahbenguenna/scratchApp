@@ -1,0 +1,38 @@
+schema: 1
+story: "6.2-followup-103"
+story_title: "check-no-network : adresses distantes et NSURLConnection, auto-test (suivi #103 de la gate 6.2)"
+pr: 112
+issue: 103
+reviewed_sha: "9cb23f6"
+gate: PASS
+status_reason: >-
+  NSURLConnection, NSURLSession, NSURLRequest et CFHTTP sont refusés ; toute adresse http:// ou https://
+  dans Sources/ et App/ l'est aussi, sauf la ligne DOCTYPE de la DTD Apple dans une liste de propriétés ;
+  un auto-test plante 13 motifs dans une copie et exige l'échec de chacun, exécuté par la CI avant le
+  contrôle. Mutation QA : ftp://, socket(AF_INET) et getaddrinfo non détectés, hors du champ de #103.
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues:
+  - id: "LOW-LEVEL-NETWORK"
+    severity: low
+    finding: "ftp://, socket(AF_INET, …) et getaddrinfo ne sont pas détectés (API de bas niveau improbables ; bac à sable macOS sans droit réseau)."
+    suggested_action: "Facultatif : ajouter ftp://, \\bsocket\\( et getaddrinfo aux motifs."
+checks:
+  - item: "Motifs de #103"
+    result: "NSURLConnection, adresses distantes (Data(contentsOf:), String(contentsOf:), AVURLAsset), exception DTD limitée aux listes de propriétés."
+  - item: "Auto-test"
+    result: "Copie intacte d'abord ; 13 motifs plantés un par un, tous détectés ; exécuté dans le job Linux avant le contrôle."
+nfr_validation:
+  security: {status: PASS, notes: "Contrôle réseau renforcé et auto-vérifié."}
+  performance: {status: PASS, notes: "Sans objet."}
+  reliability: {status: PASS, notes: "Un contrôle devenu muet fait échouer la CI."}
+  maintainability: {status: PASS, notes: "Racine en argument, cas d'auto-test lisibles."}
+evidence:
+  ci: "wait-ci sur 9cb23f6 : Linux ✅, macOS ✅"
+  local_run: "Fusion avec main : contrôle vert ; auto-test : 13 motifs détectés"
+  mutation: "URLSessionConfiguration et https:// en commentaire détectés ; ftp://, socket(AF_INET), getaddrinfo non détectés"
+recommendations:
+  immediate:
+    - action: "Fusionner (ferme #103)."
+  future:
+    - action: "Facultatif : motifs de bas niveau (ftp://, socket, getaddrinfo)."

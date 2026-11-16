@@ -42,7 +42,7 @@ struct CueButtons: View {
             .accessibilityInputLabels(["CUE"])
             .accessibilityIdentifier("\(id).cue")
         }
-        .onChange(of: model.setCueCount) {
+        .onChange(of: model.setCueAnnouncementCount) {
             AccessibilityNotification.Announcement(model.setCueAnnouncement).post()
         }
     }
@@ -104,6 +104,7 @@ struct PressButton<Face: View>: View {
             .accessibilityElement(children: .ignore)
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { if enabled { action() } }
+            .keyboardActivatable(enabled: enabled, action: action)
             .disabled(!enabled)
     }
 }

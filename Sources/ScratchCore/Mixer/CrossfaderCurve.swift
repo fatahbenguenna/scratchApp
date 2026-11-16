@@ -30,8 +30,9 @@ public enum CrossfaderCurve {
     }
 
     /// Largeur de cut-in `w = lerp(1 ; 0,03 ; curve)` : course, depuis la butée opposée, au bout de
-    /// laquelle une voie atteint le plein niveau dans la famille franche (UX §5.12).
-    static func cutInWidth(curve: Double) -> Double {
+    /// laquelle une voie atteint le plein niveau dans la famille franche (UX §5.12). Publique pour les
+    /// repères de cut-in du crossfader de l'interface (#75).
+    public static func cutInWidth(curve: Double) -> Double {
         (1 - curve) + curve * TurntableConstants.crossfaderCutInWidth // exact at both ends
     }
 }

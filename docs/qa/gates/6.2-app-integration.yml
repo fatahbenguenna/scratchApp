@@ -1,0 +1,69 @@
+schema: 1
+story: "6.2"
+story_title: "Intégration complète"
+pr: 99
+issue: 43
+reviewed_sha: "b9cc9b4"
+review_history:
+  - sha: "09f6839"
+    gate: FAIL
+    note: "Conflits avec main depuis #89 ; start après les préférences (CA 2) ; enregistrement en arrière-plan (CA 4) ; pump() à la fin de suspend() (D-54)."
+  - sha: "b9cc9b4"
+    gate: PASS
+    note: "Rebase sur caa0046 avec #89 ; ordre de launch() testé ; savePreferencesNow() avant suspend() ; pump() dans suspend() testé sur le vrai hôte ; enregistrement à la fermeture sur Mac (#97, point 3)."
+gate: PASS
+status_reason: >-
+  Seuls les commits propres à la 6.2 ont été relus (copie de la 2.1 identique à #84). Hôte démarré à
+  la fin de launch(), après les préférences et la bibliothèque, sans motor ni load ; DisplayWakingEngine
+  et réveil sur host.status ; fenêtre unique (D-38) ; contrôleur clavier unique et fenêtre d'aide ;
+  Réglages de la 3.4 ; scenePhase vers suspend() et resume(), préférences enregistrées avant suspend() ;
+  STOP publié tout de suite (pump, D-54) ; D-37 ; manifeste de confidentialité exact ; contrôle
+  « aucun réseau » en CI ; --demo-scene en Debug seulement ; enregistrement à la fermeture sur Mac.
+reviewer: Quinn
+updated: "2026-11-14"
+top_issues:
+  - id: "NO-NETWORK-GAPS"
+    severity: low
+    finding: "check-no-network.sh ne détecte ni Data(contentsOf:) sur une URL distante ni NSURLConnection (mutation QA)."
+    suggested_action: "Compléter les motifs et ajouter un auto-test (#103)."
+checks:
+  - item: "Hôte au lancement (RM-10)"
+    result: "startHost() après la réconciliation et la liste ; seul outputSampleRate envoyé ; aucun load ni motor (testLaunchStartsHostAfterLibraryWithoutPlayback_RM10) ; badge « Apple Virtual Sou… » sur la capture."
+  - item: "DisplayWakingEngine et host.status"
+    result: "Moteur enveloppé ; hostStatusDidChange() : badge, réveil, nouvel abonnement par withObservationTracking."
+  - item: "Fenêtre unique (D-38)"
+    result: "Window(id: main), minimum 960 × 600, fermeture → terminate, fenêtre inactive sans effet."
+  - item: "Clavier et aide"
+    result: "KeyboardController créé une fois et partagé par RootView et ScratchCommands ; KeyboardHelpWindow(names: keyboard.names)."
+  - item: "Cycle de vie iOS"
+    result: "scenePhase .background → suspend, .active → resume, .inactive ignoré ; idempotent ; son et clip conservés."
+  - item: "D-37"
+    result: "isIdleTimerDisabled si un moteur tourne ou si un disque est tenu, jamais en arrière-plan (testIdleTimerFollowsMotorAndHold_D37)."
+  - item: "Confidentialité"
+    result: "UserDefaults CA92.1, espace disque E174.1, dates de fichiers C617.1 et 3B52.1, démarrage du système 35F9.1 ; manifeste dans les deux apps, vérifié par plutil en CI ; bac à sable sans droit réseau."
+  - item: "--demo-scene (RM-01)"
+    result: "Lu sous #if DEBUG seulement ; capture : démo sur A et B, B en lecture, VU-mètre actif."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Bac à sable sans droit réseau ; manifeste exact ; contrôle réseau en CI à compléter (#103)."
+  performance:
+    status: PASS
+    notes: "Boucle d'affichage suspendue au repos et réveillée ; NFR3 à 5,6 % en release."
+  reliability:
+    status: PASS
+    notes: "STOP publié dès suspend() (D-54) ; préférences enregistrées avant suspend() et à la fermeture ; ordre du lancement testé."
+  maintainability:
+    status: PASS
+    notes: "AppModel+Lifecycle isolé et testé avec un hôte simulé ; LaunchOptions pur."
+evidence:
+  ci: "Rapport CI 4549db9 (b9cc9b4) : Linux ✅, macOS ✅ ; 10 tests AppLifecycleTests ; ed28e7e (09f6839) : manifeste, self-test 12/12, lancement avec --demo-scene"
+  linux_tests: "scripts/linux-test.sh sur b9cc9b4 : 241/241"
+  merge_check: "b9cc9b4 rebasée sur caa0046 : mergeable_state clean"
+  network_probe: "check-no-network.sh par mutation : URLSession, import Network, droit network.client détectés ; Data(contentsOf: URL distante) et NSURLConnection non détectés"
+recommendations:
+  immediate:
+    - action: "Fusionner."
+  future:
+    - action: "#103 : compléter check-no-network.sh."
+    - action: "Bandeaux de sortie après la 2.3 partie 2 ; parcours P0 complet en recette (#44)."
