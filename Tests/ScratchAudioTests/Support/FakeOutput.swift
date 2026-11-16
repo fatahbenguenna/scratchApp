@@ -10,6 +10,8 @@ final class FakeOutput: AudioHardwareOutput {
     var onSystemEvent: ((AudioSystemEvent) -> Void)?
     var failure: Error?
     var info = AudioOutputInfo(name: "MPC Sample (USB)", sampleRate: 44_100, bufferFrames: 256, outputLatency: 0.004)
+    /// Fréquence réelle simulée (`nil` : inconnue).
+    var actualSampleRate: Double?
     var isUsedDeviceStillPresent = true
     var isFallbackRunning: (() -> Bool)?
     private(set) var isRunning = false

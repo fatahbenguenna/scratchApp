@@ -210,9 +210,12 @@ jobs:
                 const o = r.output;
                 const name = o.available ? o.name : 'indisponible';
                 body += `**Latence geste→son (6.3 CA 3 ; référence D-56 : moyenne sur la phase, tampon et latence annoncée compris)**\n\n`;
-                body += `Sortie ${name}, ${o.sampleRate} Hz, tampon effectif ${o.effectiveBufferFrames} trames (demandé ${o.requestedBufferFrames}), latence annoncée ${o.outputLatencyMilliseconds.toFixed(1)} ms\n\n`;
+                const drift = o.actualSampleRate != null && o.driftPartsPerMillion != null
+                  ? `, fréquence réelle ${o.actualSampleRate.toFixed(2)} Hz (dérive ${o.driftPartsPerMillion.toFixed(1)} ppm)` : '';
+                body += `Sortie ${name}, ${o.sampleRate} Hz${drift}, tampon effectif ${o.effectiveBufferFrames} trames (demandé ${o.requestedBufferFrames}), latence annoncée ${o.outputLatencyMilliseconds.toFixed(1)} ms\n\n`;
                 for (const d of r.displays) {
-                  body += `- ${d.displayRate} Hz : ${d.totalMilliseconds.toFixed(1)} ms ${d.withinTarget ? '✅' : '⚠️'} (objectif ${d.targetMilliseconds} ms) ; pire phase ${d.worstTotalMilliseconds.toFixed(1)} ms ; premier geste ${d.firstGestureTotalMilliseconds.toFixed(1)} ms ; ${d.phases} phases\n`;
+                  const issue = d.worstExceedsIssueThreshold ? ` ❌ au-delà du seuil d'issue de D-56 (${d.issueThresholdMilliseconds.toFixed(1)} ms)` : '';
+                  body += `- ${d.displayRate} Hz : ${d.totalMilliseconds.toFixed(1)} ms ${d.withinTarget ? '✅' : '⚠️'} (objectif ${d.targetMilliseconds} ms) ; pire phase ${d.worstTotalMilliseconds.toFixed(1)} ms${issue} ; premier geste ${d.firstGestureTotalMilliseconds.toFixed(1)} ms ; ${d.phases} phases\n`;
                 }
                 body += '\n';
               } catch (e) {

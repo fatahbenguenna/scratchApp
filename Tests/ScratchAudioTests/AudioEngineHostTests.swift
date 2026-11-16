@@ -256,21 +256,30 @@ final class AudioEngineHostTests: XCTestCase {
         XCTAssertEqual(hostMeasurement.outputLatency, 0)
     }
 
-    /// Recette 6.3 CA 3 — SF-78, D-15, D-56 : le rapport de latence donne la sortie réelle (nom,
-    /// fréquence, tampon demandé et effectif, latence annoncée) et, à 120 puis 60 Hz, la moyenne sur
-    /// la phase comparée à l'objectif, avec le pire cas et le premier geste. Sans sortie, il mesure à
+    /// Recette 6.3 CA 3 — SF-78, D-15, D-56, #129 : le rapport de latence donne la sortie réelle (nom,
+    /// fréquence, tampon demandé et effectif, latence annoncée, fréquence réelle et dérive en ppm) et,
+    /// à 120 puis 60 Hz, la moyenne sur la phase comparée à l'objectif, avec le pire cas, le premier
+    /// geste et le seuil d'issue de D-56 (objectif plus une période d'image). Sans sortie, il mesure à
     /// 48 kHz et 256 trames, et le signale.
     func testLatencyReport_6_3() throws {
         let (host, output) = makeHost(failing: false)
         output.info = AudioOutputInfo(name: "Haut-parleurs MacBook Pro", sampleRate: 48_000, bufferFrames: 512,
                                       outputLatency: 0.006)
+        output.actualSampleRate = 47_998.8
         host.start()
         let report = try host.latencyReport(displayRates: [120, 60], phases: 2)
-        XCTAssertEqual(report.output, LatencyReport.Output(name: "Haut-parleurs MacBook Pro", available: true,
-                                                           sampleRate: 48_000, requestedBufferFrames: 256,
-                                                           effectiveBufferFrames: 512, outputLatencyMilliseconds: 6))
+        XCTAssertEqual(report.output.name, "Haut-parleurs MacBook Pro")
+        XCTAssertTrue(report.output.available)
+        XCTAssertEqual(report.output.sampleRate, 48_000)
+        XCTAssertEqual(report.output.requestedBufferFrames, 256)
+        XCTAssertEqual(report.output.effectiveBufferFrames, 512)
+        XCTAssertEqual(report.output.outputLatencyMilliseconds, 6, accuracy: 1e-9)
+        XCTAssertEqual(report.output.actualSampleRate, 47_998.8)
+        XCTAssertEqual(try XCTUnwrap(report.output.driftPartsPerMillion), -25, accuracy: 1e-6, "#129: drift in ppm")
         XCTAssertEqual(report.displays.map(\.displayRate), [120, 60])
         XCTAssertEqual(report.displays.map(\.targetMilliseconds), [20, 30])
+        XCTAssertEqual(report.displays[0].issueThresholdMilliseconds, 20 + 1_000.0 / 120, accuracy: 1e-9)
+        XCTAssertEqual(report.displays[1].issueThresholdMilliseconds, 30 + 1_000.0 / 60, accuracy: 1e-9)
         XCTAssertEqual(report.displays.map(\.phases), [2, 2])
         let reference = try GestureLatencyProbe.measure(sampleRate: 48_000, bufferFrames: 512, displayRate: 120,
                                                         outputLatency: 0.006, phases: 2)
@@ -280,9 +289,12 @@ final class AudioEngineHostTests: XCTestCase {
         XCTAssertEqual(fast.firstGestureTotalMilliseconds, reference.firstGestureTotal * 1_000, accuracy: 1e-9)
         for display in report.displays {
             XCTAssertEqual(display.withinTarget, display.totalMilliseconds <= display.targetMilliseconds)
+            XCTAssertEqual(display.worstExceedsIssueThreshold,
+                           display.worstTotalMilliseconds > display.issueThresholdMilliseconds, "D-56 issue threshold")
             XCTAssertLessThanOrEqual(display.totalMilliseconds, display.worstTotalMilliseconds)
         }
         XCTAssertEqual(report.withinTargets, report.displays.allSatisfy(\.withinTarget))
+        XCTAssertEqual(report.issueRequired, report.displays.contains(where: \.worstExceedsIssueThreshold))
         let json = try JSONEncoder().encode(report)
         XCTAssertEqual(try JSONDecoder().decode(LatencyReport.self, from: json), report)
         XCTAssertTrue(String(decoding: json, as: UTF8.self).contains("\"effectiveBufferFrames\":512"))
@@ -292,7 +304,8 @@ final class AudioEngineHostTests: XCTestCase {
         let fallback = try unavailable.latencyReport(displayRates: [120], phases: 1)
         XCTAssertEqual(fallback.output, LatencyReport.Output(name: nil, available: false, sampleRate: 48_000,
                                                              requestedBufferFrames: 256, effectiveBufferFrames: 256,
-                                                             outputLatencyMilliseconds: 0))
+                                                             outputLatencyMilliseconds: 0, actualSampleRate: nil,
+                                                             driftPartsPerMillion: nil))
         unavailable.stop()
         host.stop()
     }

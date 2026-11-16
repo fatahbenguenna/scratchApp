@@ -129,13 +129,16 @@ public final class AudioEngineHost: AudioOutputHosting, AudioNoticePosting {
     }
 
     /// Rapport de latence de la recette (6.3 CA 3) sur la sortie courante : tampon demandé et
-    /// effectif, latence annoncée, et mesure à chaque cadence d'affichage. À appeler sortie démarrée.
+    /// effectif, latence annoncée, fréquence réelle et dérive (#129), et mesure à chaque cadence
+    /// d'affichage. À appeler sortie démarrée : la fréquence réelle est lue après les mesures, quand le
+    /// système a eu le temps de l'estimer.
     public func latencyReport(displayRates: [Double] = [120, 60],
                               phases: Int = GestureLatencyProbe.defaultPhaseCount) throws -> LatencyReport {
         let measurements = try displayRates.map { rate in
             (displayRate: rate, measurement: try measureGestureLatency(displayRate: rate, phases: phases))
         }
         return LatencyReport(status: status, requestedBufferFrames: TurntableConstants.preferredBufferFrames,
+                             actualSampleRate: status.isRunning ? output.actualSampleRate : nil,
                              measurements: measurements)
     }
 
@@ -283,6 +286,9 @@ protocol AudioHardwareOutput: AnyObject {
     func resetSession()
     /// iOS : désactive la session audio (arrière-plan).
     func deactivate()
+    /// Fréquence réelle de la sortie en cours, mesurée par le système (macOS), ou `nil` si elle est
+    /// inconnue (iOS, sortie arrêtée).
+    var actualSampleRate: Double? { get }
 }
 
 /// Sortie par `AVAudioEngine`, sur le périphérique par défaut (macOS) ou la route de la session
@@ -339,6 +345,14 @@ final class AVAudioEngineOutput: AudioHardwareOutput {
         session.stopObserving()
         #else
         monitor.stop()
+        #endif
+    }
+
+    var actualSampleRate: Double? {
+        #if os(macOS)
+        graph == nil ? nil : device?.actualSampleRate
+        #else
+        nil
         #endif
     }
 
