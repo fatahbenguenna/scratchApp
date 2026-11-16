@@ -118,12 +118,25 @@ public final class AudioEngineHost: AudioOutputHosting, AudioNoticePosting {
     /// `total` est la mesure de référence de D-54 et D-56 : régime appris (second geste), moyenne sur
     /// 8 phases touches/affichage. Le pire cas (`worstTotal`) et le premier geste
     /// (`firstGestureTotal`) sont publiés à côté.
-    public func measureGestureLatency(displayRate: Double = 120) throws -> GestureLatencyProbe.Measurement {
+    public func measureGestureLatency(displayRate: Double = 120,
+                                      phases: Int = GestureLatencyProbe.defaultPhaseCount) throws -> GestureLatencyProbe.Measurement {
         let info = status.outputInfo
         return try GestureLatencyProbe.measure(sampleRate: info?.sampleRate ?? 48_000,
                                                bufferFrames: info?.bufferFrames ?? TurntableConstants.preferredBufferFrames,
                                                displayRate: displayRate,
-                                               outputLatency: info?.outputLatency ?? 0)
+                                               outputLatency: info?.outputLatency ?? 0,
+                                               phases: phases)
+    }
+
+    /// Rapport de latence de la recette (6.3 CA 3) sur la sortie courante : tampon demandé et
+    /// effectif, latence annoncée, et mesure à chaque cadence d'affichage. À appeler sortie démarrée.
+    public func latencyReport(displayRates: [Double] = [120, 60],
+                              phases: Int = GestureLatencyProbe.defaultPhaseCount) throws -> LatencyReport {
+        let measurements = try displayRates.map { rate in
+            (displayRate: rate, measurement: try measureGestureLatency(displayRate: rate, phases: phases))
+        }
+        return LatencyReport(status: status, requestedBufferFrames: TurntableConstants.preferredBufferFrames,
+                             measurements: measurements)
     }
 
     // MARK: - Internals

@@ -105,6 +105,11 @@ jobs:
           set -o pipefail
           APP="build/Build/Products/Debug/ScratchApp.app"
           "$APP/Contents/MacOS/ScratchApp" --selftest 2>&1 | tee ci-output/selftest.json
+      - name: Rapport de latence de l'app macOS (recette 6.3 CA 3)
+        run: |
+          set -o pipefail
+          APP="build/Build/Products/Debug/ScratchApp.app"
+          "$APP/Contents/MacOS/ScratchApp" --latency-report | tee ci-output/latency-report.json
       - name: Lancement de l'app et capture d'écran
         run: |
           APP="build/Build/Products/Debug/ScratchApp.app"
@@ -197,6 +202,22 @@ jobs:
             if (fs.existsSync(decoding)) {
               const lines = fs.readFileSync(decoding, 'utf8').split('\n').filter(l => l.trim()).slice(0, 12);
               body += `**Décodage (macOS, story 2.2 CA 7 : 3 s au plus en release)**\n\n${lines.map(l => '- ' + l).join('\n')}\n\n`;
+            }
+            const latency = 'artifacts/macos-logs/latency-report.json';
+            if (fs.existsSync(latency)) {
+              try {
+                const r = JSON.parse(fs.readFileSync(latency, 'utf8'));
+                const o = r.output;
+                const name = o.available ? o.name : 'indisponible';
+                body += `**Latence geste→son (6.3 CA 3 ; référence D-56 : moyenne sur la phase, tampon et latence annoncée compris)**\n\n`;
+                body += `Sortie ${name}, ${o.sampleRate} Hz, tampon effectif ${o.effectiveBufferFrames} trames (demandé ${o.requestedBufferFrames}), latence annoncée ${o.outputLatencyMilliseconds.toFixed(1)} ms\n\n`;
+                for (const d of r.displays) {
+                  body += `- ${d.displayRate} Hz : ${d.totalMilliseconds.toFixed(1)} ms ${d.withinTarget ? '✅' : '⚠️'} (objectif ${d.targetMilliseconds} ms) ; pire phase ${d.worstTotalMilliseconds.toFixed(1)} ms ; premier geste ${d.firstGestureTotalMilliseconds.toFixed(1)} ms ; ${d.phases} phases\n`;
+                }
+                body += '\n';
+              } catch (e) {
+                body += `Rapport de latence illisible : ${e}\n\n`;
+              }
             }
             const tail = 'artifacts/macos-report/report-tail.md';
             if (fs.existsSync(tail)) {
