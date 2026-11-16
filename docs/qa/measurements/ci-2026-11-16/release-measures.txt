@@ -1,0 +1,28 @@
+# Relevés de la CI macOS — recette 6.3 du 2026-11-16
+# Run GitHub Actions 43865283417, job 133292140676 (macos-15-arm64, macOS 15.8.2, Xcode 16.4)
+# Commit testé : d9b8c26 (main 2fc1f04 + PR #124 à 22af690) ; main f796f3a, après la fusion de #124, a le même arbre (9966de0)
+
+## swift test -c release -Xswiftc -enable-testing (filtre : RenderLoadTests, RealTimeAllocationTests, WaveformTests/testAnalysisTime_NFR4, testTenMinute, MemoryFootprintTests)
+2.2 CA 7 — WAV de 10 min (44,1 kHz, stéréo, 16 bits) décodé en 0.08 s (build release)
+2.2 CA 7 — MP3 de 10 min (599.8 s, 32 kbit/s, mono) décodé en 0.39 s (build release)
+NFR4 — mémoire : 2 sons distincts de 10 min (48 kHz, stéréo, 230 Mo par clip) chargés : +463 Mo (budget 650 Mo) ; après 20 remplacements : +2 Mo ; pic de décodage d'un remplacement : 1.01 × le clip (empreinte du processus de test : 472 Mo, build release)
+NFR2 — 10 000 rendus : 0 allocation, 0 retenue de clip, 0 retenues au total (build release)
+NFR3 — 2 platines à 16× : 284.8 µs par tampon de 256 trames = 5.3 % (build release, macOS)
+NFR3 — 2 platines à 16× : 145.4 µs par tampon de 128 trames = 5.5 % (build release, macOS)
+NFR4 — forme d'onde : 10 min à 48 kHz analysées en 0.015 s, 1.44 Mo de pics (build release)
+Executed 8 tests, with 0 failures (0 unexpected) in 18.846 (18.848) seconds
+
+## Tests du package (swift test --parallel, debug)
+macOS : 438 tests (tests-macos.txt) ; Linux (swift:6.0-jammy) : 247 tests (tests-linux.txt) ; 0 échec
+
+## Builds
+app macOS (Debug) : ** BUILD SUCCEEDED **
+app iOS, simulateur (Debug) : ** BUILD SUCCEEDED **
+build/Build/Products/Debug/ScratchApp.app/Contents/Resources/PrivacyInfo.xcprivacy: OK
+build/Build/Products/Debug-iphonesimulator/ScratchApp.app/PrivacyInfo.xcprivacy: OK
+
+## Self-test (--selftest) : selftest.json
+## Rapport de latence (--latency-report) : latency-report.json
+
+## Empreinte de l'app sur la scène de démonstration (Debug, deux sons de 8 s, B en lecture) : scripts/measure-memory.sh --once
+ScratchApp (7108) : empreinte 41.7M, pic 42.4M

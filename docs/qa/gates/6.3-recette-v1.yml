@@ -1,0 +1,74 @@
+schema: 1
+story: "6.3"
+story_title: "Recette V1 sur macOS"
+pr: 127
+issue: 44
+reviewed_sha: "f796f3a"
+gate: CONCERNS
+status_reason: >-
+  Partie automatique conforme sur le commit recetté (run CI 43865283417) : tests macOS (438) et Linux (247),
+  builds macOS et iOS (simulateur), self-test (12 contrôles), lancement de l'app ; 69 scénarios sur 128 prouvés
+  en entier, aucun ❌ ni ⚠️, aucune issue type:bug ; latence 17,0 ms à 120 Hz et 25,0 ms à 60 Hz sur la sortie
+  virtuelle (128 trames accordées) ; mémoire, décodage et temps réel conformes en release. Réserves : ce qui
+  exige un Mac réel avec une personne aux commandes, du matériel USB ou un appareil iOS n'est pas exécutable
+  dans cet environnement (D-23) et est listé à la section 9 de la recette. La recette macOS étant bloquante
+  (D-23), sa partie manuelle précède la décision de livraison, sauf décision explicite du PO.
+reviewer: Quinn
+updated: "2026-11-16"
+top_issues:
+  - id: "R1-APPAREIL"
+    severity: medium
+    finding: "15 scénarios 📱 et les 13 points de la section 5 non recettés sur iPhone et iPad ; app non lancée dans un simulateur (CA 6, D-23)."
+    suggested_owner: "PO (build signé) et recetteur humain"
+    suggested_action: "Recette 9.2 : build signé, simulateurs iPhone et iPad, puis les points de la section 5 et les scénarios 📱."
+  - id: "R2-MAC-REEL"
+    severity: medium
+    finding: "47 scénarios 🖐 (23 P0) et les parties manuelles des critères §7 demandent une personne aux commandes du Mac (souris, trackpad, Finder, AZERTY, écoute) ; 6.14.8 et 6.16.3 n'ont pas de preuve automatique."
+    suggested_owner: "Recetteur humain sur le Mac de recette"
+    suggested_action: "Recette 9.1, points 4 à 6, avant la décision de livraison (la recette macOS est bloquante, D-23)."
+  - id: "R3-LATENCE-SORTIES"
+    severity: medium
+    finding: "Latence mesurée sur la sortie virtuelle seulement (latence annoncée 0 ms, dérive nulle). Marge de 3,0 ms à 120 Hz et de 5,0 ms à 60 Hz : la latence annoncée de la sortie réelle s'y ajoute. Dérive (#129) non relevée."
+    suggested_owner: "Recetteur humain"
+    suggested_action: "--latency-report en release sur la sortie intégrée, le casque et l'USB ; au-delà de 20 ppm, pause de 2 min puis scratch (#129)."
+  - id: "R4-MEMOIRE-APP"
+    severity: low
+    finding: "Repère CI conforme (+463 Mo, +2 Mo après 20 remplacements), mais empreinte de l'app complète en release avec deux sons de 10 min non mesurée ; MP3 stéréo à 320 kbit/s non décodé."
+    suggested_owner: "Recetteur humain"
+    suggested_action: "scripts/measure-memory.sh pendant le scénario du CA 4 ; import chronométré du MP3 stéréo."
+  - id: "R5-USB"
+    severity: low
+    finding: "Interface USB, interface multicanal et retrait de l'interface : non testés, matériel indisponible (CA 5)."
+    suggested_owner: "PO (matériel, D-44)"
+    suggested_action: "Section 4 avec une MPC Sample si disponible ; sinon le CA 5 reste « non testé, matériel indisponible »."
+waiver: { active: false }
+checks:
+  - item: "CA 1, document de recette"
+    result: "docs/qa/recette-v1.md : 18 critères §7 et 128 scénarios avec résultat et preuve ; 152 tests cités, tous exécutés ; anomalies : aucune."
+  - item: "CA 2, CI verte"
+    result: "Run 43865283417 (Linux ✅, macOS ✅) ; self-test passed (12/12), 95 % en 58,7 ms, 17 inversions sans clic."
+  - item: "CA 3, latence"
+    result: "Sortie virtuelle de la CI : 128 → 128 trames, 48 kHz ; moyenne 17,0 ms (max 18,7) à 120 Hz et 25,0 ms (max 26,5) à 60 Hz ; premier geste 21,6 et 26,0 ms ; sorties réelles 🖐."
+  - item: "CA 4, mémoire et décodage"
+    result: "Repère release : +463 Mo pour deux sons de 10 min, +2 Mo après 20 remplacements ; MP3 de 10 min décodé en 0,39 s ; app complète et MP3 stéréo à 320 kbit/s 🖐."
+  - item: "CA 5, USB"
+    result: "Non testé, matériel indisponible ; logique de changement de sortie couverte par les tests."
+  - item: "CA 6, iOS et iPadOS"
+    result: "Build simulateur ✅ ; scénarios sur appareil listés (section 5, 15 scénarios 📱)."
+  - item: "CA 7, gate"
+    result: "CONCERNS (ce fichier)."
+nfr_validation:
+  security: {status: PASS, notes: "Aucune API réseau (check-no-network.sh) ; manifestes de confidentialité valides dans les apps macOS et iOS."}
+  performance: {status: CONCERNS, notes: "NFR2 et NFR3 conformes en release ; latence conforme sur la sortie virtuelle, avec une marge de 3,0 ms à 120 Hz à confirmer sur les sorties réelles (R3)."}
+  reliability: {status: CONCERNS, notes: "Cycle de vie et événements système couverts par les tests ; vraies interruptions, veille et matériel à vérifier (R1, R2, R5)."}
+  maintainability: {status: PASS, notes: "Preuves reproductibles (rapport de latence, self-test, measure-memory.sh, listes de tests) ; un avertissement Swift 6 sans effet en mode Swift 5 (O-1)."}
+evidence:
+  ci: "Run 43865283417 sur d9b8c26 (main 2fc1f04 + #124) ; main f796f3a a le même arbre (9966de0) ; macos-15-arm64, Xcode 16.4"
+  local: "scripts/linux-test.sh sur d9b8c26 (arbre de main f796f3a) : mêmes 247 tests que la CI, sans échec ; scripts/check-no-network.sh OK"
+  measurements: "docs/qa/measurements/ci-2026-11-16/ : latency-report.json, selftest.json, screenshot-demo-scene.png, release-measures.txt, tests-macos.txt, tests-linux.txt"
+recommendations:
+  immediate:
+    - action: "Faire la partie manuelle sur Mac (recette 9.1) avant la décision de livraison de la V1, ou la faire trancher par le PO (D-23)."
+  future:
+    - action: "Recette sur appareil (9.2), puis réexamen de D-15 par le PO avec les chiffres de latence des sorties réelles et des appareils."
+    - action: "Facultatif (Hugo) : lancer l'app iOS dans un simulateur iPhone et iPad dans la CI, avec une capture, pour couvrir les dispositions."

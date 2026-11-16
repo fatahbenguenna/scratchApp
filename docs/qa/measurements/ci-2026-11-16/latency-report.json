@@ -1,0 +1,44 @@
+{
+  "displays" : [
+    {
+      "displayRate" : 120,
+      "firstGestureTotalMilliseconds" : 21.645833333333325,
+      "issueThresholdMilliseconds" : 28.333333333333336,
+      "learnedEngineMaximumMilliseconds" : 16.06249999999987,
+      "learnedEngineMeanMilliseconds" : 14.364583333333014,
+      "learnedEngineMinimumMilliseconds" : 12.66666666666616,
+      "phases" : 8,
+      "targetMilliseconds" : 20,
+      "totalMilliseconds" : 17.031249999999684,
+      "withinTarget" : true,
+      "worstExceedsIssueThreshold" : false,
+      "worstTotalMilliseconds" : 18.729166666666536
+    },
+    {
+      "displayRate" : 60,
+      "firstGestureTotalMilliseconds" : 25.979166666666668,
+      "issueThresholdMilliseconds" : 46.666666666666664,
+      "learnedEngineMaximumMilliseconds" : 23.83333333333315,
+      "learnedEngineMeanMilliseconds" : 22.31770833333302,
+      "learnedEngineMinimumMilliseconds" : 21.020833333333044,
+      "phases" : 8,
+      "targetMilliseconds" : 30,
+      "totalMilliseconds" : 24.984374999999687,
+      "withinTarget" : true,
+      "worstExceedsIssueThreshold" : false,
+      "worstTotalMilliseconds" : 26.49999999999982
+    }
+  ],
+  "issueRequired" : false,
+  "output" : {
+    "actualSampleRate" : 48000,
+    "available" : true,
+    "driftPartsPerMillion" : 0,
+    "effectiveBufferFrames" : 128,
+    "name" : "Apple Virtual Sound Device",
+    "outputLatencyMilliseconds" : 0,
+    "requestedBufferFrames" : 128,
+    "sampleRate" : 48000
+  },
+  "withinTargets" : true
+}
