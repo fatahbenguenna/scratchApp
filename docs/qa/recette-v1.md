@@ -51,7 +51,7 @@
 
 ### 3.1 Latence (CA 3 ; SF-78, D-15, D-54, D-56)
 
-- **Sonde** : `AudioEngineHost.measureGestureLatency()` (#105, #122) sur le Mac de recette (Apple Silicon), app en **release**, sur la sortie intégrée puis sur l'interface USB.
+- **Outil** : `ScratchApp --latency-report` (#124), app en **release**, sur le Mac de recette (Apple Silicon), une fois par sortie (intégrée, casque, USB, USB multicanal). Commande : `/Applications/ScratchApp.app/Contents/MacOS/ScratchApp --latency-report > docs/qa/measurements/latence-<sortie>.json`. Le JSON donne la sortie, le tampon demandé et effectif, la latence annoncée et, à 120 Hz et 60 Hz, la moyenne D-56, la pire phase et le premier geste (sonde de #105 et #122).
 - **Statistique de référence** : régime appris (second geste après échauffement), réponse au premier échantillon, **moyenne sur 8 phases** (milieux des intervalles d'une image), plus le tampon effectif et la latence de sortie annoncée. Le maximum et le premier geste sont consignés.
 - **À relever pour chaque sortie** : tampon demandé et tampon effectif (`AudioOutputInfo.bufferFrames` ; 128 trames si #91 est retenu, sinon 256), fréquence, latence annoncée, moyenne et maximum à 120 Hz et à 60 Hz.
 - **Objectifs** : moyenne ≤ 20 ms à 120 Hz et ≤ 30 ms à 60 Hz. Bluetooth et AirPlay sont consignés tels quels.
