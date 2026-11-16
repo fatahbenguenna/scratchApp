@@ -1,0 +1,38 @@
+schema: 1
+story: "6.3-support"
+story_title: "Appui à la recette 6.3 : ScratchApp --latency-report (CA 3)"
+pr: 124
+issue: 44
+reviewed_sha: "076b08a"
+gate: PASS
+status_reason: >-
+  Rapport JSON sur la sortie réelle (nom, fréquence, tampon demandé et effectif, latence annoncée) et,
+  à 120 Hz puis 60 Hz, moyenne D-56 (8 phases, régime appris, tampon et latence annoncée compris),
+  pire phase, premier geste, parties moteur, objectif et withinTarget ; aucun son chargé (RM-01).
+  Section au rapport CI : 25,6 et 34,2 ms à 256 trames sur la sortie virtuelle, concordant avec #122.
+reviewer: Quinn
+updated: "2026-11-16"
+top_issues:
+  - id: "REQUESTED-BUFFER"
+    severity: low
+    finding: "requestedBufferFrames vaut TurntableConstants.preferredBufferFrames (256) ; après #117, le tampon visé est OutputBufferPolicy.preferredFrames (128). Conflit avec #117 dans AudioEngineHost.swift."
+    suggested_action: "La seconde fusionnée de #124 et #117 passe requestedBufferFrames à OutputBufferPolicy.preferredFrames."
+checks:
+  - item: "JSON"
+    result: "output (tampon effectif relu, latence annoncée), displays (moyenne, pire phase, premier geste, objectif), withinTargets ; testLatencyReport_6_3 (sortie simulée, cas sans sortie, aller-retour JSON)."
+  - item: "Rapport CI"
+    result: "Sortie Apple Virtual Sound Device, 48 kHz, 256 trames ; 25,6 ms (120 Hz) et 34,2 ms (60 Hz), pire phase 29,1 et 41,2 ms."
+nfr_validation:
+  security: {status: PASS, notes: "Mode de diagnostic sans son, sans réseau."}
+  performance: {status: PASS, notes: "Mesure hors ligne ; sortie réelle seulement pour le tampon et la latence annoncée."}
+  reliability: {status: PASS, notes: "Code de retour 2 en cas d'erreur ; cas sans sortie couvert."}
+  maintainability: {status: PASS, notes: "Format JSON stable et testé."}
+evidence:
+  ci: "wait-ci sur 076b08a : Linux ✅, macOS ✅ ; section « Latence geste→son » au rapport"
+  merge_check: "Sans conflit avec main, #113, #118, #125 ; conflit avec #117 (AudioEngineHost.swift et tests)"
+recommendations:
+  immediate:
+    - action: "Fusionner après #122 (rebase --onto 9a0e037) ; aligner requestedBufferFrames sur #117 selon l'ordre de fusion."
+  future:
+    - action: "Ajouter la fréquence réelle de la sortie et la dérive en ppm (#129) ; publier le dépassement « objectif + une image » (D-56)."
+    - action: "Vérifier sur le premier rapport CI après #125 et #117 : environ 17,0 et 25,0 ms à 128 trames."

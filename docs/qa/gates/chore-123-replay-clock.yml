@@ -1,0 +1,53 @@
+schema: 1
+story: "1.2-followup-123"
+story_title: "Rejeu du doigt ancré sur une horloge estimée, retard indépendant de la phase (suivi #123, D-56)"
+pr: 125
+issue: 123
+reviewed_sha: "4b20183"
+review_history:
+  - sha: "10fd504"
+    gate: PASS
+    note: "Horloge estimée ; D-56 vérifié (17,03 / 24,99 ms à 128 trames)."
+  - sha: "4443894"
+    gate: PASS
+    note: "Horloge comptée en échantillons entiers (ancrage + compteur Int64) : identité au bit près des rendus par blocs et par échantillon ; testClockDoesNotDependOnBlockSplitting_123 ; 244/244 sous Linux."
+  - sha: "4b20183"
+    gate: PASS
+    note: "Rebase sur main après #122 (range-diff identique) ; assertions de la sonde recalées : écart entre phases > 2 ms et < 1/240 s + 0,5 ms, moyenne > phase alignée + 2 ms."
+gate: PASS
+status_reason: >-
+  Cause confirmée : le délai de livraison du premier toucher s'ajoutait au retard de tout le geste.
+  FingerTrajectory estime l'horloge de l'appelant (avance audio par bloc, remontée par événement,
+  −1 µs par événement) et part de min(toucher, max(estimation, toucher) − retard). Sonde QA (milieux
+  de 8 phases) : 128 trames 17,03 ms à 120 Hz et 24,99 ms à 60 Hz de moyenne (maximum 18,73 et
+  26,50 ms), un tampon compris, sans périphérique ; maximum à 256 trames et 120 Hz 23,98 ms, sous le
+  seuil de D-56. Sans allocation ; sortie indépendante du découpage.
+reviewer: Quinn
+updated: "2026-11-16"
+top_issues:
+  - id: "CLOCK-DRIFT-AFTER-IDLE"
+    severity: low
+    finding: "Pendant une pause, l'estimation suit l'horloge audio sans être recalée : avec −100 ppm et 120 s de pause, le premier geste dépasse les objectifs (21,7 ms à 120 Hz et 32,8 ms à 60 Hz, 128 trames, avec le tampon) ; avec +100 ppm, bref trou de vitesse."
+    suggested_action: "Mesurer la dérive réelle en recette ; au-delà d'environ 20 ppm, ancrer le rejeu sur l'heure hôte du rendu (mHostTime) (#129)."
+checks:
+  - item: "D-56 (sonde QA)"
+    result: "Chiffres de la PR reproduits exactement : 17,03 / 24,99 ms (128 trames), 22,30 ms (256 trames, 120 Hz), maxima 18,73 / 26,50 / 23,98 ms."
+  - item: "Temps réel et découpage"
+    result: "testNoAllocationOnRenderThread_NFR2 et testHeldOutputDoesNotDependOnBlockSize verts ; 242/242 sous Linux."
+  - item: "Dérive (simulation QA)"
+    result: "−20 ppm, 120 s : +1,6 ms ; −50 ppm, 120 s : +3,9 ms ; −100 ppm, 120 s : +4,6 ms à 120 Hz et +7,8 ms à 60 Hz sur la moyenne (128 trames)."
+nfr_validation:
+  security: {status: PASS, notes: "Sans objet."}
+  performance: {status: PASS, notes: "D-15 tenu en moyenne à 128 trames hors périphérique ; sensibilité à la dérive suivie (#129)."}
+  reliability: {status: PASS, notes: "Premier geste et reprise inchangés ; aucune famine dans le cas nominal."}
+  maintainability: {status: PASS, notes: "Estimation documentée ; test de phase au niveau du rejeu."}
+evidence:
+  ci: "wait-ci sur 10fd504 : Linux ✅, macOS ✅"
+  linux_tests: "scripts/linux-test.sh sur la fusion avec main : 242/242"
+  merge_check: "Sans conflit avec main, #105, #122, #113 ; conflit attendu avec #117 (FingerTrajectory), rebase selon l'ordre validé"
+  drift_probe: "Sonde QA : horloge audio décalée de ±20 à ±100 ppm, pause de 5 à 120 s entre les deux gestes, 8 phases"
+recommendations:
+  immediate:
+    - action: "Fusionner après #105 et #122 (rebase avec les deux assertions de la sonde recalées) ; ferme #123."
+  future:
+    - action: "#129 : mesure de la dérive en recette ; ancrage sur mHostTime si nécessaire."
