@@ -54,6 +54,13 @@ public struct MainLayoutView: View {
             #endif
         }
         .background(Theme.bgApp)
+        // Deck events (sound loaded, deck emptied) are announced here, whichever deck is shown (UX §8.6).
+        .onChange(of: model.deckA.eventAnnouncementCount) {
+            AccessibilityNotification.Announcement(model.deckA.eventAnnouncement).post()
+        }
+        .onChange(of: model.deckB.eventAnnouncementCount) {
+            AccessibilityNotification.Announcement(model.deckB.eventAnnouncement).post()
+        }
         #if os(macOS)
         .frame(minWidth: MainLayoutMetrics.macMinimumSize.width, minHeight: MainLayoutMetrics.macMinimumSize.height)
         #else

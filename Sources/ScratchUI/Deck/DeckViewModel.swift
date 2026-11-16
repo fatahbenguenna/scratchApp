@@ -73,6 +73,10 @@ public final class DeckViewModel {
     /// confirmé par l'instantané (#94) ; émise à chaque incrément de `setCueAnnouncementCount`.
     public private(set) var setCueAnnouncement = ""
     public private(set) var setCueAnnouncementCount = 0
+    /// Annonce VoiceOver d'un événement de la platine (son chargé, platine vidée ; UX §8.6), émise
+    /// par la disposition principale à chaque incrément d'`eventAnnouncementCount` (5.3).
+    public private(set) var eventAnnouncement = ""
+    public private(set) var eventAnnouncementCount = 0
     /// Incrémenté à chaque START sur une platine vide : la vue met alors en avant « Importer » et
     /// « Charger la démo » et VoiceOver l'annonce (PO-01, UX §5.2).
     public private(set) var emptyDeckHighlightCount = 0
@@ -153,14 +157,16 @@ public final class DeckViewModel {
     public var startStopAccessibilityValue: String { motorOn ? "moteur en marche" : "moteur arrêté" }
 
     /// Annonce VoiceOver d'un START sur une platine vide (UX §8.6).
-    public var emptyStartAnnouncement: String {
-        "Aucun son chargé sur la platine \(deck.rawValue). Importez un fichier ou chargez la démo."
-    }
+    public var emptyStartAnnouncement: String { AccessibilityText.emptyStart(deck: deck) }
 
     /// Applique l'instantané de l'image (appelé par `AppModel.tick()`).
     func apply(_ snapshot: DeckSnapshot) {
         if frame != snapshot { frame = snapshot }
-        if isLoaded != snapshot.isLoaded { isLoaded = snapshot.isLoaded }
+        if isLoaded != snapshot.isLoaded {
+            // A deck only empties when its sound is deleted from the library (3.5).
+            if isLoaded { announce(AccessibilityText.cleared(deck: deck)) }
+            isLoaded = snapshot.isLoaded
+        }
         if durationSeconds != snapshot.durationSeconds { durationSeconds = snapshot.durationSeconds }
         // A commanded value stays shown until a snapshot confirms it (#57).
         let now = clock()
@@ -195,12 +201,20 @@ public final class DeckViewModel {
             return
         }
         if shown == expected {
+            if confirmedClipID != expected {
+                announce(AccessibilityText.loaded(deck: deck, title: title, duration: durationSeconds))
+            }
             confirmedClipID = expected
         } else if let shown, shown > expected {
             clearLoadedClip()   // superseded by a newer load
         } else if confirmedClipID == expected {
             clearLoadedClip()   // our clip was unloaded or replaced
         }
+    }
+
+    private func announce(_ text: String) {
+        eventAnnouncement = text
+        eventAnnouncementCount &+= 1
     }
 
     private func clearLoadedClip() {
@@ -314,6 +328,11 @@ public final class DeckViewModel {
         commandedResistance.command(clamped, at: clock())
     }
 
+    /// Résistance ± `steps` × 5 % (actions d'accessibilité, flèches sur le curseur focalisé ; 5.3).
+    public func nudgeResistance(steps: Int) {
+        setResistance(resistance + Double(steps) * 0.05)
+    }
+
     /// SET CUE (SF-13) : mémorise la position de la tête, y compris disque tenu (6.6). Sans effet sur
     /// une platine vide.
     public func setCue() {
@@ -330,8 +349,7 @@ public final class DeckViewModel {
         let confirmed = snapshot.cueSeconds != nil && snapshot.cueSeconds != pending.previous
         guard confirmed || now - pending.time >= CommandedValue<Double>.timeout else { return }
         pendingSetCue = nil
-        let tenths = DeckFormatting.tenths(snapshot.cueSeconds ?? pending.position)
-        setCueAnnouncement = "Point CUE mémorisé à " + DeckFormatting.spokenTime(tenths: tenths)
+        setCueAnnouncement = AccessibilityText.setCue(at: snapshot.cueSeconds ?? pending.position)
         setCueAnnouncementCount &+= 1
     }
 
@@ -349,14 +367,11 @@ public final class DeckViewModel {
     /// Témoin « 0 » : pitch exactement à 0 %.
     public var isPitchZero: Bool { abs(pitch) < 1e-9 }
     /// Résistance : « 50 % ».
-    public var resistanceText: String { "\(Int((resistance * 100).rounded()))\u{00A0}%" }
+    public var resistanceText: String { AccessibilityText.percent(resistance) }
     /// Un CUE est défini : témoin du bouton CUE allumé.
     public var hasCue: Bool { cueSeconds != nil }
     /// Valeur VoiceOver du bouton CUE : « CUE à 12,3 secondes » ou « aucun CUE, retour au début ».
-    public var cueAccessibilityValue: String {
-        guard let cueSeconds else { return "aucun CUE, retour au début" }
-        return "CUE à " + DeckFormatting.spokenTime(tenths: DeckFormatting.tenths(cueSeconds))
-    }
+    public var cueAccessibilityValue: String { AccessibilityText.cue(cueSeconds) }
 
     // MARK: Aperçu et needle drop (story 4.6)
 
@@ -388,9 +403,7 @@ public final class DeckViewModel {
     /// Valeur VoiceOver de l'aperçu : « position 12,3 secondes sur 3 minutes 45 secondes, CUE à
     /// 4 secondes » (ou « aucun CUE ») ; à la cadence du dixième, comme l'en-tête (UX §10.2).
     public var overviewAccessibilityValue: String {
-        guard isLoaded else { return headerAccessibilityValue }
-        let cue = cueSeconds.map { "CUE à " + DeckFormatting.spokenTime(tenths: DeckFormatting.tenths($0)) }
-        return headerAccessibilityValue + ", " + (cue ?? "aucun CUE")
+        AccessibilityText.overview(header: headerAccessibilityValue, isLoaded: isLoaded, cue: cueSeconds)
     }
 
     // MARK: Geste sur le disque (angles de `GestureAngleTracker`, temps des événements)

@@ -74,23 +74,23 @@ public final class MixerViewModel {
     /// Largeur de cut-in `w = lerp(1 ; 0,03 ; courbe)` ; repères affichés quand `w ≤ 0,2`, à `w`
     /// (plein niveau de la voie de droite) et `1 − w` (voie de gauche) (UX §5.12).
     public var cutInWidth: Double? {
-        let width = 1 + (TurntableConstants.crossfaderCutInWidth - 1) * crossfaderCurve
+        let width = CrossfaderCurve.cutInWidth(curve: crossfaderCurve)   // core formula (#75)
         return width <= 0.2 ? width : nil
     }
 
     /// Valeur VoiceOver du crossfader : « 50 %, centre », « butée gauche, voie A » (UX §5.12, §11.2).
     public var crossfaderAccessibilityValue: String {
-        if crossfader <= 0 { return "butée gauche, voie \(leftDeck.rawValue)" }
-        if crossfader >= 1 { return "butée droite, voie \(rightDeck.rawValue)" }
-        let text = Self.percent(crossfader)
-        return abs(crossfader - 0.5) < 0.005 ? text + ", centre" : text
+        AccessibilityText.crossfader(crossfader, leftDeck: leftDeck, rightDeck: rightDeck)
     }
+
+    /// Valeur VoiceOver de la courbe : « coupure franche », « douce », « 60 % » (UX §11.2).
+    public var curveAccessibilityValue: String { AccessibilityText.curve(crossfaderCurve) }
 
     /// Valeur d'un fader de voie : « 100 % ».
     public func lineFaderText(_ deck: DeckID) -> String { Self.percent(lineFaders[deck]) }
 
     /// Pourcentage entier avec espace insécable (UX §8.1).
-    static func percent(_ value: Double) -> String { "\(Int((value * 100).rounded()))\u{00A0}%" }
+    static func percent(_ value: Double) -> String { AccessibilityText.percent(value) }
 
     /// Position 0 (butée A) … 1 (butée B) (SF-12).
     public func setCrossfader(_ value: Double) {
@@ -107,6 +107,16 @@ public final class MixerViewModel {
     }
 
     /// Clavier Mac `⇧←` / `⇧↓` / `⇧→` : butée A, centre, butée B (3.5).
+    /// Fader de voie ± `steps` × 5 % (actions d'accessibilité, flèches sur le fader focalisé ; 5.3).
+    public func nudgeLineFader(_ deck: DeckID, steps: Int) {
+        setLineFader(deck, lineFaders[deck] + Double(steps) * 0.05)
+    }
+
+    /// Courbe ± `steps` × 10 % (actions d'accessibilité, flèches sur la courbe focalisée ; 5.3).
+    public func nudgeCrossfaderCurve(steps: Int) {
+        setCrossfaderCurve(crossfaderCurve + Double(steps) * 0.1)
+    }
+
     public func moveCrossfaderToA() { setCrossfader(0) }
     public func centerCrossfader() { setCrossfader(0.5) }
     public func moveCrossfaderToB() { setCrossfader(1) }

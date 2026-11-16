@@ -74,6 +74,26 @@ final class UserDefaultsPreferencesStoreTests: XCTestCase {
         XCTAssertEqual(preferences.mixer.crossfaderCurve, 1)
         XCTAssertEqual(preferences.motor, MotorTimings(startDuration: 5, brakeDuration: 0.1, slipmatCatchUp: 0.3))
 
+        // #97 — each half of a pair is read on its own: an unreadable half keeps the other one.
+        let fader = TurntableConstants.defaultLineFader
+        for json in [#"{"mixer":{"lineFaders":{"a":0.4,"b":"x"}}}"#, #"{"mixer":{"lineFaders":{"a":0.4}}}"#] {
+            defaults.set(Data(json.utf8), forKey: key)
+            XCTAssertEqual(store().load().mixer.lineFaders, DeckPair(a: 0.4, b: fader), json)
+        }
+        defaults.set(Data(#"{"mixer":{"lineFaders":7}}"#.utf8), forKey: key)
+        XCTAssertEqual(store().load().mixer.lineFaders, DeckPair(repeating: fader), "unreadable pair: both defaults")
+        defaults.set(Data(#"{"decks":{"a":{"speed":"45","pitch":0.03},"b":5}}"#.utf8), forKey: key)
+        let decks = store().load().decks
+        XCTAssertEqual(decks.a, AppPreferences.Deck(speed: .rpm45, pitch: 0.03))
+        XCTAssertEqual(decks.b, AppPreferences.Deck())
+
+        // #97 — pitch restored on the 0.1 % step (SF-11), like the interface.
+        defaults.set(Data(#"{"decks":{"a":{"pitch":0.0533},"b":{"pitch":-0.0249}}}"#.utf8), forKey: key)
+        let restored = store().load().decks
+        XCTAssertEqual(restored.a.pitch, 53 * TurntableConstants.pitchStep)
+        XCTAssertEqual(restored.b.pitch, -25 * TurntableConstants.pitchStep)
+        XCTAssertEqual(AppPreferences.quantizedPitch(restored.a.pitch), restored.a.pitch, "idempotent")
+
         defaults.set(Data("{ pas du JSON".utf8), forKey: key)
         XCTAssertEqual(store().load(), .defaults)
         defaults.set("un texte", forKey: key)
