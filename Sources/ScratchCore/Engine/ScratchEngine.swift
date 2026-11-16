@@ -46,13 +46,16 @@ public final class ScratchEngine: EngineControlling, @unchecked Sendable {
     private var meters = RenderMeters()
     private let scratch: RenderScratch
 
-    /// - Parameter outputSampleRate: fréquence de sortie initiale (modifiable par
-    ///   `EngineCommand.outputSampleRate`).
-    public init(outputSampleRate: Double = 48_000) {
+    /// - Parameters:
+    ///   - outputSampleRate: fréquence de sortie initiale (modifiable par
+    ///     `EngineCommand.outputSampleRate`).
+    ///   - replayOptions: leviers de latence du rejeu du doigt (#91), désactivés par défaut.
+    public init(outputSampleRate: Double = 48_000, replayOptions: ReplayLatencyOptions = .standard) {
         let rate = outputSampleRate.isFinite && outputSampleRate > 0 ? outputSampleRate : 48_000
         self.outputSampleRate = rate
-        self.deckA = DeckChannel(sampleRate: rate)
-        self.deckB = DeckChannel(sampleRate: rate)
+        let finger = FingerTrajectory.Configuration(options: replayOptions)
+        self.deckA = DeckChannel(sampleRate: rate, fingerConfiguration: finger)
+        self.deckB = DeckChannel(sampleRate: rate, fingerConfiguration: finger)
         self.mixer = MixerRenderer(outputSampleRate: rate)
         self.scratch = RenderScratch(capacity: ScratchEngine.maximumBlockFrames)
         self.snapshots = SnapshotBuffer(initialValue: EngineSnapshot(outputSampleRate: rate))
@@ -295,8 +298,8 @@ struct DeckChannel {
     private var outgoingRemaining = 0
     private var outgoingLength = 1
 
-    init(sampleRate: Double) {
-        physics = DeckPhysics(sampleRate: sampleRate)
+    init(sampleRate: Double, fingerConfiguration: FingerTrajectory.Configuration = FingerTrajectory.Configuration()) {
+        physics = DeckPhysics(sampleRate: sampleRate, fingerConfiguration: fingerConfiguration)
         renderer = DeckRenderer(outputSampleRate: sampleRate)
         outgoingRenderer = renderer
         updateFadeLength(sampleRate)

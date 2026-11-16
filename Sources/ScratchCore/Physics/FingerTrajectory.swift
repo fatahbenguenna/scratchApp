@@ -28,8 +28,9 @@
 ///   retard après le relâchement) prolonge le geste au lieu d'être perdu (story 1.2) : le rejeu va
 ///   jusqu'au bout, le disque reste tenu entre les deux contacts, puis suit le nouveau doigt depuis
 ///   le point de relâchement, sans saut.
-/// - Les touches prédites sont ignorées (D-16, calibrage de la story 1.2) : aucun gain de retard
-///   sans dépassement aux inversions.
+/// - Les touches prédites sont ignorées par défaut (D-16, calibrage de la story 1.2). Le levier 3 de
+///   #91 (`ReplayLatencyOptions.predictedTouches`, désactivé) les suit entre deux livraisons, avec des
+///   garde-fous contre le dépassement aux inversions (`appendPredicted`).
 ///
 /// Latence ajoutée = `delay`, sur l'horloge estimée : environ une image d'affichage, plus l'ancienneté
 /// de la dernière touche à la livraison, la quantification au tampon et la marge (architecture §6.4).
@@ -47,6 +48,10 @@ struct FingerTrajectory {
         var maximumRateDeviation: Double = 0.1
         /// Lissage exponentiel du retard appris (0…1, par lot).
         var delaySmoothing: Double = 0.1
+        /// Levier 3 (#91) : suivre les touches prédites entre deux livraisons.
+        var usesPredictedTouches = false
+        /// Avance maximale d'une prédiction sur la dernière touche réelle.
+        var maximumPredictionHorizon: Double = 1.0 / 120
     }
 
     private static let capacity = 32
@@ -85,6 +90,9 @@ struct FingerTrajectory {
     private var endTime: Double?
     /// Décalage des angles d'un geste repris pendant le rejeu du relâchement précédent.
     private var angleOffset: Double = 0
+    /// Prédiction retenue au-delà de la dernière touche réelle (levier 3), ou `-infinity`.
+    private var predictedTime = -Double.infinity
+    private var predictedAngle: Double = 0
 
     /// Dernière cible produite (angle cumulé du doigt).
     private(set) var output: Double = 0
@@ -142,6 +150,7 @@ struct FingerTrajectory {
         endTime = nil
         output = angle
         isActive = true
+        predictedTime = -.infinity
     }
 
     /// Nouvel événement. Les temps non strictement croissants et les valeurs non finies sont ignorés.
@@ -150,6 +159,38 @@ struct FingerTrajectory {
         push(time: time, angle: angle + angleOffset)
         hasFreshEvents = true
         synchronizeClock(with: time)
+        predictedTime = -.infinity // real touches replace the predictions
+    }
+
+    /// Touche prédite (levier 3, désactivé par défaut ; SF-78, D-16). Elle n'est retenue que dans le
+    /// sens du dernier mouvement réel, sans aller plus vite que lui, sans dépasser le point d'arrêt d'un
+    /// mouvement qui ralentit (décélération constante), et à `maximumPredictionHorizon` au plus de la
+    /// dernière touche réelle. Les touches réelles suivantes la remplacent.
+    mutating func appendPredicted(angle: Double, time: Double) {
+        guard configuration.usesPredictedTouches, isActive, endTime == nil, count >= 2,
+              angle.isFinite, time.isFinite, time > newestTime, time > predictedTime,
+              time - newestTime <= configuration.maximumPredictionHorizon else { return }
+        let last = (oldest + count - 1) & Self.indexMask
+        let previous = (oldest + count - 2) & Self.indexMask
+        let span = times[last] - times[previous]
+        guard span > 0 else { return }
+        let velocity = (angles[last] - angles[previous]) / span
+        let step = angle + angleOffset - angles[last]
+        // Along the current direction only: a predicted reversal is not followed.
+        guard velocity != 0, step * velocity > 0 else { return }
+        var reach = abs(velocity) * (time - newestTime)
+        if count >= 3 {
+            // Slowing down toward a reversal: never beyond the stop point at the current deceleration.
+            let before = (oldest + count - 3) & Self.indexMask
+            let earlierSpan = times[previous] - times[before]
+            let earlierVelocity = earlierSpan > 0 ? (angles[previous] - angles[before]) / earlierSpan : 0
+            let deceleration = (abs(earlierVelocity) - abs(velocity)) / (0.5 * (span + earlierSpan))
+            if earlierVelocity * velocity > 0, deceleration > 0 {
+                reach = min(reach, velocity * velocity / (2 * deceleration))
+            }
+        }
+        predictedTime = time
+        predictedAngle = angles[last] + (step > 0 ? min(step, reach) : max(step, -reach))
     }
 
     /// L'horloge de l'appelant a au moins atteint `time` : estimation remontée, ou abaissée de 1 µs
@@ -177,6 +218,7 @@ struct FingerTrajectory {
     mutating func end(time: Double) {
         guard isActive, endTime == nil else { return }
         if time.isFinite { synchronizeClock(with: time) }
+        predictedTime = -.infinity
         let releaseTime = time.isFinite ? max(time, newestTime) : newestTime
         if releaseTime > newestTime {
             push(time: releaseTime, angle: newestAngle)
@@ -223,7 +265,7 @@ struct FingerTrajectory {
     mutating func nextTarget() -> Double {
         guard isActive else { return output }
         var next = playhead + rate * samplePeriod
-        let limit = newestTime
+        let limit = max(newestTime, predictedTime)
         if next >= limit {
             if !isStarving, endTime == nil { starvationCount += 1 }
             isStarving = true
@@ -240,7 +282,11 @@ struct FingerTrajectory {
             count -= 1
         }
         let t0 = times[oldest]
-        if count < 2 || playhead <= t0 {
+        if playhead > newestTime, predictedTime > newestTime {
+            // Inside the predicted span (lever 3).
+            let newest = newestTime
+            output = newestAngle + (predictedAngle - newestAngle) * (playhead - newest) / (predictedTime - newest)
+        } else if count < 2 || playhead <= t0 {
             output = angles[oldest]
         } else {
             let i1 = (oldest + 1) & Self.indexMask
@@ -266,5 +312,14 @@ struct FingerTrajectory {
         times[index] = time
         angles[index] = angle
         count += 1
+    }
+}
+
+extension FingerTrajectory.Configuration {
+    /// Réglage du rejeu avec les leviers de latence de #91.
+    init(options: ReplayLatencyOptions) {
+        self.init()
+        if options.reducedMargin { targetMargin = 0.0005 }
+        usesPredictedTouches = options.predictedTouches
     }
 }
