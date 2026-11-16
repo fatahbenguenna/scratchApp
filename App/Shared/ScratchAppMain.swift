@@ -24,6 +24,10 @@ struct ScratchAppMain: App {
         if CommandLine.arguments.contains("--selftest") {
             Self.runSelfTestAndExit()
         }
+        // Recette 6.3 CA 3 : `ScratchApp --latency-report` (JSON), sur la sortie réelle, sans lecture.
+        if CommandLine.arguments.contains("--latency-report") {
+            Self.runLatencyReportAndExit()
+        }
         let model = Self.makeModel(launchOptions: Self.launchOptions())
         self.model = model
         #if os(macOS)
@@ -104,6 +108,28 @@ struct ScratchAppMain: App {
             let root = FileManager.default.temporaryDirectory.appendingPathComponent("ScratchApp", isDirectory: true)
             return LibraryLocations(documentsDirectory: root.appendingPathComponent("Documents", isDirectory: true),
                                     supportDirectory: root.appendingPathComponent("Support", isDirectory: true))
+        }
+    }
+
+    /// Rapport de latence de la recette (6.3 CA 3 ; D-15, D-54, D-56). La sortie réelle démarre pour
+    /// donner son tampon effectif et sa latence annoncée. Aucun son n'est chargé : le moteur rend du
+    /// silence (RM-01). La mesure de la sonde se fait hors ligne.
+    @MainActor
+    private static func runLatencyReportAndExit() -> Never {
+        let host = AudioEngineHost(engine: ScratchEngine())
+        host.start()
+        do {
+            let report = try host.latencyReport()
+            host.stop()
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let json = (try? encoder.encode(report)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+            print(json)
+            exit(0)
+        } catch {
+            host.stop()
+            FileHandle.standardError.write(Data("Rapport de latence en échec : \(error)\n".utf8))
+            exit(2)
         }
     }
 

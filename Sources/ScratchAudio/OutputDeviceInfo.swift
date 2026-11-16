@@ -87,6 +87,16 @@ struct OutputDevice {
     /// Taille de tampon effective, en trames (relue, jamais la valeur demandée).
     var bufferFrameSize: UInt32? { value(kAudioDevicePropertyBufferFrameSize) }
 
+    /// Fréquence réelle mesurée par le système pendant que la sortie tourne, en hertz : elle s'écarte
+    /// de la fréquence nominale selon la dérive de l'horloge du périphérique (#129).
+    var actualSampleRate: Double? {
+        var address = Self.address(kAudioDevicePropertyActualSampleRate)
+        var rate: Float64 = 0
+        var size = UInt32(MemoryLayout<Float64>.size)
+        guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, &rate) == noErr, rate > 0 else { return nil }
+        return rate
+    }
+
     /// Demande `frames` trames par tampon, ramenées à la plage du périphérique. Renvoie le tampon
     /// effectif relu, ou `nil` si le périphérique refuse la demande.
     @discardableResult
