@@ -3,7 +3,14 @@ story: "1.2-followup-123"
 story_title: "Rejeu du doigt ancré sur une horloge estimée, retard indépendant de la phase (suivi #123, D-56)"
 pr: 125
 issue: 123
-reviewed_sha: "10fd504"
+reviewed_sha: "4443894"
+review_history:
+  - sha: "10fd504"
+    gate: PASS
+    note: "Horloge estimée ; D-56 vérifié (17,03 / 24,99 ms à 128 trames)."
+  - sha: "4443894"
+    gate: PASS
+    note: "Horloge comptée en échantillons entiers (ancrage + compteur Int64) : identité au bit près des rendus par blocs et par échantillon ; testClockDoesNotDependOnBlockSplitting_123 ; 244/244 sous Linux."
 gate: PASS
 status_reason: >-
   Cause confirmée : le délai de livraison du premier toucher s'ajoutait au retard de tout le geste.
