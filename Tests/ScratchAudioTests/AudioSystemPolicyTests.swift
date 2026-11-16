@@ -124,13 +124,15 @@ final class AudioSystemPolicyTests: XCTestCase {
             for event in allEvents {
                 let result = actions(event, interrupted)
                 XCTAssertFalse(result.contains(.applyPendingCommands), "\(event): never pump while the fallback clock renders")
-                XCTAssertEqual(result.contains(.startOutput), event == .interruptionEnded, "\(event): output restarts only at the end")
+                XCTAssertEqual(result.contains(.startOutput), event == .interruptionEnded || event == .mediaServicesReset,
+                               "\(event): output restarts only at the end (or after a media services reset)")
                 XCTAssertFalse(result.contains(.notify(.outputUnavailable)), "\(event)")
                 XCTAssertFalse(result.contains(.stopOutput), "\(event): the output is already stopped")
             }
             XCTAssertEqual(actions(.routeChanged(previousDeviceUnavailable: true), interrupted),
                            [.stopAllMotors, .notify(.outputDisconnected)], "headphones unplugged during a call")
-            XCTAssertEqual(actions(.mediaServicesReset, interrupted), [.stopAllMotors, .resetSession, .rebuildGraph])
+            XCTAssertEqual(actions(.mediaServicesReset, interrupted), [.stopAllMotors, .resetSession, .rebuildGraph, .startOutput],
+                           "a media services reset closes the interruption (iOS may never send its end)")
             XCTAssertEqual(actions(.configurationChanged, interrupted), [])
             XCTAssertEqual(actions(.interruptionEnded, interrupted), [.rebuildGraph, .startOutput],
                            "rebuilt on the current route (it may have changed during the call)")
