@@ -200,11 +200,14 @@ final class AudioEngineHostTests: XCTestCase {
     /// manuel et le rendu direct donnent les mêmes valeurs. Le régime appris suit la cadence
     /// d'affichage : plus lent à 60 Hz qu'à 120 Hz.
     /// Valeurs de référence sous Linux, en rendu direct, à 48 kHz et 256 trames, sans la latence du
-    /// périphérique (partie moteur, puis avec un tampon) :
-    /// - 120 Hz : régime appris, moyenne 20,24 ms (25,57 ms), maximum 23,79 ms (29,12 ms) ;
+    /// périphérique (partie moteur, puis avec un tampon), avec le rejeu ancré sur l'horloge estimée
+    /// (#123) :
+    /// - 120 Hz : régime appris, moyenne 16,97 ms (22,30 ms), maximum 18,65 ms (23,98 ms) ;
     ///   premier geste, moyenne 21,65 ms (26,98 ms) ;
-    /// - 60 Hz : régime appris, moyenne 28,87 ms (34,21 ms), maximum 35,83 ms (41,17 ms) ;
+    /// - 60 Hz : régime appris, moyenne 24,81 ms (30,15 ms), maximum 26,15 ms (31,48 ms) ;
     ///   premier geste, moyenne 23,31 ms (28,64 ms).
+    /// Avant #123, le régime appris valait 20,24 ms de moyenne et 23,79 ms au pire à 120 Hz, et
+    /// 28,87 ms et 35,83 ms à 60 Hz : le délai de livraison du premier toucher s'ajoutait au retard.
     func testGestureLatencyProbe_D15() throws {
         let measurement = try GestureLatencyProbe.measure(sampleRate: 48_000, bufferFrames: 256, displayRate: 120,
                                                           outputLatency: 0.004)
@@ -224,8 +227,11 @@ final class AudioEngineHostTests: XCTestCase {
             XCTAssertLessThanOrEqual(spread.minimum, spread.mean)
             XCTAssertLessThanOrEqual(spread.mean, spread.maximum)
         }
-        XCTAssertGreaterThan(measurement.learned.maximum - measurement.learned.minimum, 0.004,
+        // #123: the phase only acts through the age of the newest touch at delivery (at most 1/240 s).
+        XCTAssertGreaterThan(measurement.learned.maximum - measurement.learned.minimum, 0.002,
                              "the learned delay depends on the touch/display phase")
+        XCTAssertLessThan(measurement.learned.maximum - measurement.learned.minimum, 1 / 240 + 0.000_5,
+                          "#123: no longer up to one display frame")
 
         let direct = Self.directSpread(displayRate: 120, phases: 8)
         XCTAssertEqual(measurement.learned.values.count, direct.learned.values.count)
@@ -236,7 +242,7 @@ final class AudioEngineHostTests: XCTestCase {
 
         // #114: the aligned phase is the best case; the mean no longer depends on the alignment.
         let aligned = try XCTUnwrap(Self.directEngineDelays(displayRate: 120, splitting: false).delays)
-        XCTAssertGreaterThan(measurement.engineDelay, aligned.learned + 0.004, "aligned phase: best case")
+        XCTAssertGreaterThan(measurement.engineDelay, aligned.learned + 0.002, "aligned phase: best case")
         let finer = Self.directSpread(displayRate: 120, phases: 16)
         XCTAssertEqual(finer.learned.mean, measurement.engineDelay, accuracy: 0.000_2, "8 phases are enough for the mean")
 

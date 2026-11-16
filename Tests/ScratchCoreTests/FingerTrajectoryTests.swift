@@ -78,6 +78,7 @@ final class FingerTrajectoryTests: XCTestCase {
             for index in start..<min(total, start + blockFrames) where started {
                 targets[index] = trajectory.nextTarget()
             }
+            trajectory.advanceClock(frameCount: blockFrames) // as DeckPhysics.process does
             start += blockFrames
         }
         return (targets, trajectory)
@@ -136,6 +137,101 @@ final class FingerTrajectoryTests: XCTestCase {
                 }
             }
         }
+    }
+
+    /// Deux gestes à la vitesse nominale, touches à 240 Hz livrées à chaque image, vues au début de
+    /// chaque tampon (protocole de la sonde de latence, #92, #114). Renvoie le retard du rejeu au
+    /// second geste : du premier mouvement horodaté jusqu'à l'instant où la tête l'atteint.
+    private func secondGestureReplayDelay(displayRate: Double, phase: Double, blockFrames frames: Int) -> Double? {
+        enum Kind { case begin, move, end }
+        let touchRate = 240.0
+        let starts = [0.1 + phase, 2.1 + phase]
+        func delivery(_ time: Double) -> Double { (time * displayRate - 1e-9).rounded(.up) / displayRate }
+        var events: [(delivery: Double, kind: Kind, time: Double)] = []
+        for (index, start) in starts.enumerated() {
+            events.append((delivery(start), .begin, start))
+            let count = Int((index == 0 ? 1.5 : 0.5) * touchRate)
+            for step in 1 ... count {
+                let time = start + Double(step) / touchRate
+                events.append((delivery(time), .move, time))
+            }
+            if index == 0 {
+                let end = start + Double(count) / touchRate
+                events.append((delivery(end), .end, end))
+            }
+        }
+        let omega = TurntableConstants.referenceAngularVelocity
+        let firstMove = starts[1] + 1 / touchRate
+        var trajectory = FingerTrajectory(sampleRate: sampleRate)
+        var next = 0
+        var sample = 0
+        var secondBegun = false
+        while Double(sample) / sampleRate < starts[1] + 0.5 {
+            let now = Double(sample) / sampleRate
+            while next < events.count, events[next].delivery <= now {
+                let event = events[next]
+                let start = event.time < starts[1] ? starts[0] : starts[1]
+                switch event.kind {
+                case .begin:
+                    trajectory.begin(angle: 0, time: event.time)
+                    secondBegun = event.time == starts[1]
+                case .move: trajectory.append(angle: omega * (event.time - start), time: event.time)
+                case .end: trajectory.end(time: event.time)
+                }
+                next += 1
+            }
+            trajectory.prepareBlock()
+            for offset in 0 ..< frames where trajectory.isActive {
+                _ = trajectory.nextTarget()
+                if secondBegun, trajectory.playhead >= firstMove {
+                    return Double(sample + offset + 1) / sampleRate - firstMove
+                }
+            }
+            trajectory.advanceClock(frameCount: frames)
+            sample += frames
+        }
+        return nil
+    }
+
+    /// #123, D-56 — le retard du rejeu en régime appris ne dépend plus de la phase entre les touches et
+    /// l'affichage. Le geste suivant part du retard appris compté depuis l'horloge estimée : le délai
+    /// de livraison de son premier toucher (jusqu'à une image) ne s'y ajoute plus. Sur 8 phases, l'écart
+    /// restant vient de l'ancienneté de la dernière touche à la livraison (au plus 1/240 s). Avant le
+    /// correctif, à 60 Hz et 128 trames : de 20,9 à 34,9 ms (écart de 14 ms, moyenne 27,7 ms) ; après :
+    /// de 21,2 à 24,0 ms (moyenne 22,5 ms).
+    func testLearnedReplayDelayDoesNotDependOnPhase_123() throws {
+        for (displayRate, frames, meanBound) in [(60.0, 128, 0.024), (60.0, 256, 0.026), (120.0, 128, 0.016), (120.0, 256, 0.018)] {
+            var delays: [Double] = []
+            for k in 0 ..< 8 {
+                let phase = (Double(k) + 0.5) / (8 * displayRate)
+                delays.append(try XCTUnwrap(secondGestureReplayDelay(displayRate: displayRate, phase: phase, blockFrames: frames)))
+            }
+            let mean = delays.reduce(0, +) / Double(delays.count)
+            let spread = delays.max()! - delays.min()!
+            let label = "\(displayRate) Hz, \(frames) frames"
+            XCTAssertLessThanOrEqual(spread, 1 / 240 + 0.0005, "\(label): spread \(spread)")
+            XCTAssertLessThanOrEqual(mean, meanBound, label)
+            XCTAssertGreaterThan(delays.min()!, 1 / displayRate, "\(label): at least one display frame (no starvation)")
+        }
+    }
+
+    /// #123 — l'horloge estimée est comptée en échantillons entiers : la même durée rendue en un bloc ou
+    /// échantillon par échantillon donne exactement la même horloge, donc le même rendu (D-54 : la
+    /// sonde rend échantillon par échantillon pendant l'attente d'une réponse).
+    func testClockDoesNotDependOnBlockSplitting_123() throws {
+        var whole = FingerTrajectory(sampleRate: sampleRate)
+        var split = FingerTrajectory(sampleRate: sampleRate)
+        XCTAssertNil(whole.clock)
+        whole.begin(angle: 0, time: 1.2345)
+        split.begin(angle: 0, time: 1.2345)
+        for _ in 0 ..< 37 {
+            whole.advanceClock(frameCount: 256)
+            for _ in 0 ..< 256 { split.advanceClock(frameCount: 1) }
+        }
+        XCTAssertEqual(whole.clock?.bitPattern, split.clock?.bitPattern)
+        XCTAssertEqual(try XCTUnwrap(whole.clock), 1.2345 + 37 * 256 / sampleRate, accuracy: 1e-12)
+        whole.setSampleRate(44_100)
+        XCTAssertEqual(try XCTUnwrap(whole.clock), 1.2345 + 37 * 256 / sampleRate, accuracy: 1e-12, "kept across a rate change")
     }
 
     /// Doigt immobilisé : la cible converge exactement vers l'angle final et la vitesse devient

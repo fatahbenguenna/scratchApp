@@ -277,6 +277,7 @@ struct DeckPhysics {
     mutating func process(frameCount: Int, positions: UnsafeMutablePointer<Double>, rates: UnsafeMutablePointer<Double>) {
         finger.prepareBlock()
         guard frameCount > 0 else { return }
+        defer { finger.advanceClock(frameCount: frameCount) } // the replay clock runs between gestures too
 
         // Per-block coefficients: settings only change between blocks.
         let dt = 1 / sampleRate
