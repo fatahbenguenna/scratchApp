@@ -3,43 +3,48 @@ story: "2.1-followup-91"
 story_title: "Latence geste→son : tampon de 128 trames, 256 en repli (suivi #91, D-54, D-56)"
 pr: 117
 issue: 91
-reviewed_sha: "452b0bf"
-gate: CONCERNS
+reviewed_sha: "b7a3244"
+review_history:
+  - sha: "452b0bf"
+    gate: CONCERNS
+    note: "Calibrage évalué en phase alignée (meilleur cas), et non selon D-56 ; en attente de #114."
+  - sha: "b7a3244"
+    gate: PASS
+    note: "Rebasée sur #125 (#123) : moyenne D-56 à 128 trames 17,03 ms (120 Hz) et 24,98 ms (60 Hz), objectifs tenus (D-57) ; leviers 2 et 3 en option désactivée ; négociation du tampon après deviceInUse = nil."
+gate: PASS
 status_reason: >-
-  OutputBufferPolicy (128 trames d'abord, tampon accordé jusqu'à 256 gardé, sinon 256 ; tampon effectif
-  publié) correct et testé ; NFR3 à 128 trames : 5,6 % en release. CONCERNS en attendant #114 : le
-  calibrage n'est pas évalué selon D-56 (phase alignée au lieu de la moyenne sur 8 phases). Selon D-56
-  (sonde QA, milieux de 8 phases comme #122, un tampon compris, sans périphérique) : 48 kHz 18,79 ms à
-  120 Hz et 30,26 ms à 60 Hz ; 44,1 kHz 19,75 et 32,26 ms ; reste de 0,25 à 1,2 ms à 120 Hz, objectif
-  dépassé à 60 Hz. Maximum à 256 trames et 120 Hz au-delà d'une période d'image (#123, cause trouvée
-  par James : correctif du rejeu annoncé).
+  Levier 1 (128 trames, 256 en repli, tampon effectif publié) avec le rejeu ancré de #123 : moyenne D-56
+  de 17,03 ms à 120 Hz et 24,98 ms à 60 Hz à 48 kHz (maxima 18,73 et 26,50 ms), un tampon compris, sans
+  périphérique ; reste de 3,0 et 5,0 ms ; pire phase sous l'objectif plus une image à 128 et à 256
+  trames. Test réécrit sur la moyenne (au moins 2 ms de reste). Leviers 2 (marge réduite) et 3 (touches
+  prédites, avec garde-fous aux inversions) en option désactivée par défaut, comportement identique.
+  NFR3 à 128 trames : 4,7 % en release. Conflit avec #113 résolu dans le bon ordre.
 reviewer: Quinn
 updated: "2026-11-16"
 top_issues:
-  - id: "CALIBRATION-NOT-D56"
-    severity: medium
-    finding: "Mesures, tests (testLearnedLatencyWith128Frames_D15, au moins 4 ms de reste) et doc d'OutputBufferPolicy en phase alignée ; selon D-56, le reste est de 0,7 à 1,7 ms à 48 kHz, et l'objectif est dépassé à 44,1 kHz et 60 Hz."
-    suggested_action: "Rebaser sur #114 ; mesurer et tester la moyenne de 8 phases (et publier le maximum) ; mettre à jour la doc et le tableau pour le PO."
-  - id: "D56-MAX-256"
+  - id: "LATENCY-REPORT-REQUESTED"
     severity: low
-    finding: "Repli à 256 trames, 120 Hz : maximum 28,60 ms (48 kHz) et 29,62 ms (44,1 kHz), soit plus d'une période d'image au-dessus de 20 ms."
-    suggested_action: "Examiner le rejeu dans la pire phase (#123)."
+    finding: "Conflit avec #124 : le rapport de latence doit publier OutputBufferPolicy.preferredFrames comme tampon demandé."
+    suggested_action: "La seconde fusionnée de #117 et #124 aligne requestedBufferFrames."
 checks:
+  - item: "Leviers désactivés"
+    result: "ReplayLatencyOptions.standard par défaut ; testLatencyLeversAreOffByDefault_91 (retard identique avec des prédictions envoyées) ; testPredictedTouchesDoNotOvershootReversals_91."
   - item: "Négociation du tampon"
     result: "testBufferNegotiation_D54 : 128 accordé, minimum à 192, refus puis 256, Bluetooth au-delà de 256, tout refusé."
   - item: "D-56 (sonde QA, 8 phases)"
     result: "Milieux de 8 phases (#122) : 128 trames 18,79 / 30,26 ms (48 kHz), 19,75 / 32,26 ms (44,1 kHz) à 120 / 60 Hz ; 256 trames 25,57 / 34,21 ms (48 kHz) ; un tampon compris, sans périphérique. Les valeurs k/8 publiées d'abord étaient basses de 0,5 à 1 ms."
 nfr_validation:
   security: {status: PASS, notes: "Sans objet."}
-  performance: {status: CONCERNS, notes: "Gain réel (−6,4 ms à 120 Hz en moyenne) mais reste pour le périphérique d'environ 1 ms ; à réévaluer avec #114."}
+  performance: {status: PASS, notes: "D-15 tenu en moyenne à 128 trames hors périphérique (3,0 et 5,0 ms de reste) ; NFR3 4,7 % en release."}
   reliability: {status: PASS, notes: "Repli à 256 trames ; tampon effectif publié."}
   maintainability: {status: PASS, notes: "Politique pure et testée ; constante partagée inchangée."}
 evidence:
-  ci: "wait-ci sur 452b0bf : Linux ✅, macOS ✅"
-  merge_check: "Sans conflit avec main ; conflit avec #113 dans AudioEngineHost.swift"
+  ci: "b7a3244 : premier passage macOS annulé faute de runner, relance verte (rapport df34f92)"
+  merge_check: "Sans conflit avec main (ef5dce3) ; conflit attendu avec #124 (AudioEngineHost.swift)"
+  linux_tests: "scripts/linux-test.sh sur la fusion avec main : 247/247"
   d56_probe: "Protocole de #105, 8 phases k/(8 × cadence), rendu direct sous Linux"
 recommendations:
   immediate:
-    - action: "Attendre #114, rebaser, mesurer et tester la moyenne selon D-56."
+    - action: "Fusionner après #125 (rebase --onto 4b20183) ; ferme #91."
   future:
-    - action: "#123 : pire phase à 256 trames et 120 Hz ; leviers suivants (marge du rejeu, touches prédites) si la recette manque l'objectif."
+    - action: "Recette (#44) : tampon effectivement accordé sur macOS, latence annoncée des sorties de référence, dérive des horloges (#129) ; leviers 2 et 3 si le reste ne suffit pas."
