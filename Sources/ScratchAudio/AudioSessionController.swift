@@ -11,14 +11,64 @@ import ScratchCore
 /// - activation au démarrage de l'hôte ;
 /// - nom de la route de sortie (UX §5.17) et valeurs obtenues (tampon, fréquence, latence).
 ///
-/// Les notifications d'interruption, de changement de route et de réinitialisation des services
-/// média, traduites en `AudioSystemEvent`, relèvent de la story 2.3.
+/// Story 2.3 (T2) : les notifications d'interruption, de changement de route
+/// (`AVAudioSession.routeChangeReasonKey`, `.oldDeviceUnavailable`) et de réinitialisation des services
+/// média sont traduites en `AudioSystemEvent` (`AudioSessionEvents`) et transmises sur le fil principal,
+/// entre `startObserving()` et `stopObserving()`.
 @MainActor
 public final class AudioSessionController {
     /// Appelé sur le fil principal pour chaque événement du système audio (story 2.3).
     public var onEvent: ((AudioSystemEvent) -> Void)?
 
-    public init() {}
+    private var observers: [any NSObjectProtocol] = []
+
+    public init() {
+        assert(AVAudioSession.InterruptionType.began.rawValue == AudioSessionEvents.interruptionBegan
+            && AVAudioSession.InterruptionType.ended.rawValue == AudioSessionEvents.interruptionEnded
+            && AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue == AudioSessionEvents.oldDeviceUnavailable
+            && AVAudioSession.RouteChangeReason.categoryChange.rawValue == AudioSessionEvents.categoryChange,
+            "AudioSessionEvents constants must match the SDK raw values")
+    }
+
+    /// Écoute les notifications de la session. Elles sont reçues sur la file principale et transmises
+    /// de façon synchrone : un retrait de casque arrête les moteurs sans attendre (CA 2).
+    public func startObserving() {
+        guard observers.isEmpty else { return }
+        let center = NotificationCenter.default
+        let session = AVAudioSession.sharedInstance()
+        observers = [
+            center.addObserver(forName: AVAudioSession.interruptionNotification, object: session,
+                               queue: .main) { [weak self] notification in
+                let info = notification.userInfo
+                let type = info?[AVAudioSessionInterruptionTypeKey] as? UInt
+                let reason = info?[AVAudioSessionInterruptionReasonKey] as? UInt
+                let wasSuspended = info?[AudioSessionEvents.wasSuspendedKey] as? Bool
+                MainActor.assumeIsolated {
+                    self?.forward(AudioSessionEvents.event(interruptionType: type, reason: reason,
+                                                           wasSuspended: wasSuspended))
+                }
+            },
+            center.addObserver(forName: AVAudioSession.routeChangeNotification, object: session,
+                               queue: .main) { [weak self] notification in
+                let reason = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
+                MainActor.assumeIsolated { self?.forward(AudioSessionEvents.event(routeChangeReason: reason)) }
+            },
+            center.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: session,
+                               queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.forward(.mediaServicesReset) }
+            },
+        ]
+    }
+
+    /// Cesse d'écouter les notifications de la session.
+    public func stopObserving() {
+        for observer in observers { NotificationCenter.default.removeObserver(observer) }
+        observers = []
+    }
+
+    private func forward(_ event: AudioSystemEvent?) {
+        if let event { onEvent?(event) }
+    }
 
     /// Configure et active la session : lecture, non mixable, 48 kHz et 256 trames préférés.
     public func activate() throws {

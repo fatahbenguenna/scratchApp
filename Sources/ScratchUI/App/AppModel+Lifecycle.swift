@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import ScratchAudio
 import ScratchCore
 
 // MARK: - Cycle de vie (story 6.2)
@@ -12,6 +13,7 @@ extension AppModel {
         guard let host else { return }
         host.start()
         hostStatusDidChange()
+        hostNoticeDidChange()
     }
 
     /// iPhone et iPad, passage en arrière-plan (SF-81, RM-56 ; 6.5 « Passer en arrière-plan ») :
@@ -60,6 +62,23 @@ extension AppModel {
         } onChange: { [weak self] in
             // Called before the new value is stored: read it on the next main-actor turn.
             Task { @MainActor in self?.hostStatusDidChange() }
+        }
+    }
+
+    /// Avis de l'hôte audio (story 2.3 CA 8 ; UX §8.5) : interruption, sortie déconnectée, indisponible
+    /// ou retrouvée. Chaque nouvel avis devient un bandeau, une seule fois ; puis nouvel abonnement.
+    /// Seul un hôte qui publie des avis (`AudioNoticePosting`, comme `AudioEngineHost`) en donne.
+    func hostNoticeDidChange() {
+        guard let poster = host as? any AudioNoticePosting else { return }
+        if let posted = poster.notice, posted.id != shownHostNoticeID {
+            shownHostNoticeID = posted.id
+            toasts.show(posted.notice.message)
+        }
+        withObservationTracking {
+            _ = poster.notice
+        } onChange: { [weak self] in
+            // Called before the new value is stored: read it on the next main-actor turn.
+            Task { @MainActor in self?.hostNoticeDidChange() }
         }
     }
 
