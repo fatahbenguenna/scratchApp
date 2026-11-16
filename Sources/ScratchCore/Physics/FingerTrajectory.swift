@@ -15,7 +15,14 @@
 ///   le plus petit retard sans famine, quelle que soit la cadence d'affichage.
 /// - **Famine** (la tête rattrape le dernier événement) : la tête se fige (vitesse nulle, jamais de
 ///   saut ni de dépassement) jusqu'au lot suivant, ce qui rallonge aussitôt le retard.
-/// - Le retard appris (`delay`) sert de retard initial au geste suivant.
+/// - Le retard appris (`delay`) sert de retard initial au geste suivant. Il est compté depuis une
+///   **estimation de l'horloge de l'appelant** (`clock`), et non depuis l'horodatage du toucher : la
+///   tête d'un nouveau geste part de `clock − delay`. Le délai de livraison du premier toucher (jusqu'à
+///   une image) ne s'ajoute donc plus au retard du geste, qui ne dépend plus de la phase entre les
+///   touches et l'affichage (#123, D-56). L'estimation avance au rythme de l'horloge audio
+///   (`advanceClock`, à la fin de chaque bloc, geste en cours ou non) ; elle est remontée à chaque
+///   événement reçu, puisque l'horloge de l'appelant a au moins atteint son horodatage, et redescend
+///   de 1 µs par événement pour suivre une dérive entre les deux horloges (jusqu'à 240 ppm à 240 Hz).
 /// - Le relâchement (`end`) est lui aussi rejoué : le disque n'est relâché qu'après le dernier
 ///   mouvement, avec le même retard. Un `begin` reçu pendant ce rejeu (doigt reposé moins d'un
 ///   retard après le relâchement) prolonge le geste au lieu d'être perdu (story 1.2) : le rejeu va
@@ -24,8 +31,9 @@
 /// - Les touches prédites sont ignorées (D-16, calibrage de la story 1.2) : aucun gain de retard
 ///   sans dépassement aux inversions.
 ///
-/// Latence ajoutée = `delay` : ≈ 13 ms avec un affichage à 120 Hz, ≈ 21 ms à 60 Hz
-/// (architecture §6.4). Fil audio uniquement, aucune allocation.
+/// Latence ajoutée = `delay`, sur l'horloge estimée : environ une image d'affichage, plus l'ancienneté
+/// de la dernière touche à la livraison, la quantification au tampon et la marge (architecture §6.4).
+/// Fil audio uniquement, aucune allocation.
 struct FingerTrajectory {
     struct Configuration: Equatable, Sendable {
         /// Retard du tout premier geste, avant apprentissage.
@@ -44,6 +52,8 @@ struct FingerTrajectory {
     private static let capacity = 32
     private static let indexMask = 31
     private static let historyCount = 16
+    /// Correction de dérive de l'estimation de l'horloge, par événement (s).
+    private static let clockDriftStep = 1e-6
 
     let configuration: Configuration
     private var samplePeriod: Double
@@ -61,7 +71,10 @@ struct FingerTrajectory {
 
     /// Position de rejeu, sur l'horloge de l'appelant.
     private(set) var playhead: Double = 0
-    /// Retard appris entre le dernier événement reçu et la tête de rejeu (latence ajoutée).
+    /// Estimation de l'horloge de l'appelant au début du prochain bloc (`nil` avant le premier
+    /// événement). Elle ne dépasse jamais l'horloge réelle, à la dérive près.
+    private(set) var clock: Double?
+    /// Retard appris entre l'horloge de l'appelant (estimée) et la tête de rejeu : la latence ajoutée.
     private(set) var delay: Double
     private var rate: Double = 1
     private var hasFreshEvents = false
@@ -100,6 +113,7 @@ struct FingerTrajectory {
         guard angle.isFinite, time.isFinite else { return }
         if isReleasing {
             resume(angle: angle, time: time)
+            synchronizeClock(with: time)
             return
         }
         angleOffset = 0
@@ -107,7 +121,14 @@ struct FingerTrajectory {
         count = 1
         times[0] = time
         angles[0] = angle
-        playhead = time - delay
+        // #123: the learned delay counts from now, not from the touch timestamp (which may have been
+        // delivered up to a display frame late). Never start after the touch itself.
+        if let now = clock {
+            playhead = min(time, max(now, time) - delay)
+        } else {
+            playhead = time - delay
+        }
+        synchronizeClock(with: time)
         rate = 1
         marginHistory = SIMD16(repeating: configuration.targetMargin)
         historyIndex = 0
@@ -124,11 +145,29 @@ struct FingerTrajectory {
         guard isActive, endTime == nil, angle.isFinite, time.isFinite, time > newestTime else { return }
         push(time: time, angle: angle + angleOffset)
         hasFreshEvents = true
+        synchronizeClock(with: time)
+    }
+
+    /// L'horloge de l'appelant a au moins atteint `time` : estimation remontée, ou abaissée de 1 µs
+    /// (dérive entre les horloges).
+    private mutating func synchronizeClock(with time: Double) {
+        guard let now = clock else {
+            clock = time
+            return
+        }
+        clock = max(time, now - Self.clockDriftStep)
+    }
+
+    /// Avance l'estimation de l'horloge de `frameCount` échantillons. À appeler à la fin de chaque bloc,
+    /// qu'un geste soit en cours ou non.
+    mutating func advanceClock(frameCount: Int) {
+        if let now = clock { clock = now + Double(frameCount) * samplePeriod }
     }
 
     /// Fin du geste : le relâchement prendra effet quand le rejeu atteindra `time`.
     mutating func end(time: Double) {
         guard isActive, endTime == nil else { return }
+        if time.isFinite { synchronizeClock(with: time) }
         let releaseTime = time.isFinite ? max(time, newestTime) : newestTime
         if releaseTime > newestTime {
             push(time: releaseTime, angle: newestAngle)
@@ -166,7 +205,7 @@ struct FingerTrajectory {
         let marginError = marginHistory.min() - configuration.targetMargin
         let deviation = configuration.rateGain * marginError
         rate = 1 + min(configuration.maximumRateDeviation, max(-configuration.maximumRateDeviation, deviation))
-        let lag = newestTime - playhead
+        let lag = (clock ?? newestTime) - playhead // real delay, measured on the clock estimate
         let learned = delay + configuration.delaySmoothing * (lag - delay)
         delay = min(configuration.maximumDelay, max(configuration.minimumDelay, learned))
     }
