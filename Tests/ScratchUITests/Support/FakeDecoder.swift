@@ -71,6 +71,28 @@ final class FakeDecoder: AudioDecoding, @unchecked Sendable {
 
 /// WAV PCM 16 bits mono minimal : `seed` change le contenu (empreinte SHA-256 distincte).
 enum TestWAV {
+    /// WAV PCM 16 bits de bruit pseudo-aléatoire, à la fréquence et au nombre de canaux voulus
+    /// (mesures de mémoire de la recette 6.3) ; `seed` change le contenu.
+    static func noise(seconds: Double, sampleRate: Int, channels: Int, seed: UInt32) -> Data {
+        let frames = Int((seconds * Double(sampleRate)).rounded())
+        let dataSize = frames * channels * 2
+        var header = Data()
+        func append(_ text: String) { header.append(contentsOf: Array(text.utf8)) }
+        func append32(_ value: Int) { withUnsafeBytes(of: UInt32(value).littleEndian) { header.append(contentsOf: $0) } }
+        func append16(_ value: Int) { withUnsafeBytes(of: UInt16(truncatingIfNeeded: value).littleEndian) { header.append(contentsOf: $0) } }
+        append("RIFF"); append32(36 + dataSize); append("WAVE")
+        append("fmt "); append32(16); append16(1); append16(channels); append32(sampleRate)
+        append32(sampleRate * channels * 2); append16(channels * 2); append16(16)
+        append("data"); append32(dataSize)
+        var samples = [Int16](repeating: 0, count: frames * channels)
+        var state = seed
+        for index in samples.indices {
+            state = state &* 1_664_525 &+ 1_013_904_223
+            samples[index] = Int16(truncatingIfNeeded: Int32(bitPattern: state) >> 18) // about -18 dBFS
+        }
+        return header + samples.withUnsafeBytes { Data($0) }
+    }
+
     static func data(seconds: Double, seed: UInt32 = 1) -> Data {
         let sampleRate = 8_000
         let frames = Int((seconds * Double(sampleRate)).rounded())

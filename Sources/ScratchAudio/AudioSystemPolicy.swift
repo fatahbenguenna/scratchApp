@@ -22,6 +22,26 @@ public enum AudioHostNotice: Equatable, Sendable {
     }
 }
 
+/// Avis publié par l'hôte (story 2.3 CA 8). `id` croît à chaque avis : deux avis identiques successifs
+/// restent distincts.
+public struct PostedAudioNotice: Equatable, Sendable, Identifiable {
+    public let id: Int
+    public let notice: AudioHostNotice
+
+    public init(id: Int, notice: AudioHostNotice) {
+        self.id = id
+        self.notice = notice
+    }
+}
+
+/// Hôte audio qui publie des avis pour les bandeaux (story 2.3 CA 8 ; UX §8.5) : `AudioEngineHost`.
+/// L'`AppModel` affiche chaque nouvel avis. Le contrat `AudioOutputHosting` reste inchangé.
+@MainActor
+public protocol AudioNoticePosting: AnyObject {
+    /// Dernier avis publié, observable.
+    var notice: PostedAudioNotice? { get }
+}
+
 /// Plateforme de l'hôte. La politique est une seule fonction pure, testée sur macOS pour les deux.
 public enum AudioPlatform: Equatable, Sendable {
     case iOS
@@ -86,8 +106,9 @@ public enum AudioHostAction: Equatable, Sendable {
 /// utilisée, une interruption, la réinitialisation des services média ou la veille les mettent à STOP ;
 /// la reprise est toujours manuelle (RM-10). Quand la sortie est indisponible, chaque changement de
 /// route ou de configuration et chaque tic de la minuterie (2 s) relancent un essai (SF-82). Pendant
-/// une interruption iOS, rien ne relance la sortie avant `interruptionEnded`, et aucun `pump()` n'est
-/// demandé tant que l'horloge de secours rend (#96).
+/// une interruption iOS, rien ne relance la sortie avant `interruptionEnded` (ou une réinitialisation
+/// des services média, qui clôt l'interruption), et aucun `pump()` n'est demandé tant que l'horloge
+/// de secours rend (#96).
 public enum AudioSystemPolicy {
     /// Intervalle du nouvel essai tant que la sortie est indisponible (SF-82, D-35).
     public static let retryInterval: Double = 2
@@ -131,9 +152,12 @@ public enum AudioSystemPolicy {
     }
 
     /// Pendant une interruption iOS (#96) : l'horloge de secours rend, donc ni `pump()` ni redémarrage.
-    /// Les pertes de sortie et les réinitialisations arrêtent encore les moteurs. La session et le graphe
-    /// sont reconstruits sans démarrer. La fin de l'interruption reconstruit le graphe sur la route
-    /// courante (elle a pu changer pendant l'appel) et relance la sortie, jamais les moteurs.
+    /// Les pertes de sortie arrêtent encore les moteurs. La fin de l'interruption reconstruit le graphe
+    /// sur la route courante (elle a pu changer pendant l'appel) et relance la sortie, jamais les
+    /// moteurs. iOS ne garantit pas cette fin : une réinitialisation des services média clôt aussi
+    /// l'interruption (la session renaît sans elle) ; STOP, session et graphe reconstruits, puis la
+    /// sortie redémarre (gate de la partie 2). Le retour au premier plan la clôt également
+    /// (`AudioEngineHost.resume()`).
     private static func interruptedActions(for event: AudioSystemEvent) -> [AudioHostAction] {
         switch event {
         case .interruptionBegan:
@@ -147,7 +171,7 @@ public enum AudioSystemPolicy {
         case .configurationChanged:
             return []
         case .mediaServicesReset:
-            return [.stopAllMotors, .resetSession, .rebuildGraph]
+            return [.stopAllMotors, .resetSession, .rebuildGraph, .startOutput]
         case .systemWillSleep:
             return [.stopAllMotors]
         case .systemDidWake:
