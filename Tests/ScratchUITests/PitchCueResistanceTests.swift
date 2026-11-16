@@ -66,13 +66,40 @@ final class PitchCueResistanceTests: XCTestCase {
         XCTAssertEqual(deck.cueAccessibilityValue, "aucun CUE, retour au début")
         deck.setCue()
         XCTAssertEqual(engine.sentCommands, [.setCue(.a)])
-        XCTAssertEqual(deck.setCueCount, 1, "150 ms flash and announcement")
-        XCTAssertEqual(deck.setCueAnnouncement, "Point CUE mémorisé à 12,3 secondes")
+        XCTAssertEqual(deck.setCueCount, 1, "150 ms flash at once")
+        XCTAssertEqual(deck.setCueAnnouncementCount, 0, "announced once the snapshot shows the CUE (#94)")
         deck.recallCue()
         XCTAssertEqual(engine.sentCommands.last, .recallCue(.a))
         let withCue = loadedDeck(cue: 12.34)
         XCTAssertTrue(withCue.hasCue, "CUE indicator lit")
         XCTAssertEqual(withCue.cueAccessibilityValue, "CUE à 12,3 secondes")
+    }
+
+    // #94 — l'annonce dit le CUE mémorisé par le moteur (instantané), pas la position affichée.
+    func testSetCueAnnouncesTheConfirmedCue_94() async {
+        var now = 0.0
+        let deck = loadedDeck(position: 12.39)
+        deck.clock = { now }
+        deck.setCue()
+        now = 0.005
+        deck.apply(DeckSnapshot(clipID: deck.frame.clipID, durationSeconds: 225, positionSeconds: 12.4))
+        XCTAssertEqual(deck.setCueAnnouncementCount, 0, "older snapshot: still waiting")
+        now = 0.02
+        deck.apply(DeckSnapshot(clipID: deck.frame.clipID, durationSeconds: 225, positionSeconds: 12.41,
+                                cueSeconds: 12.405))
+        XCTAssertEqual(deck.setCueAnnouncementCount, 1)
+        XCTAssertEqual(deck.setCueAnnouncement, "Point CUE mémorisé à 12,4 secondes", "the engine's CUE")
+        // Same place again: the CUE does not change, the announcement comes after 100 ms.
+        deck.setCue()
+        now = 0.1
+        deck.apply(DeckSnapshot(clipID: deck.frame.clipID, durationSeconds: 225, positionSeconds: 12.41,
+                                cueSeconds: 12.405))
+        XCTAssertEqual(deck.setCueAnnouncementCount, 1)
+        now = 0.121
+        deck.apply(DeckSnapshot(clipID: deck.frame.clipID, durationSeconds: 225, positionSeconds: 12.41,
+                                cueSeconds: 12.405))
+        XCTAssertEqual(deck.setCueAnnouncementCount, 2)
+        XCTAssertEqual(deck.setCueAnnouncement, "Point CUE mémorisé à 12,4 secondes")
     }
 
     // AC3 — 6.6 « Définir / Rappeler un CUE pendant que je retiens le disque ».

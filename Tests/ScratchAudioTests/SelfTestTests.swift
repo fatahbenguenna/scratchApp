@@ -1,5 +1,6 @@
 import XCTest
 import ScratchCore
+import ScratchLibrary
 @testable import ScratchAudio
 
 /// Self-test de scratch complet (story 2.4 ; spec §7, P0) : mêmes vérifications que
@@ -30,6 +31,18 @@ final class SelfTestTests: XCTestCase {
         XCTAssertEqual(report.checks["cutInWithin1ms"], false)
         XCTAssertEqual(report.checks["noNaN"], true)
         XCTAssertNotNil(try? JSONEncoder().encode(report))
+    }
+
+    /// #90 : le self-test passe par la fabrique partagée `ScratchAudioGraph` (2.1), exacte à
+    /// l'échantillon près : ses mesures sont celles du rendu direct du même scénario.
+    func testSelfTestMatchesTheDirectRender() throws {
+        let report = try SelfTest.run()
+        let demo = DemoSound.makeClip()
+        let direct = ScratchScenario(clipA: demo, clipB: demo).run(on: ScratchEngine()).report
+        XCTAssertEqual(report.checks.filter { $0.key != "renderedThroughAVAudioEngine" }, direct.checks)
+        for (name, value) in direct.details where value.isFinite {
+            XCTAssertEqual(report.details[name], value, "\(name)")
+        }
     }
 
     /// CA4 : exécution en moins de 30 s (build de débogage de la CI compris).

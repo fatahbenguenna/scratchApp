@@ -31,11 +31,10 @@ struct CrossfaderCurveControl: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Courbe du crossfader")
-        .accessibilityValue(mixer.curveText.lowercased())
-        .accessibilityAdjustableAction { direction in
-            mixer.setCrossfaderCurve(mixer.crossfaderCurve + (direction == .increment ? 0.1 : -0.1))
-        }
+        .accessibilityValue(mixer.curveAccessibilityValue)
+        .accessibilityAdjustableAction { mixer.nudgeCrossfaderCurve(steps: $0 == .increment ? 1 : -1) }
         .accessibilityIdentifier("mixer.curve")
+        .keyboardAdjustable(id: "mixer.curve") { mixer.nudgeCrossfaderCurve(steps: $0) }
     }
 }
 

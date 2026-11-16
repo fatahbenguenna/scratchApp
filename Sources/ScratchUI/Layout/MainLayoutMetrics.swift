@@ -75,6 +75,9 @@ struct MainLayoutMetrics: Equatable {
         case .phoneLandscape: return 20
         }
     }
+    /// Visuel de l'aperçu (UX §5.8) : 28 sur Mac, centré dans sa rangée de 32 ; sinon toute la rangée.
+    /// La zone tactile de 44 déborde vers le haut.
+    var overviewVisualHeight: CGFloat { idiom == .mac ? 28 : overviewHeight }
     var transportHeight: CGFloat { idiom == .tablet ? 56 : 44 }
     let resistanceHeight: CGFloat = 44
     let pitchWidth: CGFloat = 44

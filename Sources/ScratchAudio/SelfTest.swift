@@ -6,9 +6,10 @@ import ScratchLibrary
 /// Auto-test hors ligne du pipeline audio complet, lancé par `ScratchApp --selftest` dans la CI
 /// (story 2.4 ; architecture §9.3 ; spec §7, P0).
 ///
-/// Le graphe réel — un `AVAudioSourceNode` stéréo Float32 désentrelacé qui appelle
-/// `ScratchEngine.render`, relié au mélangeur principal — est rendu en **mode manuel hors ligne**
-/// d'`AVAudioEngine`, à 48 kHz, par tranches de 256 trames : aucun périphérique de sortie n'est
+/// Le graphe réel de l'app — la fabrique partagée `ScratchAudioGraph` de la story 2.1 : un
+/// `AVAudioSourceNode` stéréo Float32 désentrelacé qui appelle `ScratchEngine.render`, branché
+/// directement sur la sortie — est rendu en **mode manuel hors ligne** d'`AVAudioEngine`, à 48 kHz,
+/// par tranches de 256 trames, à l'échantillon près comme le rendu direct : aucun périphérique de sortie n'est
 /// nécessaire (runners de CI). Il joue `ScratchScenario` (story 1.5) avec le son de démonstration
 /// sur A et sur B et publie les vérifications nommées de `ScratchScenario.checkNames`, plus
 /// `renderedThroughAVAudioEngine`.
@@ -32,15 +33,8 @@ public enum SelfTest {
         let engine = ScratchEngine(outputSampleRate: sampleRate)
         let scenario = ScratchScenario(clipA: sound, clipB: sound, sampleRate: sampleRate, blockFrames: sliceFrames)
 
-        let audioEngine = AVAudioEngine()
-        guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate,
-                                         channels: 2, interleaved: false) else {
-            throw NSError(domain: "ScratchAudio.SelfTest", code: 1)
-        }
-        try audioEngine.enableManualRenderingMode(.offline, format: format, maximumFrameCount: 512)
-        let source = makeSourceNode(engine: engine, format: format)
-        audioEngine.attach(source)
-        audioEngine.connect(source, to: audioEngine.mainMixerNode, format: format)
+        let graph = try ScratchAudioGraph.offline(engine: engine, sampleRate: sampleRate, maximumFrameCount: 512)
+        let audioEngine = graph.avEngine
         try audioEngine.start()
         defer { audioEngine.stop() }
 
@@ -79,20 +73,5 @@ public enum SelfTest {
         let passed = ScratchScenario.checkNames.allSatisfy { checks[$0] == true }
             && checks["renderedThroughAVAudioEngine"] == true
         return Report(passed: passed, checks: checks, details: details)
-    }
-
-    /// Nœud source du graphe : extrait les deux pointeurs de l'`AudioBufferList` et appelle le
-    /// moteur. Le bloc, créé une seule fois, ne capture que le moteur (fil audio : ni allocation, ni
-    /// verrou, ni journalisation). À remplacer par la fabrique partagée de la story 2.1.
-    static func makeSourceNode(engine: ScratchEngine, format: AVAudioFormat) -> AVAudioSourceNode {
-        // TODO(2.1): utiliser ScratchAudioGraph
-        AVAudioSourceNode(format: format) { _, _, frameCount, bufferList -> OSStatus in
-            let buffers = UnsafeMutableAudioBufferListPointer(bufferList)
-            guard buffers.count >= 2,
-                  let left = buffers[0].mData?.assumingMemoryBound(to: Float.self),
-                  let right = buffers[1].mData?.assumingMemoryBound(to: Float.self) else { return noErr }
-            engine.render(frameCount: Int(frameCount), left: left, right: right)
-            return noErr
-        }
     }
 }

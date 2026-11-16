@@ -53,6 +53,15 @@ struct CrossfaderView: View {
         .accessibilityAction(named: "Centre") { mixer.setCrossfader(0.5) }
         .accessibilityAction(named: "Butée droite") { mixer.setCrossfader(1) }
         .accessibilityIdentifier("mixer.crossfader")
+        .keyboardAdjustable(id: "mixer.crossfader", adjust: { mixer.nudgeCrossfader(steps: $0 > 0 ? 1 : -1) },
+                            shiftArrow: { arrow in
+                                // Physical stops and center, as without focus (D-09).
+                                switch arrow {
+                                case .left: mixer.setCrossfader(0)
+                                case .right: mixer.setCrossfader(1)
+                                case .up, .down: mixer.setCrossfader(0.5)
+                                }
+                            })
     }
 
     /// Lettre d'extrémité ; pastille pleine pendant une coupure momentanée de la voie (UX §5.12).
